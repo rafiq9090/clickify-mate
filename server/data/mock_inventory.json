@@ -1,0 +1,137 @@
+[
+  {
+    "id": "bt-123-s",
+    "name": "Premium T-Shirt",
+    "sku": "bt-123-s",
+    "size": "S",
+    "color": "Black",
+    "price": 490,
+    "stock_quantity": 10
+  },
+  {
+    "id": "bt-123-m",
+    "name": "Premium T-Shirt",
+    "sku": "bt-123-m",
+    "size": "M",
+    "color": "Black",
+    "price": 490,
+    "stock_quantity": 15
+  },
+  {
+    "id": "bt-123-l",
+    "name": "Premium T-Shirt",
+    "sku": "bt-123-l",
+    "size": "L",
+    "color": "Black",
+    "price": 490,
+    "stock_quantity": 12
+  },
+  {
+    "id": "bt-123-xl",
+    "name": "Premium T-Shirt",
+    "sku": "bt-123-xl",
+    "size": "XL",
+    "color": "Black",
+    "price": 490,
+    "stock_quantity": 8
+  },
+  {
+    "id": "bt-123-xxl",
+    "name": "Premium T-Shirt",
+    "sku": "bt-123-xxl",
+    "size": "XXL",
+    "color": "Black",
+    "price": 490,
+    "stock_quantity": 5
+  },
+  {
+    "id": "wt-124-s",
+    "name": "Premium T-Shirt",
+    "sku": "wt-124-s",
+    "size": "S",
+    "color": "White",
+    "price": 490,
+    "stock_quantity": 7
+  },
+  {
+    "id": "wt-124-m",
+    "name": "Premium T-Shirt",
+    "sku": "wt-124-m",
+    "size": "M",
+    "color": "White",
+    "price": 490,
+    "stock_quantity": 14
+  },
+  {
+    "id": "wt-124-l",
+    "name": "Premium T-Shirt",
+    "sku": "wt-124-l",
+    "size": "L",
+    "color": "White",
+    "price": 490,
+    "stock_quantity": 19
+  },
+  {
+    "id": "wt-124-xl",
+    "name": "Premium T-Shirt",
+    "sku": "wt-124-xl",
+    "size": "XL",
+    "color": "White",
+    "price": 490,
+    "stock_quantity": 9
+  },
+  {
+    "id": "wt-124-xxl",
+    "name": "Premium T-Shirt",
+    "sku": "wt-124-xxl",
+    "size": "XXL",
+    "color": "White",
+    "price": 490,
+    "stock_quantity": 4
+  },
+  {
+    "id": "nb-125-s",
+    "name": "Premium T-Shirt",
+    "sku": "nb-125-s",
+    "size": "S",
+    "color": "Navy Blue",
+    "price": 490,
+    "stock_quantity": 11
+  },
+  {
+    "id": "nb-125-m",
+    "name": "Premium T-Shirt",
+    "sku": "nb-125-m",
+    "size": "M",
+    "color": "Navy Blue",
+    "price": 490,
+    "stock_quantity": 18
+  },
+  {
+    "id": "nb-125-l",
+    "name": "Premium T-Shirt",
+    "sku": "nb-125-l",
+    "size": "L",
+    "color": "Navy Blue",
+    "price": 490,
+    "stock_quantity": 16
+  },
+  {
+    "id": "nb-125-xl",
+    "name": "Premium T-Shirt",
+    "sku": "nb-125-xl",
+    "size": "XL",
+    "color": "Navy Blue",
+    "price": 490,
+    "stock_quantity": 10
+  },
+  {
+    "id": "nb-125-xxl",
+    "name": "Premium T-Shirt",
+    "sku": "nb-125-xxl",
+    "size": "XXL",
+    "color": "Navy Blue",
+    "price": 490,
+    "stock_quantity": 6
+  }
+]

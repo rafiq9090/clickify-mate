@@ -1,0 +1,3 @@
+# Placeholder ads.txt - Replace pub-XXXXXXXXXXXXXXXX with your actual Google AdSense Publisher ID
+# Find it in: Google AdSense Dashboard → Account → Account Information → Publisher ID
+google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
