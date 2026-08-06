@@ -1,29 +1,10 @@
 {
-  "name": "clickify-mate",
-  "type": "module",
+  "name": "clickify-mate-monorepo",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
-  },
-  "dependencies": {
-    "@nuxt/ui": "^4.6.0",
-    "@nuxtjs/google-fonts": "^3.2.0",
-    "@supabase/supabase-js": "^2.100.1",
-    "@vueuse/core": "^14.2.1",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^4.2.1",
-    "nuxt": "^4.4.2",
-    "vue": "^3.5.30",
-    "vue-router": "^5.0.4",
-    "vue3-emoji-picker": "^1.1.8",
-    "vuedraggable": "^4.1.0"
-  },
-  "devDependencies": {
-    "@types/node": "^25.5.0",
-    "tsx": "^4.21.0"
+    "dev": "npm --prefix apps/dashboard run dev",
+    "build": "npm --prefix apps/dashboard run build",
+    "generate": "npm --prefix apps/dashboard run generate"
   }
 }

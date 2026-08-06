@@ -1,0 +1,194 @@
+services:
+  # PostgreSQL - Core Relational Data
+  postgres:
+    image: postgres:15-alpine
+    container_name: telegraph_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: clickify_mate
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB - Chat History & Log Records
+  mongodb:
+    image: mongo:6-jammy
+    container_name: telegraph_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: adminpassword
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+  # Redis - High-speed Queue Broker & Session Cache
+  redis:
+    image: redis:7-alpine
+    container_name: telegraph_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # Python Agent AI Service (FastAPI)
+  agent_ai:
+    build:
+      context: ./services/agent_ai
+      dockerfile: Dockerfile
+    container_name: telegraph_agent_ai
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/clickify_mate
+      - IMAGE_VERIFIER_URL=image_verifier:5002
+      - PYTHONPATH=/app:/app/app/grpc_stubs
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Go Ingestion & Orchestration Service
+  orchestrator:
+    build:
+      context: ./services/orchestrator
+      dockerfile: Dockerfile
+    container_name: telegraph_orchestrator
+    ports:
+      - "5001:5001"
+      - "5003:5003"
+    environment:
+      - REDIS_ADDR=redis:6379
+      - PORT=5001
+      - GRPC_PORT=5003
+      - WHATSAPP_FORWARD_URL=http://agent_ai:8000/webhook/whatsapp
+      - TELEGRAM_FORWARD_URL=http://webhook_rust:5004/webhook/telegram
+      - FACEBOOK_FORWARD_URL=http://webhook_rust:5004/webhook/facebook
+    depends_on:
+      redis:
+        condition: service_started
+      agent_ai:
+        condition: service_started
+      webhook_rust:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Rust Image Verification Service (OCR & Screenshot fingerprinting)
+  image_verifier:
+    build:
+      context: ./services/image_verifier
+      dockerfile: Dockerfile
+    container_name: telegraph_image_verifier
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+
+  # Rust Webhook & Cryptography Service (AES-256-GCM engine & Webhook dispatcher)
+  webhook_rust:
+    build:
+      context: ./services/webhook_rust
+      dockerfile: Dockerfile
+    container_name: telegraph_webhook_rust
+    ports:
+      - "5004:5004"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/clickify_mate
+      - AGENT_ENCRYPTION_KEY=${AGENT_ENCRYPTION_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Loki - Centralized Log DB
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: telegraph_loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  # Promtail - Log Shipping Agent
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: telegraph_promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # Prometheus - Metrics Scraping Server
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: telegraph_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  # Alertmanager - Alert routing
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: telegraph_alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    restart: unless-stopped
+
+  # Grafana - Dashboards & Visualization UI
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: telegraph_grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - loki
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  loki_data:
+  grafana_data:
+  prometheus_data:
+

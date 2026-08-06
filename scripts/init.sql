@@ -1,25 +1,22 @@
--- ============================================================
--- USERS TABLE (Dashboard Auth)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.users (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
+-- Mock roles and schemas for compatibility with Supabase structures
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+        CREATE ROLE authenticated;
+    END IF;
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN
+        CREATE ROLE anon;
+    END IF;
+END
+$$;
 
--- Index for fast email lookup on login
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users (email);
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS UUID AS $$
+BEGIN
+    RETURN '00000000-0000-0000-0000-000000000000'::uuid;
+END;
+$$ LANGUAGE plpgsql;
 
--- Enable Row Level Security
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-
--- Only the row owner can read/update their own record
-CREATE POLICY "Users can manage own record" ON public.users
-    FOR ALL USING (true);
-
--- ============================================================
 -- Create Generations table to store AI results
 CREATE TABLE IF NOT EXISTS public.generations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -172,7 +169,6 @@ CREATE TABLE IF NOT EXISTS public.visitors (
 ALTER TABLE public.visitors ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable all for all visitors" ON public.visitors FOR ALL USING (true);
 
--- Create Agent Configurations for secure social media connection
 CREATE TABLE IF NOT EXISTS public.agent_configs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL, -- Link to a future Auth system

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package verifier;
+
+service ImageVerifier {
+  // Checks payment receipt image bytes, validates authenticity, and extracts transaction identifiers
+  rpc VerifyReceipt (VerifyRequest) returns (VerifyResponse);
+}
+
+message VerifyRequest {
+  string event_id = 1;
+  string image_base64 = 2;
+  double expected_amount = 3;
+}
+
+message VerifyResponse {
+  bool is_valid = 1;
+  string transaction_id = 2;
+  double amount_detected = 3;
+  string hash_signature = 4;
+  string error_message = 5;
+}

@@ -1,0 +1,20 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+supabase
+httpx
+pydub
+python-multipart
+pyjwt
+groq
+gtts
+audioop-lts; python_version >= "3.13"
+psycopg2-binary
+grpcio
+grpcio-tools
+
+
+
+
+

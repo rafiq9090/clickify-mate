@@ -1,0 +1,553 @@
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+/* Text fonts are managed via @nuxtjs/google-fonts in nuxt.config.ts */
+@import "tailwindcss";
+
+/* =========================
+   THEME TOKENS
+========================= */
+@theme {
+  /* Primary — Royal Blue */
+  --color-primary:         #2575FC;
+  --color-primary-accent:  #1A56DB;
+
+  /* Secondary — Purple */
+  --color-secondary:       #8E2DE2;
+  --color-secondary-accent:#4A00E0;
+
+  /* Tertiary / Neutral */
+  --color-tertiary:        #2575FC;
+  --color-neutral:         #1A1A1A;
+
+  /* Semantic layout tokens (resolved per-theme below) */
+  --color-background:          var(--bg);
+  --color-on-background:       var(--on-bg);
+  --color-surface:             var(--surface);
+  --color-surface-hover:       var(--surface-hover);
+  --color-outline:             var(--outline);
+  --color-on-surface:          var(--on-surface);
+  --color-on-surface-variant:  var(--on-surface-variant);
+
+  /* Dashboard-specific tokens */
+  --color-card-bg:        var(--card-bg);
+  --color-card-border:    var(--card-border);
+  --color-card-text:      var(--card-text);
+  --color-muted:          var(--muted);
+  --color-heading:        var(--heading);
+  --color-badge-bg:       var(--badge-bg);
+
+  /* Platform chat colours */
+  --color-whatsapp-bg:      #0b141a;
+  --color-whatsapp-header:  #1f2c34;
+  --color-whatsapp-bubble:  #202c33;
+  --color-telegram-bg:      #0e1621;
+  --color-telegram-header:  #24303f;
+  --color-telegram-bubble:  #182533;
+
+  /* Fonts */
+  --font-headline:     "Hanken Grotesk", sans-serif;
+  --font-body:         "Hanken Grotesk", "Noto Sans Bengali", sans-serif;
+  --font-leckerli-one: "Leckerli One", cursive;
+}
+
+/* ─────────────────────────────────────────
+   LIGHT MODE (default)
+───────────────────────────────────────── */
+:root {
+  --bg:                #F4F6FB;
+  --on-bg:             #0F172A;
+  --surface:           #FFFFFF;
+  --surface-hover:     #EEF2FF;
+  --outline:           #E2E8F0;
+  --on-surface:        #0F172A;
+  --on-surface-variant:#64748B;
+
+  /* Dashboard cards */
+  --card-bg:           rgba(255,255,255,0.85);
+  --card-border:       rgba(226,232,240,0.9);
+  --card-text:         #1E293B;
+  --muted:             #64748B;
+  --heading:           #0F172A;
+  --badge-bg:          rgba(37,117,252,0.08);
+
+  color-scheme: light;
+}
+
+/* ─────────────────────────────────────────
+   DARK MODE
+───────────────────────────────────────── */
+.dark {
+  --bg:                #0D0F16;
+  --on-bg:             #F1F5F9;
+  --surface:           #161A24;
+  --surface-hover:     #1E2433;
+  --outline:           #2D3447;
+  --on-surface:        #F1F5F9;
+  --on-surface-variant:#94A3B8;
+
+  /* Dashboard cards */
+  --card-bg:           rgba(22,26,36,0.7);
+  --card-border:       rgba(255,255,255,0.07);
+  --card-text:         #E2E8F0;
+  --muted:             #64748B;
+  --heading:           #F1F5F9;
+  --badge-bg:          rgba(37,117,252,0.12);
+
+  color-scheme: dark;
+}
+
+/* ─────────────────────────────────────────
+   ROOT / BODY
+───────────────────────────────────────── */
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--on-bg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.4s cubic-bezier(0.4,0,0.2,1),
+              color 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ─────────────────────────────────────────
+   TYPOGRAPHY
+───────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-headline);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--heading);
+}
+
+/* ─────────────────────────────────────────
+   DASHBOARD LAYOUT HELPERS
+───────────────────────────────────────── */
+
+/* Sidebar */
+.dash-sidebar {
+  background: var(--surface);
+  border-color: var(--outline);
+}
+
+/* Navigation items */
+.dash-nav-item {
+  color: var(--on-surface-variant);
+  border-color: transparent;
+  background: transparent;
+  transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+}
+.dash-nav-item:hover {
+  color: var(--color-primary);
+  background: rgba(37,117,252,0.06);
+}
+.dash-nav-item.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 18px rgba(37,117,252,0.25);
+}
+
+/* Section card — used everywhere in the dashboard */
+.dash-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.5rem;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.dark .dash-card {
+  box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+}
+.dash-card:hover {
+  border-color: rgba(37,117,252,0.25);
+}
+
+/* Section headings */
+.dash-section-title {
+  color: var(--heading);
+}
+
+/* Body text inside cards */
+.dash-body-text {
+  color: var(--on-surface-variant);
+}
+
+/* Input fields */
+.dash-input {
+  background: var(--surface-hover);
+  border: 1px solid var(--outline);
+  color: var(--on-surface);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+.dash-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37,117,252,0.12);
+}
+
+/* Terminal / code output box */
+.dash-terminal {
+  background: #f0f4f8;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 1.5rem;
+  color: #1e293b;
+}
+.dark .dash-terminal {
+  background: #07080e;
+  border-color: rgba(255,255,255,0.07);
+  color: #e2e8f0;
+}
+/* Terminal mono text inside */
+.dash-terminal .font-mono { color: #475569; }
+.dark .dash-terminal .font-mono { color: #94a3b8; }
+
+
+/* Pill badge */
+.dash-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.dash-badge-primary {
+  background: rgba(37,117,252,0.1);
+  border: 1px solid rgba(37,117,252,0.2);
+  color: var(--color-primary);
+}
+.dash-badge-success {
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,0.2);
+  color: #22c55e;
+}
+.dash-badge-warning {
+  background: rgba(234,179,8,0.1);
+  border: 1px solid rgba(234,179,8,0.2);
+  color: #ca8a04;
+}
+.dash-badge-danger {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: #ef4444;
+}
+.dash-badge-muted {
+  background: rgba(100,116,139,0.1);
+  border: 1px solid rgba(100,116,139,0.15);
+  color: var(--muted);
+}
+
+/* URL / copy strip */
+.dash-copy-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface-hover);
+  border: 1px solid var(--outline);
+  border-radius: 0.75rem;
+  padding: 0.6rem 1rem;
+}
+.dark .dash-copy-strip {
+  background: rgba(0,0,0,0.3);
+  border-color: rgba(255,255,255,0.06);
+}
+.dash-copy-strip span.url {
+  font-family: ui-monospace, monospace;
+  font-size: 0.65rem;
+  color: var(--on-surface-variant);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-copy-strip button {
+  color: var(--muted);
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+.dash-copy-strip button:hover { color: var(--color-primary); }
+
+/* Divider */
+.dash-divider {
+  border-color: var(--outline);
+}
+
+/* Empty-state container */
+.dash-empty {
+  border: 1.5px dashed var(--outline);
+  border-radius: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  gap: 0.75rem;
+}
+
+/* ─────────────────────────────────────────
+   ICONS
+───────────────────────────────────────── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+/* ─────────────────────────────────────────
+   COMPONENT LAYER (Tailwind compat)
+───────────────────────────────────────── */
+@layer components {
+
+  .premium-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+  .premium-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 10px 30px rgba(37,117,252,0.1);
+    transform: translateY(-4px);
+  }
+
+  .premium-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary);
+    color: #fff;
+    padding: 0.75rem 2rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    font-family: var(--font-headline);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+    box-shadow: 0 4px 12px rgba(37,117,252,0.22);
+  }
+  .premium-btn-primary:hover {
+    background: var(--color-primary-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(37,117,252,0.32);
+  }
+
+  .premium-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    color: var(--on-surface);
+    border: 1px solid var(--outline);
+    padding: 0.75rem 2rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+  }
+  .premium-btn-secondary:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+  }
+
+  .premium-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--outline);
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--on-surface);
+    padding: 0.75rem 1rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .premium-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37,117,252,0.13);
+  }
+}
+
+/* ─────────────────────────────────────────
+   ANIMATIONS
+───────────────────────────────────────── */
+@keyframes heroReveal {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-hero-reveal {
+  animation: heroReveal 0.8s cubic-bezier(0.2,0.8,0.2,1) forwards;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-gradient-text {
+  background-size: 200% auto;
+  animation: gradientShift 4s linear infinite;
+}
+
+/* ─────────────────────────────────────────
+   SCROLLBAR
+───────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+html, body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary) transparent;
+}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary);
+  border-radius: 20px;
+}
+.dark ::-webkit-scrollbar-track { background: #0a0c14; }
+
+::selection {
+  background: rgba(37,117,252,0.22);
+  color: #fff;
+}
+
+/* ─────────────────────────────────────────
+   UTILITY
+───────────────────────────────────────── */
+.dark { color-scheme: dark; }
+
+.gpu-accelerated {
+  transform: translate3d(0,0,0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform;
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(37,117,252,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37,117,252,0.04) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+.dark .grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #4A00E0 0%, #8E2DE2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glow-bg {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(37,117,252,0.13) 0%, rgba(255,255,255,0) 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  z-index: -1;
+}
+
+/* ─────────────────────────────────────────
+   DASHBOARD ADAPTIVE LIGHT-MODE OVERRIDES
+   These fix hardcoded dark-only Tailwind patterns
+   (bg-surface/40, border-white/10, text-white/XX etc.)
+   when the user is NOT in dark mode.
+───────────────────────────────────────── */
+
+/* ── Cards / containers ── */
+:root .dash-page .bg-surface\/40,
+:root .dash-page .bg-surface\/50,
+:root .dash-page .bg-surface\/60 {
+  background: rgba(255,255,255,0.85) !important;
+}
+
+/* ── Borders ── */
+:root .dash-page .border-white\/10,
+:root .dash-page .border-white\/5 {
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* ── Inline bg tints used for sub-rows / hover cells ── */
+:root .dash-page .bg-white\/5 {
+  background: rgba(0,0,0,0.03) !important;
+}
+:root .dash-page .bg-black\/20,
+:root .dash-page .bg-black\/40 {
+  background: rgba(0,0,0,0.04) !important;
+}
+
+/* ── Text colours ── */
+:root .dash-page .text-white\/80,
+:root .dash-page .text-white\/90 {
+  color: var(--on-surface) !important;
+}
+:root .dash-page .text-white\/70 {
+  color: rgba(15,23,42,0.8) !important;
+}
+:root .dash-page .text-white\/60,
+:root .dash-page .text-white\/50 {
+  color: rgba(15,23,42,0.6) !important;
+}
+:root .dash-page .text-white\/40,
+:root .dash-page .text-white\/30 {
+  color: rgba(15,23,42,0.45) !important;
+}
+:root .dash-page .text-white\/20,
+:root .dash-page .text-white\/25 {
+  color: rgba(15,23,42,0.3) !important;
+}
+
+/* ── Terminal panel ── */
+:root .dash-page .bg-\[\#0a0a0a\] {
+  background: #f1f5f9 !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+:root .dash-page .bg-\[\#0a0a0a\] .text-emerald-300 {
+  color: #15803d !important;
+}
+:root .dash-page .bg-\[\#0a0a0a\] pre {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.07) !important;
+}
+
+/* ── Dividers ── */
+:root .dash-page .border-white\/5,
+:root .dash-page .border-t.border-white\/5 {
+  border-color: rgba(0,0,0,0.06) !important;
+}
+
+/* ── Step number circles ── */
+:root .dash-page .bg-white\/5.border-white\/10 {
+  background: rgba(0,0,0,0.05) !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* ── Select / textarea inputs ── */
+:root .dash-page select.bg-black\/20,
+:root .dash-page textarea.bg-black\/20 {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.1) !important;
+  color: var(--on-surface) !important;
+}
+
+/* ── Dashed empty-state borders ── */
+:root .dash-page .border-dashed.border-white\/10 {
+  border-color: rgba(0,0,0,0.12) !important;
+}

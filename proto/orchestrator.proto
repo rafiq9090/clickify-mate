@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package orchestrator;
+
+option go_package = "clickify-mate/services/orchestrator/internal/transport/grpc;grpc";
+
+service AgentOrchestrator {
+  // Processes an incoming social platform event (WhatsApp, Telegram, Facebook)
+  rpc ProcessEvent (EventRequest) returns (EventResponse);
+
+  // Queries product inventory stock status
+  rpc CheckStock (StockRequest) returns (StockResponse);
+}
+
+message EventRequest {
+  string event_id = 1;
+  string platform = 2;
+  string agent_id = 3;
+  string sender_id = 4;
+  string content = 5;
+  string message_type = 6;
+  string payload_json = 7;
+}
+
+message EventResponse {
+  bool success = 1;
+  string reply_text = 2;
+  int32 tokens_used = 3;
+  string error_message = 4;
+}
+
+message StockRequest {
+  string sku = 1;
+}
+
+message StockResponse {
+  bool exists = 1;
+  string name = 2;
+  int32 stock = 3;
+  double price = 4;
+}
