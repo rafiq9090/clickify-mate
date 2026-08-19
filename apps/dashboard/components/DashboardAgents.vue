@@ -1,294 +1,520 @@
 <template>
-  <section class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-    <div class="flex items-center justify-between">
-      <h2 class="text-xl font-black tracking-tight flex items-center gap-3 text-on-surface">
-        <span class="w-2 h-8 bg-primary rounded-full"></span>
-        Connected AI Agents
-      </h2>
-      <button @click="$emit('open-connect-modal')" class="text-[10px] font-black uppercase tracking-[0.2em] text-primary hover:underline cursor-pointer bg-transparent border-none p-0">Deploy New Agent +</button>
+  <section class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline/40">
+      <div>
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined text-xl">smart_toy</span>
+          </div>
+          <h2 class="text-xl font-bold tracking-tight text-on-surface">Connected AI Agents</h2>
+        </div>
+        <p class="text-xs text-on-surface-variant mt-1">
+          Manage platform routing, training knowledge, and catalog automation for each channel.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button 
+          @click="$emit('switch-tab', 'catalog')"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-base text-secondary">photo_library</span>
+          <span>Open Product Catalog</span>
+        </button>
+
+        <button 
+          @click="$emit('open-connect-modal')" 
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-all shadow-sm hover:shadow-md active:scale-98 cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-base">add</span>
+          Connect New Agent
+        </button>
+      </div>
     </div>
 
-    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-      <div v-for="i in 3" :key="i" class="h-64 bg-surface-container-low animate-pulse rounded-[3rem]"></div>
+    <!-- Loading Skeleton -->
+    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-for="i in 3" :key="i" class="h-80 bg-surface/50 border border-outline/50 animate-pulse rounded-2xl"></div>
     </div>
 
-    <div v-else-if="agents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-      <div v-for="agent in agents" :key="agent.id" class="bg-surface/40 border border-outline/70 p-5 md:p-8 rounded-[0.9rem] shadow-sm group hover:border-primary/30 transition-all relative overflow-hidden">
-        <div class="flex items-start justify-between mb-8">
-          <div class="flex items-center gap-4">
-            <div class="w-14 h-14 bg-surface-hover rounded-2xl flex items-center justify-center text-2xl border border-outline">
-              <span class="material-symbols-outlined">support_agent</span>
+    <!-- Agents Grid -->
+    <div v-else-if="agents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div 
+        v-for="agent in agents" 
+        :key="agent.id" 
+        class="bg-surface border border-outline/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group hover:border-primary/40 relative"
+      >
+        <!-- Top Agent Header -->
+        <div>
+          <div class="flex items-start justify-between gap-3 mb-4">
+            <div class="flex items-center gap-3">
+              <div 
+                class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-transform group-hover:scale-105"
+                :class="getPlatformIconClass(agent.platform)"
+              >
+                <span class="material-symbols-outlined">{{ getPlatformIcon(agent.platform) }}</span>
+              </div>
+              <div class="min-w-0">
+                <h3 class="text-sm font-bold text-on-surface truncate capitalize flex items-center gap-1.5" :title="agent.name || formatPlatformName(agent.platform)">
+                  {{ agent.name || (formatPlatformName(agent.platform) + ' Agent') }}
+                </h3>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="text-[11px] text-on-surface-variant font-mono">
+                    ID: ...{{ agent.id.slice(-6) }}
+                  </span>
+                  <button 
+                    @click="$emit('copy-text', agent.id, 'Agent ID')" 
+                    class="text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer"
+                    title="Copy full Agent ID"
+                  >
+                    <span class="material-symbols-outlined text-[13px]">content_copy</span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 class="font-black text-lg text-on-surface">{{ formatPlatformName(agent.platform) }} Agent</h3>
-              <div class="flex items-center gap-2 group/id cursor-pointer" @click="$emit('copy-text', agent.id)" title="Click to copy full ID">
-                <p class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40">ID: ...{{ agent.id.slice(-6) }}</p>
-                <span class="material-symbols-outlined text-[10px] opacity-0 group-hover/id:opacity-100 transition-opacity">content_copy</span>
+
+            <!-- Platform Badge & Toggle -->
+            <div class="flex flex-col items-end gap-1.5 shrink-0">
+              <button 
+                type="button"
+                @click="$emit('toggle-agent-status', agent)"
+                class="px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                :class="agent.is_active ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'"
+                :title="agent.is_active ? 'Click to Pause this Agent' : 'Click to Start / Resume this Agent'"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="agent.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+                <span>{{ agent.is_active ? 'Active (Click to Pause)' : 'Paused (Click to Start)' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Channel Specific Badge -->
+          <div class="mb-4 flex items-center gap-1.5 text-xs text-on-surface-variant">
+            <span class="font-medium text-on-surface">Target Channel:</span>
+            <span class="capitalize font-semibold text-primary">
+              {{ formatPlatformName(agent.platform) }}
+            </span>
+            <span v-if="agent.external_id" class="text-[11px] font-mono text-on-surface-variant/70">
+              ({{ agent.external_id }})
+            </span>
+          </div>
+
+          <!-- Internal Card Tabs -->
+          <div class="flex items-center gap-1 p-1 bg-surface-hover/50 rounded-xl mb-4 border border-outline/40">
+            <button 
+              type="button"
+              @click="agent.activeCardTab = 'knowledge'" 
+              class="flex-1 py-1.5 text-xs rounded-lg font-medium transition-all cursor-pointer"
+              :class="(!agent.activeCardTab || agent.activeCardTab === 'knowledge') ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-on-surface-variant hover:text-on-surface'"
+            >
+              Knowledge
+            </button>
+            <button 
+              type="button"
+              @click="agent.activeCardTab = 'catalog'" 
+              class="flex-1 py-1.5 text-xs rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-1"
+              :class="agent.activeCardTab === 'catalog' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-on-surface-variant hover:text-on-surface'"
+            >
+              <span>Catalog</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary/10 text-primary font-bold">
+                {{ getAgentCatalogProducts(agent).length + (agent.product_images || []).length }}
+              </span>
+            </button>
+            <button 
+              type="button"
+              @click="agent.activeCardTab = 'behavior'" 
+              class="flex-1 py-1.5 text-xs rounded-lg font-medium transition-all cursor-pointer"
+              :class="agent.activeCardTab === 'behavior' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-on-surface-variant hover:text-on-surface'"
+            >
+              Settings
+            </button>
+          </div>
+
+          <!-- Tab Content: Knowledge / Instructions -->
+          <div v-show="!agent.activeCardTab || agent.activeCardTab === 'knowledge'" class="mb-4 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-on-surface-variant flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm text-primary">psychology</span>
+                Product Instructions &amp; Rules
+              </span>
+              <button 
+                type="button" 
+                @click="$emit('show-guide')" 
+                class="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+              >
+                Blueprint Guide
+              </button>
+            </div>
+            
+            <textarea 
+              v-model="agent.knowledge" 
+              @input="agent.isDirty = true" 
+              rows="6"
+              placeholder="Enter product catalog, price, return policy, delivery fees..."
+              class="w-full bg-surface-hover/50 border border-outline rounded-xl p-3 text-xs text-on-surface outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all resize-none leading-relaxed"
+            ></textarea>
+
+            <div class="text-right text-[11px] text-on-surface-variant font-mono">
+              {{ (agent.knowledge || '').length }} characters
+            </div>
+          </div>
+
+          <!-- Tab Content: Live Product Catalog & Photos (Synchronized with Catalog + Overrides) -->
+          <div v-show="agent.activeCardTab === 'catalog'" class="mb-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sm text-secondary">photo_library</span>
+                Connected Products ({{ getAgentCatalogProducts(agent).length }})
+              </span>
+              <span class="text-[10px] text-emerald-500 font-semibold font-mono">B2 Cloud Ready</span>
+            </div>
+
+            <!-- List of Synchronized Catalog Products -->
+            <div class="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden agent-scroll pr-1">
+              
+              <!-- 1. Products from Central Product Catalog -->
+              <div 
+                v-for="prod in getAgentCatalogProducts(agent)" 
+                :key="prod.sku || prod.id"
+                class="p-2.5 rounded-xl bg-surface-hover/60 border border-outline/70 space-y-1.5"
+              >
+                <div class="flex items-center gap-2.5">
+                  <!-- Hero Image Thumbnail -->
+                  <div class="w-11 h-11 rounded-lg bg-surface flex items-center justify-center overflow-hidden border border-outline shrink-0 relative">
+                    <img 
+                      v-if="getProductHero(prod)" 
+                      :src="resolveImage(getProductHero(prod))" 
+                      class="w-full h-full object-cover" 
+                      @error="prod.image = ''" 
+                    />
+                    <span v-else class="material-symbols-outlined text-xs text-on-surface-variant/40">inventory_2</span>
+                  </div>
+
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-1">
+                      <span class="font-bold text-xs text-on-surface truncate">{{ prod.name }}</span>
+                      <span class="text-xs font-semibold text-primary shrink-0">৳{{ prod.price }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20 uppercase">
+                        {{ prod.sku }}
+                      </span>
+                      <span class="text-[10px] text-on-surface-variant/70">
+                        Stock: {{ prod.stock_quantity }}
+                      </span>
+                      <span v-if="(prod.images || []).length > 1" class="text-[10px] text-secondary font-semibold">
+                        📷 {{ prod.images.length }} photos
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Mini Photo Gallery Preview if Multiple Images -->
+                <div v-if="(prod.images || []).length > 1" class="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+                  <div 
+                    v-for="(gImg, gIdx) in prod.images" 
+                    :key="gIdx"
+                    class="w-6 h-6 rounded-md bg-surface border border-outline/60 overflow-hidden shrink-0"
+                    :title="gImg.role"
+                  >
+                    <img :src="resolveImage(gImg.url)" class="w-full h-full object-cover" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Direct Agent Photo Overrides -->
+              <div 
+                v-for="(img, idx) in agent.product_images" 
+                :key="'custom-' + idx" 
+                class="p-2.5 rounded-xl bg-surface-hover/60 border border-outline/60 space-y-2"
+              >
+                <div class="flex items-center gap-2.5">
+                  <div class="w-11 h-11 rounded-lg bg-surface flex items-center justify-center overflow-hidden border border-outline shrink-0 relative">
+                    <img 
+                      v-if="img.url" 
+                      :src="resolveImage(img.url)" 
+                      class="w-full h-full object-cover" 
+                      @error="img.url = ''" 
+                    />
+                    <span v-else class="material-symbols-outlined text-xs text-on-surface-variant/40">image</span>
+                  </div>
+
+                  <div class="flex-1 min-w-0 space-y-1">
+                    <div class="flex items-center gap-1.5">
+                      <input 
+                        v-model="img.id"
+                        @input="agent.isDirty = true"
+                        placeholder="SKU / ID (e.g. HOODIE-01)"
+                        class="flex-1 min-w-0 bg-surface px-2.5 py-1 rounded-lg text-xs font-semibold text-primary outline-none border border-outline focus:border-primary/50 transition-colors uppercase font-mono"
+                      />
+                      <label class="p-1.5 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-white transition-colors cursor-pointer shrink-0" title="Upload from Device">
+                        <input type="file" accept="image/*" class="hidden" @change="handleFileUpload($event, img, agent)" />
+                        <span class="material-symbols-outlined text-xs">upload_file</span>
+                      </label>
+                      <button 
+                        type="button" 
+                        @click="removeAgentImage(agent, idx)"
+                        class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                        title="Remove"
+                      >
+                        <span class="material-symbols-outlined text-xs">close</span>
+                      </button>
+                    </div>
+
+                    <input 
+                      v-model="img.url"
+                      @input="agent.isDirty = true"
+                      placeholder="Image URL or upload..."
+                      class="w-full bg-surface px-2 py-1 rounded-lg text-[11px] text-on-surface outline-none border border-outline/70 focus:border-primary/50 transition-colors truncate"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty Notice if no products found -->
+              <div v-if="getAgentCatalogProducts(agent).length === 0 && (agent.product_images || []).length === 0" class="py-6 text-center text-xs text-on-surface-variant/70 border border-dashed border-outline/60 rounded-xl space-y-1.5">
+                <span class="material-symbols-outlined text-2xl text-on-surface-variant/40">add_shopping_cart</span>
+                <p>No products assigned to this agent yet.</p>
+                <button 
+                  @click="$emit('switch-tab', 'catalog')" 
+                  class="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                >
+                  + Add Products in Product Catalog
+                </button>
+              </div>
+
+              <!-- Quick Add Direct Image Button -->
+              <button 
+                type="button"
+                @click="addAgentImage(agent)"
+                class="w-full py-2 border border-dashed border-outline/80 rounded-xl flex items-center justify-center gap-1.5 text-xs text-on-surface-variant hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-sm">add_circle</span>
+                <span>+ Add Direct Custom Image</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tab Content: Behavior & Settings -->
+          <div v-show="agent.activeCardTab === 'behavior'" class="mb-4 space-y-3.5">
+            <!-- Facebook specific options -->
+            <div v-if="agent.platform === 'fb_comment'" class="space-y-2 text-xs">
+              <span class="font-semibold text-on-surface block pb-1 border-b border-outline/40">Comment Automations</span>
+              <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
+                <input type="checkbox" v-model="agent.agent_behavior.fb_private_reply_prices" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
+                <span>Auto-DM prices to comments</span>
+              </label>
+              <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
+                <input type="checkbox" v-model="agent.agent_behavior.fb_public_reply_enabled" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
+                <span>Enable public replies on comments</span>
+              </label>
+              <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
+                <input type="checkbox" v-model="agent.agent_behavior.fb_delete_negatives" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
+                <span>Auto-delete spam/negative comments</span>
+              </label>
+            </div>
+
+            <!-- General Options -->
+            <div class="space-y-2 text-xs">
+              <span class="font-semibold text-on-surface block pb-1 border-b border-outline/40">Response Settings</span>
+              <div class="flex items-center justify-between">
+                <span class="text-on-surface-variant">Conversation Tone</span>
+                <select 
+                  v-model="agent.agent_behavior.tone" 
+                  @change="agent.isDirty = true"
+                  class="bg-surface-hover border border-outline rounded-lg px-2.5 py-1 text-xs text-on-surface outline-none cursor-pointer"
+                >
+                  <option value="Friendly">Friendly &amp; Helpful</option>
+                  <option value="Professional">Professional / Formal</option>
+                  <option value="Bangla-English">Bangla-English (Casual)</option>
+                </select>
               </div>
             </div>
           </div>
-          <div :class="agent.is_active ? 'bg-success/10 text-success' : 'bg-outline-variant/20 text-on-surface-variant'" class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 border border-current/10">
-            <span class="w-1.5 h-1.5 rounded-full bg-current" :class="agent.is_active ? 'animate-pulse' : ''"></span>
-            {{ agent.is_active ? 'Active' : 'Offline' }}
-          </div>
         </div>
 
-        <!-- Card Tabs -->
-        <div class="flex border-b border-outline mb-4 overflow-x-auto bg-surface-hover/30 p-1 rounded-xl gap-1 shrink-0">
+        <!-- Card Footer -->
+        <div class="pt-3 border-t border-outline/50 flex flex-col gap-2">
+          <!-- Sync Changes Button -->
+          <button 
+            v-if="agent.isDirty" 
+            type="button"
+            @click="$emit('update-knowledge', agent)" 
+            class="w-full py-2.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-base">cloud_sync</span>
+            <span>Save &amp; Sync Agent</span>
+          </button>
+
+          <!-- Disconnect Agent Button -->
           <button 
             type="button"
-            @click="agent.activeCardTab = 'knowledge'"
-            :class="agent.activeCardTab === 'knowledge' ? 'bg-primary/10 text-primary border-primary/20' : 'text-on-surface-variant hover:text-on-surface border-transparent'"
-            class="flex-1 py-1.5 px-2.5 text-[9px] font-black uppercase tracking-wider rounded-lg border text-center transition-all whitespace-nowrap"
-          >
-            Knowledge
-          </button>
-          <button 
-            type="button"
-            @click="agent.activeCardTab = 'catalog'"
-            :class="agent.activeCardTab === 'catalog' ? 'bg-primary/10 text-primary border-primary/20' : 'text-on-surface-variant hover:text-on-surface border-transparent'"
-            class="flex-1 py-1.5 px-2.5 text-[9px] font-black uppercase tracking-wider rounded-lg border text-center transition-all whitespace-nowrap"
-          >
-            Catalog
-          </button>
-          <button 
-            type="button"
-            @click="agent.activeCardTab = 'behavior'"
-            :class="agent.activeCardTab === 'behavior' ? 'bg-primary/10 text-primary border-primary/20' : 'text-on-surface-variant hover:text-on-surface border-transparent'"
-            class="flex-1 py-1.5 px-2.5 text-[9px] font-black uppercase tracking-wider rounded-lg border text-center transition-all whitespace-nowrap"
-          >
-            Routing & Webhook
-          </button>
-        </div>
-
-        <!-- Tab Content: Knowledge -->
-        <div v-show="agent.activeCardTab === 'knowledge'" class="mb-4 p-4 bg-surface-hover border border-outline rounded-[0.9rem] relative animate-in fade-in duration-200">
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-primary/60">
-              <span class="material-symbols-outlined text-sm">psychology</span>
-              Agent Rules & Info
-              <button @click="$emit('show-guide')" class="text-[9px] text-primary/80 hover:text-primary underline ml-1 cursor-pointer transition-colors bg-transparent border-none p-0 normal-case tracking-normal">Help Guide</button>
-            </div>
-            <span class="text-[8px] font-mono text-on-surface-variant/40">{{ (agent.knowledge || '').length }} chars</span>
-          </div>
-          
-          <!-- Inline Template Loaders -->
-          <div class="flex flex-wrap gap-1.5 mb-3 border-b border-outline/30 pb-2">
-            <span class="text-[8px] font-black uppercase tracking-widest text-on-surface-variant/50 flex items-center">Pre-populate:</span>
-            <button 
-              type="button"
-              @click="agent.knowledge = singleProductTemplate; agent.isDirty = true"
-              class="px-2 py-0.5 bg-surface/50 border border-outline hover:border-primary/30 text-on-surface-variant hover:text-primary rounded text-[8px] font-black uppercase transition-colors"
-            >
-              Single
-            </button>
-            <button 
-              type="button"
-              @click="agent.knowledge = multiProductTemplate; agent.isDirty = true"
-              class="px-2 py-0.5 bg-surface/50 border border-outline hover:border-primary/30 text-on-surface-variant hover:text-primary rounded text-[8px] font-black uppercase transition-colors"
-            >
-              Multi
-            </button>
-            <button 
-              type="button"
-              @click="agent.knowledge = multiCategoryTemplate; agent.isDirty = true"
-              class="px-2 py-0.5 bg-surface/50 border border-outline hover:border-primary/30 text-on-surface-variant hover:text-primary rounded text-[8px] font-black uppercase transition-colors"
-            >
-              Category
-            </button>
-            <button 
-              type="button"
-              @click="agent.knowledge = agentKnowledgeBaseTemplate; agent.isDirty = true"
-              class="px-2 py-0.5 bg-surface/50 border border-outline hover:border-primary/30 text-on-surface-variant hover:text-primary rounded text-[8px] font-black uppercase transition-colors"
-            >
-              Blueprint
-            </button>
-          </div>
-
-          <textarea 
-            v-model="agent.knowledge" 
-            @input="agent.isDirty = true"
-            placeholder="Type business details here..." 
-            class="w-full bg-transparent text-[11px] font-medium text-on-surface-variant italic min-h-[160px] outline-none resize-none placeholder:opacity-30 border-none p-0 leading-relaxed"
-          ></textarea>
-        </div>
-
-        <!-- Tab Content: Catalog -->
-        <div v-show="agent.activeCardTab === 'catalog'" class="mb-4 p-4 bg-surface-hover/60 border border-outline rounded-[0.9rem] relative animate-in fade-in duration-200">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-secondary/60">
-              <span class="material-symbols-outlined text-sm">gallery_thumbnail</span>
-              Product Gallery (Max 3)
-            </div>
-          </div>
-          <div class="space-y-3">
-            <div v-for="idx in agent.visibleImageCount" :key="idx-1" class="flex items-center gap-1.5 sm:gap-3 animate-in fade-in slide-in-from-top-1 duration-300 w-full min-w-0">
-              <div class="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center overflow-hidden border border-outline shrink-0">
-                <img v-if="agent.product_images[idx-1]?.url" :src="agent.product_images[idx-1].url" class="w-full h-full object-cover" @error="agent.product_images[idx-1].url = ''" />
-                <span v-else class="material-symbols-outlined text-xs opacity-20">image</span>
-              </div>
-              <input 
-                v-model="agent.product_images[idx-1].id"
-                @input="agent.isDirty = true"
-                placeholder="Product-ID(e.g:101)"
-                class="w-20 sm:w-28 bg-surface-hover px-1.5 py-1.5 rounded-[0.4rem] text-[10px] font-bold text-secondary outline-none border border-outline focus-visible:border-secondary/40 transition-colors shrink-0 min-w-0 text-left"
-              />
-              <input 
-                v-model="agent.product_images[idx-1].url"
-                @input="agent.isDirty = true"
-                placeholder="Paste Image URL..."
-                class="flex-grow min-w-0 bg-surface-hover px-2 py-1.5 rounded-[0.4rem] text-[10px] font-medium text-on-surface outline-none border border-outline focus-visible:border-secondary/40 transition-colors"
-              />
-            </div>
-
-            <!-- Add Button -->
-            <button 
-              type="button"
-              v-if="agent.visibleImageCount < 3"
-              @click="agent.visibleImageCount++"
-              class="w-full py-2 border border-dashed border-outline rounded-xl flex items-center justify-center gap-2 text-on-surface-variant/50 hover:text-secondary hover:border-secondary/40 transition-all group/add"
-            >
-              <span class="material-symbols-outlined text-sm group-hover/add:scale-110 transition-transform">add_circle</span>
-              <span class="text-[9px] font-black uppercase tracking-widest">Add Product Image</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Tab Content: Behavior, Routing, Webhooks -->
-        <div v-show="agent.activeCardTab === 'behavior'" class="mb-4 p-4 bg-surface-hover border border-outline rounded-[0.9rem] relative animate-in fade-in duration-200 space-y-4">
-          <!-- Facebook specific settings -->
-          <div v-if="agent.platform === 'fb_comment'" class="space-y-3">
-            <div class="text-[8px] font-black uppercase tracking-widest text-on-surface-variant/40 mb-1 border-b border-outline/30 pb-1">Facebook Comments Routing</div>
-            
-            <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" v-model="agent.agent_behavior.fb_private_reply_prices" @change="agent.isDirty = true" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
-              <span class="text-[10px] font-semibold text-on-surface-variant group-hover:text-on-surface transition-colors">Private reply to Price inquiries</span>
-            </label>
-            
-            <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" v-model="agent.agent_behavior.fb_private_reply_orders" @change="agent.isDirty = true" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
-              <span class="text-[10px] font-semibold text-on-surface-variant group-hover:text-on-surface transition-colors">Private reply to Intent/Orders</span>
-            </label>
-            
-            <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" v-model="agent.agent_behavior.fb_private_reply_pii" @change="agent.isDirty = true" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
-              <span class="text-[10px] font-semibold text-on-surface-variant group-hover:text-on-surface transition-colors">Private reply to Phone/Address</span>
-            </label>
-
-            <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" v-model="agent.agent_behavior.fb_private_reply_complaints" @change="agent.isDirty = true" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
-              <span class="text-[10px] font-semibold text-on-surface-variant group-hover:text-on-surface transition-colors">Private reply to Complaints</span>
-            </label>
-
-            <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" v-model="agent.agent_behavior.fb_public_reply_enabled" @change="agent.isDirty = true" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
-              <span class="text-[10px] font-semibold text-on-surface-variant group-hover:text-on-surface transition-colors">Enable public replies on comments</span>
-            </label>
-
-            <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" v-model="agent.agent_behavior.fb_delete_negatives" @change="agent.isDirty = true" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
-              <span class="text-[10px] font-semibold text-red-400 group-hover:text-red-300 transition-colors">Auto-delete negative/spam comments</span>
-            </label>
-          </div>
-
-          <!-- Webhook forwarding settings -->
-          <div class="space-y-3">
-            <div class="text-[8px] font-black uppercase tracking-widest text-on-surface-variant/40 mb-1 border-b border-outline/30 pb-1">Webhook Pipeline</div>
-            <div class="flex flex-col gap-1">
-              <span class="text-[8px] font-black uppercase tracking-widest text-on-surface-variant/50">Custom Forwarding URL</span>
-              <input 
-                v-model="agent.agent_behavior.webhook_forward_url"
-                @input="agent.isDirty = true"
-                placeholder="e.g. https://crm.my-shop.com/webhook"
-                class="w-full bg-surface-hover border border-outline rounded-lg px-3 py-1.5 text-[10px] text-on-surface outline-none focus:border-secondary/40 transition-colors"
-              />
-            </div>
-            <div class="space-y-1">
-              <span class="text-[8px] font-black uppercase tracking-widest text-on-surface-variant/50">Forward Events</span>
-              <div class="flex gap-3">
-                <label class="flex items-center gap-1.5 cursor-pointer group">
-                  <input type="checkbox" v-model="agent.agent_behavior.webhook_events.messages" @change="agent.isDirty = true" class="w-3 h-3 rounded border-outline bg-surface-hover text-secondary focus:ring-secondary/20 cursor-pointer" />
-                  <span class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant group-hover:text-on-surface transition-colors">Messages</span>
-                </label>
-                <label class="flex items-center gap-1.5 cursor-pointer group">
-                  <input type="checkbox" v-model="agent.agent_behavior.webhook_events.comments" @change="agent.isDirty = true" class="w-3 h-3 rounded border-outline bg-surface-hover text-secondary focus:ring-secondary/20 cursor-pointer" />
-                  <span class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant group-hover:text-on-surface transition-colors">Comments</span>
-                </label>
-                <label class="flex items-center gap-1.5 cursor-pointer group">
-                  <input type="checkbox" v-model="agent.agent_behavior.webhook_events.orders" @change="agent.isDirty = true" class="w-3 h-3 rounded border-outline bg-surface-hover text-secondary focus:ring-secondary/20 cursor-pointer" />
-                  <span class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant group-hover:text-on-surface transition-colors">Orders</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sync Changes floating indicator inside card -->
-        <div class="mb-4 animate-in fade-in zoom-in-95 duration-200" v-if="agent.isDirty">
-          <button 
-            type="button"
-            @click="$emit('update-knowledge', agent)"
-            class="w-full py-3 bg-secondary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-[1.01] transition-all flex items-center justify-center gap-2"
-          >
-            <span class="material-symbols-outlined text-xs">cloud_sync</span>
-            Save & Sync Changes
-          </button>
-        </div>
-
-        <div class="flex flex-col gap-4">
-          <button 
-            @click="$emit('disconnect-agent', agent.id)"
-            class="w-full py-4 bg-red-500/5 text-red-400 border border-red-500/10 hover:border-red-500/40 hover:bg-red-500/10 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-102 transition-all duration-500 flex items-center justify-center gap-2"
+            @click="$emit('disconnect-agent', agent.id)" 
+            class="w-full py-2 text-rose-500 hover:bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span class="material-symbols-outlined text-sm">delete</span>
-            Disconnect Agent
+            <span>Disconnect Agent</span>
           </button>
         </div>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else class="bg-primary/5 border-2 border-dashed border-primary/20 rounded-[4rem] p-16 text-center space-y-6">
-      <div class="w-20 h-20 bg-primary/10 rounded-[2rem] mx-auto flex items-center justify-center text-primary">
-        <span class="material-symbols-outlined text-4xl">robot_2</span>
+    <div v-else class="bg-surface border border-outline border-dashed rounded-3xl p-12 text-center max-w-xl mx-auto space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto text-3xl">
+        <span class="material-symbols-outlined text-4xl">smart_toy</span>
       </div>
-      <div class="max-w-md mx-auto space-y-2">
-        <h3 class="text-xl font-black">No Active Agents Found</h3>
-        <p class="text-sm font-medium text-on-surface-variant">Your command center is ready. Connect your first social media agent to start automating your customer intelligence.</p>
+      <div>
+        <h3 class="text-base font-bold text-on-surface">No Connected AI Agents</h3>
+        <p class="text-xs text-on-surface-variant mt-1">
+          Connect your WhatsApp, Telegram, or Facebook Messenger page to automate 24/7 sales.
+        </p>
       </div>
-      <button @click="$emit('open-connect-modal')" class="inline-flex items-center gap-3 px-8 h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:-translate-y-1 transition-all cursor-pointer">
-        Initialize First Agent
+      <button 
+        @click="$emit('open-connect-modal')" 
+        class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-all shadow-sm cursor-pointer"
+      >
+        <span class="material-symbols-outlined text-base">add</span>
+        Connect Your First Agent
       </button>
     </div>
   </section>
 </template>
 
 <script setup>
-import {
-  singleProductTemplate,
-  multiProductTemplate,
-  multiCategoryTemplate,
-  agentKnowledgeBaseTemplate
-} from '~/shared/templates'
+import { ref, onMounted } from 'vue'
 
-defineProps({
+const props = defineProps({
   agents: { type: Array, required: true },
   loading: { type: Boolean, required: true }
 })
 
-defineEmits([
+const emit = defineEmits([
   'open-connect-modal',
   'disconnect-agent',
   'update-knowledge',
   'show-guide',
-  'copy-text'
+  'copy-text',
+  'switch-tab'
 ])
 
+const inventoryProducts = ref([])
+
+const fetchInventory = async () => {
+  try {
+    const res = await $fetch('/api/admin/inventory')
+    if (Array.isArray(res)) {
+      inventoryProducts.value = res
+    }
+  } catch (e) {
+    console.error('Failed to load inventory for agents:', e)
+  }
+}
+
+onMounted(() => {
+  fetchInventory()
+})
+
+const getAgentCatalogProducts = (agent) => {
+  return inventoryProducts.value.filter(p => {
+    return !p.assigned_agent || p.assigned_agent === 'all' || p.assigned_agent === agent.id
+  })
+}
+
+const getProductHero = (prod) => {
+  if (prod.images && Array.isArray(prod.images) && prod.images.length > 0) {
+    const hero = prod.images.find(img => img.role === 'hero') || prod.images[0]
+    return hero?.url || ''
+  }
+  return prod.image || ''
+}
+
+const resolveImage = (url) => {
+  if (!url) return ''
+  if (url.startsWith('/api/media')) return url
+  if (url.includes('.backblazeb2.com/')) {
+    const parts = url.split('.backblazeb2.com/')
+    if (parts[1]) {
+      return `/api/media/${parts[1]}`
+    }
+  }
+  return url
+}
+
 const formatPlatformName = (platform) => {
-  if (platform === 'fb_comment') return 'FB comment'
-  if (platform === 'messenger') return 'Messenger'
   if (platform === 'whatsapp') return 'WhatsApp'
   if (platform === 'telegram') return 'Telegram'
-  return platform || ''
+  if (platform === 'messenger') return 'Messenger'
+  if (platform === 'fb_comment') return 'Facebook Comments'
+  return platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Direct'
+}
+
+const getPlatformIcon = (platform) => {
+  if (platform === 'whatsapp') return 'chat'
+  if (platform === 'telegram') return 'send'
+  if (platform === 'messenger') return 'forum'
+  return 'chat_bubble'
+}
+
+const getPlatformIconClass = (platform) => {
+  if (platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+  if (platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+  if (platform === 'messenger' || platform === 'facebook') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+  return 'bg-primary/10 text-primary'
+}
+
+const addAgentImage = (agent) => {
+  if (!agent.product_images) agent.product_images = []
+  agent.product_images.push({ id: '', url: '' })
+  agent.isDirty = true
+}
+
+const removeAgentImage = (agent, index) => {
+  agent.product_images.splice(index, 1)
+  agent.isDirty = true
+}
+
+const handleFileUpload = async (event, img, agent) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const res = await $fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    })
+    if (res?.url) {
+      img.url = res.url
+      agent.isDirty = true
+    }
+  } catch (err) {
+    alert('Upload failed: ' + err.message)
+  }
 }
 </script>
+
+<style scoped>
+.agent-scroll {
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 140, 160, 0.3) transparent;
+}
+.agent-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 0px;
+}
+.agent-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.agent-scroll::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 160, 0.25);
+  border-radius: 9999px;
+}
+.agent-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 160, 0.5);
+}
+</style>

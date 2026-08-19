@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
     "@nuxt/ui": "^4.6.0",
     "@nuxtjs/google-fonts": "^3.2.0",
     "@supabase/supabase-js": "^2.100.1",

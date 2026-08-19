@@ -1,137 +1,76 @@
 [
   {
-    "id": "bt-123-s",
-    "name": "Premium T-Shirt",
-    "sku": "bt-123-s",
-    "size": "S",
-    "color": "Black",
-    "price": 490,
-    "stock_quantity": 10
+    "id": "item-1786986929082",
+    "name": "Premium Winter Hoodie",
+    "sku": "premium-winter-hoodie",
+    "size": "L/XL/XXL",
+    "color": "sky blue",
+    "regular_price": 1500,
+    "price": 1200,
+    "stock_quantity": 10,
+    "assigned_agent": "da321b82-9271-4da3-a1b5-cd77172a1605",
+    "images": [
+      {
+        "role": "hero",
+        "url": "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80",
+        "color": "sky blue",
+        "size": "L/XL/XXL",
+        "quantity": 10,
+        "price": 1200
+      }
+    ]
   },
   {
-    "id": "bt-123-m",
-    "name": "Premium T-Shirt",
-    "sku": "bt-123-m",
-    "size": "M",
-    "color": "Black",
-    "price": 490,
-    "stock_quantity": 15
-  },
-  {
-    "id": "bt-123-l",
-    "name": "Premium T-Shirt",
-    "sku": "bt-123-l",
-    "size": "L",
-    "color": "Black",
-    "price": 490,
-    "stock_quantity": 12
-  },
-  {
-    "id": "bt-123-xl",
-    "name": "Premium T-Shirt",
-    "sku": "bt-123-xl",
-    "size": "XL",
-    "color": "Black",
-    "price": 490,
-    "stock_quantity": 8
-  },
-  {
-    "id": "bt-123-xxl",
-    "name": "Premium T-Shirt",
-    "sku": "bt-123-xxl",
-    "size": "XXL",
-    "color": "Black",
-    "price": 490,
-    "stock_quantity": 5
-  },
-  {
-    "id": "wt-124-s",
-    "name": "Premium T-Shirt",
-    "sku": "wt-124-s",
-    "size": "S",
-    "color": "White",
-    "price": 490,
-    "stock_quantity": 7
-  },
-  {
-    "id": "wt-124-m",
-    "name": "Premium T-Shirt",
-    "sku": "wt-124-m",
-    "size": "M",
-    "color": "White",
-    "price": 490,
-    "stock_quantity": 14
-  },
-  {
-    "id": "wt-124-l",
-    "name": "Premium T-Shirt",
-    "sku": "wt-124-l",
-    "size": "L",
-    "color": "White",
-    "price": 490,
-    "stock_quantity": 19
-  },
-  {
-    "id": "wt-124-xl",
-    "name": "Premium T-Shirt",
-    "sku": "wt-124-xl",
-    "size": "XL",
-    "color": "White",
-    "price": 490,
-    "stock_quantity": 9
-  },
-  {
-    "id": "wt-124-xxl",
-    "name": "Premium T-Shirt",
-    "sku": "wt-124-xxl",
-    "size": "XXL",
-    "color": "White",
-    "price": 490,
-    "stock_quantity": 4
-  },
-  {
-    "id": "nb-125-s",
-    "name": "Premium T-Shirt",
-    "sku": "nb-125-s",
-    "size": "S",
-    "color": "Navy Blue",
-    "price": 490,
-    "stock_quantity": 11
-  },
-  {
-    "id": "nb-125-m",
-    "name": "Premium T-Shirt",
-    "sku": "nb-125-m",
-    "size": "M",
-    "color": "Navy Blue",
-    "price": 490,
-    "stock_quantity": 18
-  },
-  {
-    "id": "nb-125-l",
-    "name": "Premium T-Shirt",
-    "sku": "nb-125-l",
-    "size": "L",
-    "color": "Navy Blue",
-    "price": 490,
-    "stock_quantity": 16
-  },
-  {
-    "id": "nb-125-xl",
-    "name": "Premium T-Shirt",
-    "sku": "nb-125-xl",
-    "size": "XL",
-    "color": "Navy Blue",
-    "price": 490,
-    "stock_quantity": 10
-  },
-  {
-    "id": "nb-125-xxl",
-    "name": "Premium T-Shirt",
-    "sku": "nb-125-xxl",
-    "size": "XXL",
-    "color": "Navy Blue",
-    "price": 490,
-    "stock_quantity": 6
+    "id": "item-1786964421958",
+    "name": "t-shirt",
+    "sku": "t-shirt-white",
+    "size": "L/XL",
+    "color": "",
+    "price": 1000,
+    "regular_price": 1200,
+    "stock_quantity": 22,
+    "assigned_agent": "da321b82-9271-4da3-a1b5-cd77172a1605",
+    "images": [
+      {
+        "role": "hero",
+        "url": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80",
+        "color": "White",
+        "size": "L",
+        "quantity": 5,
+        "price": 1000
+      },
+      {
+        "role": "hero",
+        "url": "https://i5.walmartimages.com/seo/Maroon-Shirt-for-Men-Gildan-2000-Men-T-Shirt-Cotton-Men-Shirt-Men-s-Fashion-Shirts-Best-Mens-Classic-Short-Sleeve-T-shirt_73b36dde-53be-4250-b467-0aeb61917d22.dfa76bd9023d7c824674e36ce47cb958.jpeg",
+        "color": "Maroon",
+        "size": "L",
+        "quantity": 6,
+        "price": 1000
+      },
+      {
+        "role": "hero",
+        "url": "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&auto=format&fit=crop&q=80",
+        "color": "Red",
+        "size": "XL",
+        "quantity": 1,
+        "price": 1000
+      },
+      {
+        "role": "detail",
+        "url": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80",
+        "color": "Black",
+        "size": "L",
+        "quantity": 2,
+        "price": 1000
+      },
+      {
+        "role": "back",
+        "url": "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80",
+        "color": "sky blue",
+        "size": "XL",
+        "quantity": 2,
+        "price": 1000
+      }
+    ]
   }
 ]

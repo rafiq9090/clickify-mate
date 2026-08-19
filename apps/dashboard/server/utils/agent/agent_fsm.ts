@@ -1,0 +1,133 @@
+import type { ConversationState, AgentContext } from './agent_types'
+import { useSupabaseAdmin } from '../supabase'
+
+export function computeNextState(
+    currentState: ConversationState,
+    event: {
+        intent?: string
+        hasProductSelection?: boolean
+        hasStockConfirmed?: boolean
+        hasName?: boolean
+        hasPhone?: boolean
+        hasAddress?: boolean
+        requiresAdvance?: boolean
+        hasTrxId?: boolean
+        isConfirmed?: boolean
+        isCorrection?: boolean
+        isComplaint?: boolean
+    }
+): { nextState: ConversationState; previousValidState?: ConversationState } {
+    // 1. Temporary Repair State: preserve previous valid state
+    if (event.isCorrection) {
+        return {
+            nextState: 'REPAIR',
+            previousValidState: currentState === 'REPAIR' ? 'VARIANT_SELECTION' : currentState
+        }
+    }
+
+    // 2. Complaint / Support
+    if (event.isComplaint) {
+        return { nextState: 'SUPPORT', previousValidState: currentState }
+    }
+
+    // 3. Greeting: Greetings are conversational interrupts, NEVER overwrite business state!
+    if (event.intent === 'GREETING') {
+        return { nextState: currentState, previousValidState: currentState }
+    }
+
+    // 4. Temporary Product / Stock / Delivery / Image Inquiries (Interruptible Inquiries)
+    if (
+        event.intent === 'PRODUCT_DISCOVERY' ||
+        event.intent === 'PRICE_QUERY' ||
+        event.intent === 'STOCK_QUERY' ||
+        event.intent === 'DELIVERY_QUERY' ||
+        event.intent === 'IMAGE_REQUEST'
+    ) {
+        if (currentState === 'ORDER_CONFIRMED' || currentState === 'COMPLETED') {
+            // Keep business state intact while answering inquiry
+            return { nextState: currentState, previousValidState: currentState }
+        }
+        // If in middle of checkout, preserve the checkout state in previousValidState
+        return {
+            nextState: currentState === 'SALES_INQUIRING' ? 'PRODUCT_DISCOVERY' : currentState,
+            previousValidState: currentState
+        }
+    }
+
+    // 5. Normal Order Confirmation Progression
+    if (event.isConfirmed) {
+        return { nextState: 'ORDER_CONFIRMED' }
+    }
+
+    if (event.requiresAdvance && !event.hasTrxId) {
+        return { nextState: 'AWAIT_PAYMENT' }
+    }
+
+    if (event.hasName && event.hasPhone && event.hasAddress) {
+        return { nextState: 'VERIFY_ORDER' }
+    }
+
+    if (event.hasName && event.hasPhone && !event.hasAddress) {
+        return { nextState: 'COLLECT_ADDRESS' }
+    }
+
+    if (event.hasName && !event.hasPhone) {
+        return { nextState: 'COLLECT_PHONE' }
+    }
+
+    if (event.intent === 'ORDER_START') {
+        return { nextState: 'COLLECT_NAME' }
+    }
+
+    if (event.hasProductSelection && event.hasStockConfirmed) {
+        return { nextState: 'VARIANT_SELECTION' }
+    }
+
+    return { nextState: currentState }
+}
+
+export async function saveFsmState(
+    agentId: string,
+    customerId: string,
+    state: ConversationState,
+    previousValidState?: ConversationState,
+    collectedDetails?: Record<string, any>
+): Promise<void> {
+    const supabase = useSupabaseAdmin()
+    if (!supabase || !supabase.from) return
+
+    try {
+        const emailKey = `${customerId}@telegram.org`
+        const { data: existing } = await supabase
+            .from('leads')
+            .select('id, data')
+            .eq('email', emailKey)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        const mergedData = {
+            ...(existing?.data || {}),
+            customer: customerId,
+            agent_id: agentId,
+            current_state: state,
+            previous_valid_state: previousValidState || existing?.data?.previous_valid_state || state,
+            collected_details: {
+                ...(existing?.data?.collected_details || {}),
+                ...(collectedDetails || {})
+            }
+        }
+
+        if (existing?.id) {
+            await supabase.from('leads').update({ data: mergedData }).eq('id', existing.id)
+        } else {
+            await supabase.from('leads').insert({
+                email: emailKey,
+                source: 'ai_agent',
+                data: mergedData
+            })
+        }
+    } catch (e: any) {
+        console.error('[FSM STATE SAVE ERROR]:', e.message)
+    }
+}

@@ -1,7 +1,163 @@
 // server/api/agents/telegram.ts
 import { decrypt } from '../../utils/encryption'
 import { generateAIReply, analyzeSentimentAndPickEmoji } from '../../utils/groq'
-import { processMockOrderStockDeduction } from '../../utils/mock_shop'
+import { processMockOrderStockDeduction, getMockInventory, resolveIntelligentProductImages } from '../../utils/mock_shop'
+import { getFileFromBackblaze } from '../../utils/backblaze'
+import { runAgent } from '../../utils/agent/agent_orchestrator'
+import { sendTelegramReaction } from '../../utils/agent/agent_reactions'
+import { checkAndRecordWebhookEvent } from '../../utils/agent/webhook_dedup'
+import { verifyTelegramSecret } from '../../utils/agent/webhook_auth'
+import { analyzeImage } from '../../utils/agent/vision'
+import type { IncomingAgentEvent } from '../../utils/agent/agent_types'
+
+async function fetchImageBufferAndType(imageUrl: string): Promise<{ buffer: Buffer | null; contentType: string }> {
+    if (!imageUrl) return { buffer: null, contentType: 'image/jpeg' }
+
+    let imageBuffer: Buffer | null = null
+    let contentType = 'image/jpeg'
+
+    // 1. If it's a Backblaze B2 link (or /api/media/... proxy), stream binary bytes directly
+    if (imageUrl.includes('.backblazeb2.com/') || imageUrl.startsWith('/api/media/')) {
+        let b2Key = ''
+        if (imageUrl.startsWith('/api/media/')) {
+            b2Key = imageUrl.replace('/api/media/', '')
+        } else if (imageUrl.includes('.backblazeb2.com/')) {
+            const parts = imageUrl.split('.backblazeb2.com/')
+            b2Key = parts[1] || ''
+        }
+
+        if (b2Key) {
+            try {
+                const s3Obj = await getFileFromBackblaze(b2Key)
+                const stream = s3Obj.Body as any
+                const chunks: Buffer[] = []
+                for await (const chunk of stream) {
+                    chunks.push(Buffer.from(chunk))
+                }
+                imageBuffer = Buffer.concat(chunks)
+                contentType = s3Obj.ContentType || 'image/jpeg'
+            } catch (b2Err: any) {
+                console.warn(`[TELEGRAM B2 STREAM WARN]:`, b2Err.message)
+            }
+        }
+    }
+
+    // 2. If standard HTTP/HTTPS public URL, download binary buffer directly
+    if (!imageBuffer && imageUrl.startsWith('http')) {
+        try {
+            const res = await fetch(imageUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            })
+            if (res.ok) {
+                const arrayBuf = await res.arrayBuffer()
+                imageBuffer = Buffer.from(arrayBuf)
+                contentType = res.headers.get('content-type') || 'image/jpeg'
+            }
+        } catch (fetchErr: any) {
+            console.warn(`[TELEGRAM FETCH PHOTO WARN]:`, fetchErr.message)
+        }
+    }
+
+    return { buffer: imageBuffer, contentType }
+}
+
+async function sendTelegramPhotoReliable(chatId: string | number, imageUrl: string, botToken: string) {
+    if (!imageUrl) return
+
+    const { buffer: imageBuffer, contentType } = await fetchImageBufferAndType(imageUrl)
+
+    // 1. Send binary stream via Telegram FormData
+    if (imageBuffer) {
+        try {
+            const formData = new FormData()
+            const blob = new Blob([new Uint8Array(imageBuffer)], { type: contentType })
+            formData.append('chat_id', chatId.toString())
+            formData.append('photo', blob, 'product.jpg')
+
+            const res: any = await $fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+                method: 'POST',
+                body: formData
+            })
+            console.log(`[TELEGRAM DEBUG]: Successfully sent binary photo to chat ${chatId}`)
+            return res?.result ? [res.result] : []
+        } catch (sendErr: any) {
+            console.error('[TELEGRAM BINARY SEND PHOTO ERROR]:', sendErr.data || sendErr.message)
+        }
+    }
+
+    // 2. Fallback: URL string
+    try {
+        const res: any = await $fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+            method: 'POST',
+            body: { chat_id: chatId, photo: imageUrl }
+        })
+        console.log(`[TELEGRAM DEBUG]: Sent photo URL to chat ${chatId}`)
+        return res?.result ? [res.result] : []
+    } catch (urlErr: any) {
+        console.error('[TELEGRAM SEND PHOTO URL ERROR]:', urlErr.data || urlErr.message)
+        return []
+    }
+}
+
+async function sendTelegramMediaGroupReliable(chatId: string | number, imageUrls: string[], botToken: string): Promise<any[]> {
+    if (!imageUrls || imageUrls.length === 0) return []
+
+    // If single image, send standard single photo
+    if (imageUrls.length === 1 && imageUrls[0]) {
+        const single = await sendTelegramPhotoReliable(chatId, imageUrls[0], botToken)
+        return single || []
+    }
+
+    // Up to 10 photos per album in Telegram sendMediaGroup
+    const targetUrls = Array.from(new Set(imageUrls.filter(Boolean))).slice(0, 10)
+
+    try {
+        const formData = new FormData()
+        formData.append('chat_id', chatId.toString())
+
+        const mediaArray: any[] = []
+
+        for (let i = 0; i < targetUrls.length; i++) {
+            const url = targetUrls[i]
+            if (!url) continue
+            const { buffer, contentType } = await fetchImageBufferAndType(url)
+
+            if (buffer) {
+                const attachName = `photo_${i}`
+                const blob = new Blob([new Uint8Array(buffer)], { type: contentType })
+                formData.append(attachName, blob, `product_${i}.jpg`)
+                mediaArray.push({
+                    type: 'photo',
+                    media: `attach://${attachName}`
+                })
+            } else {
+                mediaArray.push({
+                    type: 'photo',
+                    media: url
+                })
+            }
+        }
+
+        formData.append('media', JSON.stringify(mediaArray))
+
+        const res: any = await $fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
+            method: 'POST',
+            body: formData
+        })
+        console.log(`[TELEGRAM DEBUG]: Successfully sent media group album (${targetUrls.length} photos) to chat ${chatId}`)
+        return Array.isArray(res?.result) ? res.result : []
+    } catch (albumErr: any) {
+        console.warn(`[TELEGRAM MEDIA GROUP WARN]: Failed sendMediaGroup album, falling back to sequential delivery:`, albumErr.data || albumErr.message)
+        const results: any[] = []
+        for (const url of targetUrls) {
+            const singleRes = await sendTelegramPhotoReliable(chatId, url, botToken)
+            if (Array.isArray(singleRes)) results.push(...singleRes)
+        }
+        return results
+    }
+}
 
 async function getTelegramFileBuffer(fileId: string, botToken: string) {
     const fileInfo = await $fetch<any>(`https://api.telegram.org/bot${botToken}/getFile`, {
@@ -43,65 +199,6 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string, apiKey: st
     return res.text || ''
 }
 
-async function analyzeImage(imageBase64: string, mimeType: string, prompt: string, apiKey: string) {
-    try {
-        const res = await $fetch<any>('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: {
-                model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-                messages: [
-                    {
-                        role: 'user',
-                        content: [
-                            { type: 'text', text: prompt },
-                            {
-                                type: 'image_url',
-                                image_url: {
-                                    url: `data:${mimeType};base64,${imageBase64}`
-                                }
-                            }
-                        ]
-                    }
-                ],
-                temperature: 0.2
-            }
-        })
-        return res.choices?.[0]?.message?.content || ''
-    } catch (e: any) {
-        console.warn(`[GROQ VISION WARNING] Primary vision model failed: ${e.message}. Trying fallback...`)
-        const res = await $fetch<any>('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: {
-                model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-                messages: [
-                    {
-                        role: 'user',
-                        content: [
-                            { type: 'text', text: prompt },
-                            {
-                                type: 'image_url',
-                                image_url: {
-                                    url: `data:${mimeType};base64,${imageBase64}`
-                                }
-                            }
-                        ]
-                    }
-                ],
-                temperature: 0.2
-            }
-        })
-        return res.choices?.[0]?.message?.content || ''
-    }
-}
-
 
 export default defineEventHandler(async (event) => {
     const VERSION = "1.4.0-MEDIA-SUPPORT"
@@ -129,8 +226,16 @@ export default defineEventHandler(async (event) => {
         return { success: true }
     }
 
+    // 1. Webhook Authentication (Telegram Secret Token)
+    const secretCheck = verifyTelegramSecret(event)
+    if (!secretCheck.isValid) {
+        console.warn(`[TELEGRAM WEBHOOK AUTH REJECTED]: ${secretCheck.reason}`)
+        throw createError({ statusCode: 401, statusMessage: `Unauthorized: ${secretCheck.reason}` })
+    }
+
     const chatId = message.chat.id
     const messageId = message.message_id
+
 
     try {
         const apiKey = await getApiKey('groq_api_key', 'groqApiKey')
@@ -189,6 +294,19 @@ export default defineEventHandler(async (event) => {
             return { success: false, error: 'Agent configuration not found' }
         }
 
+        // 2. Multi-Tenant Durable Webhook Deduplication
+        if (messageId) {
+            const isDuplicate = await checkAndRecordWebhookEvent({
+                agentId: agent.id,
+                channel: 'telegram',
+                messageId
+            })
+            if (isDuplicate) {
+                return { success: true, duplicate: true }
+            }
+        }
+
+
         // --- SMART FALLBACK: If current agent has no knowledge, find one for this user that does ---
         if (!agent.knowledge || agent.knowledge.length < 5) {
             console.log(`[AGENT DEBUG]: Primary agent ${agent.id} has no knowledge. Searching alternatives...`)
@@ -231,6 +349,23 @@ export default defineEventHandler(async (event) => {
         console.log(`[AGENT DEBUG V${VERSION}]: Generating reply for ${chatId}`)
 
         let userText = message.text || ''
+        let replyContext: any = null
+
+        // --- PROCESS TELEGRAM REPLIED / QUOTED MESSAGE ---
+        if (message.reply_to_message) {
+            const repliedMsg = message.reply_to_message
+            const repliedAuthor = [repliedMsg.from?.first_name, repliedMsg.from?.last_name].filter(Boolean).join(' ') || (repliedMsg.from?.is_bot ? 'AI Assistant' : 'User')
+            const repliedText = repliedMsg.text || repliedMsg.caption || (repliedMsg.photo ? '[Product Photo]' : '')
+            if (repliedText) {
+                replyContext = {
+                    author: repliedAuthor,
+                    text: repliedText,
+                    message_id: repliedMsg.message_id ? repliedMsg.message_id.toString() : null
+                }
+                userText = `[In reply to "${repliedText}"]: ${userText}`.trim()
+                console.log(`[TELEGRAM DEBUG]: Customer replied to message #${repliedMsg.message_id} (${repliedAuthor}): "${repliedText}"`)
+            }
+        }
 
         // --- PROCESS MEDIA TYPES IF NECESSARY ---
         if (message.voice) {
@@ -305,333 +440,124 @@ export default defineEventHandler(async (event) => {
             }
         }
 
-        // 2. Save User Message
+        // --- EXTRACT CUSTOMER NAME & PROFILE PHOTO ---
+        const fromUser = message.from || {}
+        const customerName = [fromUser.first_name, fromUser.last_name].filter(Boolean).join(' ') || (fromUser.username ? `@${fromUser.username}` : `Telegram User #${chatId.toString().slice(-6)}`)
+        let customerAvatar = ''
+        if (fromUser.id && botToken) {
+            try {
+                const photoRes: any = await $fetch(`https://api.telegram.org/bot${botToken}/getUserProfilePhotos`, {
+                    method: 'POST',
+                    body: { user_id: fromUser.id, limit: 1 }
+                }).catch(() => null)
+                const fileId = photoRes?.result?.photos?.[0]?.[0]?.file_id
+                if (fileId) {
+                    const fileInfo: any = await $fetch(`https://api.telegram.org/bot${botToken}/getFile`, {
+                        method: 'POST',
+                        body: { file_id: fileId }
+                    }).catch(() => null)
+                    if (fileInfo?.result?.file_path) {
+                        customerAvatar = `https://api.telegram.org/file/bot${botToken}/${fileInfo.result.file_path}`
+                    }
+                }
+            } catch (e) {
+                // Ignore profile photo errors
+            }
+        }
+
+        // 2. Save User Message with message_id and reply_to context
         await supabase.from('chat_history').insert({
             agent_id: agent.id,
             user_external_id: chatId.toString(),
+            customer_name: customerName,
+            customer_avatar: customerAvatar,
             role: 'user',
-            content: userText
+            content: userText,
+            message_id: message.message_id ? message.message_id.toString() : null,
+            reply_to: replyContext
         })
 
-        // 2b. PARALLEL EXECUTION (Reaction + AI Reply)
-        event.context.agent_behavior = agent.agent_behavior
-        const [emoji, aiResult] = await Promise.all([
-            analyzeSentimentAndPickEmoji(userText, apiKey, history),
-            generateAIReply(userText, agent.agent_behavior?.tone || 'Mixed', apiKey, agent.knowledge || '', history, sessionState, 0, agent.updated_at, event)
-        ])
-
-        // 1. Send Reaction First (Instant Feedback)
-        if (emoji && emoji !== 'none') {
-            console.log(`[TELEGRAM DEBUG]: Sending reaction: ${emoji}`)
-            $fetch(`https://api.telegram.org/bot${botToken}/setMessageReaction`, {
-                method: 'POST',
-                body: {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    reaction: [{ type: 'emoji', emoji: emoji }]
-                }
-            }).catch(e => console.error('[TELEGRAM REACTION ERROR]:', e.message))
+        // Check if owner has paused AI auto-reply for this customer or if agent is inactive
+        if (sessionLead?.data?.ai_disabled === true || agent.is_active === false) {
+            console.log(`[TELEGRAM DEBUG]: AI Auto-Pilot is PAUSED for customer ${chatId}. Saved message to inbox. Skipping AI generation.`)
+            return { success: true, ai_paused: true }
         }
 
-        const { reply, tokens, updatedSessionState } = aiResult
-        let aiReply = reply
-
-        // --- EXTRACT PAYMENT TRANSACTION ID FROM USER TEXT ---
-        let paymentTransactionId = null
-        const txPatterns = [
-            /(?:bkash|nagad|rocket|transaction|trans|ref|trx|txid|id)[:\s]+([a-zA-Z0-9]{8,15})/gi,
-            /(?:trxid)[:\s]*([a-zA-Z0-9]{8,15})/gi
-        ]
-        for (const pattern of txPatterns) {
-            const match = pattern.exec(userText)
-            if (match && match[1]) {
-                paymentTransactionId = match[1].trim()
-                break
-            }
-        }
-        if (!paymentTransactionId) {
-            const standaloneMatches = userText.match(/\b[a-zA-Z0-9]{8,15}\b/g)
-            if (standaloneMatches) {
-                for (const candidate of standaloneMatches) {
-                    const hasLetters = /[a-zA-Z]/.test(candidate)
-                    const hasNumbers = /[0-9]/.test(candidate)
-                    if (hasLetters && hasNumbers) {
-                        paymentTransactionId = candidate
-                        break
-                    }
-                }
-            }
+        // --- Clickify AI Agent 2.0 Engine Execution ---
+        const incomingEvent: IncomingAgentEvent = {
+            channel: 'telegram',
+            eventId: `tg-${message.message_id || Date.now()}`,
+            customerId: chatId.toString(),
+            customerName,
+            customerAvatar,
+            messageId: message.message_id ? message.message_id.toString() : '',
+            text: userText,
+            replyTo: replyContext,
+            timestamp: Date.now(),
+            rawPayload: message
         }
 
-        // Save updated session state back to the lead (always insert/update)
-        const finalState = updatedSessionState || sessionState || { current_state: 'sales', collected_details: {} }
-        const finalTxId = paymentTransactionId || sessionLead?.data?.payment_transaction_id || null
-        
-        if (sessionLead) {
-            const { data: updatedLead, error: updateErr } = await supabase
-                .from('leads')
-                .update({
-                    data: {
-                        ...sessionLead.data,
-                        current_state: finalState.current_state,
-                        collected_details: finalState.collected_details,
-                        payment_transaction_id: finalTxId
-                    }
-                })
-                .eq('id', sessionLead.id)
-                .select()
-                .maybeSingle()
-            
-            if (updateErr) {
-                console.error(`[TELEGRAM ERROR]: Failed to update session lead:`, updateErr.message, updateErr)
-            } else if (updatedLead) {
-                sessionLead = updatedLead
-                console.log(`[TELEGRAM DEBUG]: Updated session lead ${sessionLead.id}`)
-            }
-        } else {
-            const { data: insertedLead, error: insertErr } = await supabase
-                .from('leads')
-                .insert({
-                    email: emailKey,
-                    source: 'ai_agent',
-                    data: {
-                        platform: 'telegram',
-                        customer: chatId.toString(),
-                        agent_id: agent.id,
-                        user_id: agent.user_id,
-                        current_state: finalState.current_state,
-                        collected_details: finalState.collected_details,
-                        payment_transaction_id: finalTxId
-                    }
-                })
-                .select()
-                .maybeSingle()
-            
-            if (insertErr) {
-                console.error(`[TELEGRAM ERROR]: Failed to insert new lead:`, insertErr.message, insertErr)
-            } else if (insertedLead) {
-                sessionLead = insertedLead
-                console.log(`[TELEGRAM DEBUG]: Created new session lead ${sessionLead.id}`)
-            }
+        const agentRes = await runAgent(incomingEvent, agent)
+
+        if (agentRes.aiPaused) {
+            return { success: true, ai_paused: true }
         }
 
-        // --- IMAGE EXTRACTION (Supports Product ID and Index) ---
-        let hasImages = false
-        const rawImages = agent.product_images || []
-        const allImages = rawImages.map((img: any, idx: number) => {
-            if (typeof img === 'string') {
-                return { id: (idx + 1).toString(), url: img }
-            } else if (img && typeof img === 'object') {
-                return { id: img.id || (idx + 1).toString(), url: img.url || '' }
-            }
-            return { id: '', url: '' }
-        }).filter((img: any) => img.url)
+        const aiReply = agentRes.text || ''
+        const imagesToSend = agentRes.imagesToSend || []
+        const hasImages = imagesToSend.length > 0
+        const tokens = agentRes.tokensUsed || 0
 
-        const imagesToSend: string[] = []
-
-        // Find all matches globally
-        const imageMatches = [...aiReply.matchAll(/\[SEND_IMAGES:?\s*([^\]]*?)\]/gi)]
-        if (imageMatches.length > 0) {
-            hasImages = true
-            for (const match of imageMatches) {
-                const identifiers = (match[1] || '').split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
-                identifiers.forEach((id: string) => {
-                    let matched = allImages.find((img: any) => img.id.toLowerCase() === id)
-                    if (!matched) {
-                        const isWhite = id.includes('white') || id.includes('wt') || id.includes('w-')
-                        const isBlack = id.includes('black') || id.includes('bt') || id.includes('b-')
-                        const isBlue = id.includes('blue') || id.includes('nb') || id.includes('navy') || id.includes('n-')
-                        
-                        if (isWhite) {
-                            matched = allImages.find((img: any) => {
-                                const imgId = (img.id || '').toLowerCase()
-                                return imgId.includes('white') || imgId.includes('wt') || imgId.includes('w-')
-                            })
-                        } else if (isBlack) {
-                            matched = allImages.find((img: any) => {
-                                const imgId = (img.id || '').toLowerCase()
-                                return imgId.includes('black') || imgId.includes('bt') || imgId.includes('b-')
-                            })
-                        } else if (isBlue) {
-                            matched = allImages.find((img: any) => {
-                                const imgId = (img.id || '').toLowerCase()
-                                return imgId.includes('blue') || imgId.includes('nb') || imgId.includes('navy') || imgId.includes('n-')
-                            })
-                        }
-                    }
-                    if (!matched) {
-                        matched = allImages.find((img: any) => {
-                            const imgId = (img.id || '').toLowerCase()
-                            return imgId.includes(id) || id.includes(imgId)
-                        })
-                    }
-                    if (!matched) {
-                        const idx = parseInt(id)
-                        if (!isNaN(idx) && allImages[idx - 1]) {
-                            matched = allImages[idx - 1]
-                        }
-                    }
-                    if (matched) {
-                        imagesToSend.push(matched.url)
-                    }
-                })
-                // Remove the matched tag from the reply
-                aiReply = aiReply.replace(match[0], '').trim()
-            }
-            if (imagesToSend.length === 0 && allImages.length > 0) {
-                imagesToSend.push(allImages[0].url)
-            }
+        // 1. Send Reaction (Instant Feedback)
+        if (agentRes.reaction?.shouldReact && agentRes.reaction?.emoji && message.message_id) {
+            sendTelegramReaction(chatId, message.message_id, agentRes.reaction.emoji, botToken)
         }
 
-        // Handle legacy/fallback tag
-        if (aiReply.includes('[SEND_IMAGES]')) {
-            if (allImages.length > 0) {
-                hasImages = true
-                imagesToSend.push(allImages[0].url)
-            }
-            aiReply = aiReply.replace(/\[SEND_IMAGES\]/gi, '').trim()
-        }
-
-        // --- ORDER DATA EXTRACTION ---
-        const orderMatch = aiReply.match(/\[ORDER_DATA: (.*?)\]/)
-        if (orderMatch && orderMatch[1]) {
-            const orderInfo = orderMatch[1]
-            aiReply = aiReply.replace(orderMatch[0], '').trim()
-
-            // Deduct mock stock
-            const deduction = await processMockOrderStockDeduction(orderInfo, agent.agent_behavior || {})
-            if (deduction.success) {
-                console.log(`[TELEGRAM DEBUG]: Stock deduction success. Total: ৳${deduction.deductedPrice}`)
-                aiReply += `\n\n[STOCK RESERVED]: ${deduction.message}`
-            } else {
-                console.warn(`[TELEGRAM DEBUG]: Stock deduction failed: ${deduction.message}`)
-                aiReply = `I am sorry, but we cannot complete this order because: ${deduction.message}`
-            }
-
-            // paymentTransactionId is already extracted at the top level
-
-            if (sessionLead) {
-                const ageInMs = Date.now() - new Date(sessionLead.created_at).getTime()
-                if (ageInMs < 2 * 60 * 60 * 1000) { // 2 hours active session window
-                    const { data: updatedLead, error: updateErr } = await supabase
-                        .from('leads')
-                        .update({
-                            data: {
-                                ...sessionLead.data,
-                                order: orderInfo,
-                                current_state: 'sales',
-                                collected_details: {},
-                                payment_transaction_id: paymentTransactionId || sessionLead.data?.payment_transaction_id
-                            }
-                        })
-                        .eq('id', sessionLead.id)
-                        .select()
-                        .maybeSingle()
-                    
-                    if (updateErr) {
-                        console.error(`[TELEGRAM ERROR]: Failed to update lead with order:`, updateErr.message, updateErr)
-                    } else if (updatedLead) {
-                        sessionLead = updatedLead
-                        console.log(`[TELEGRAM DEBUG]: Finalized order for existing lead ${sessionLead.id}`)
-                    }
-                } else {
-                    const { data: insertedLead, error: insertErr } = await supabase.from('leads').insert({
-                        email: emailKey,
-                        source: 'ai_agent',
-                        data: {
-                            platform: 'telegram',
-                            customer: chatId.toString(),
-                            order: orderInfo,
-                            agent_id: agent.id,
-                            user_id: agent.user_id,
-                            current_state: 'sales',
-                            collected_details: {},
-                            payment_transaction_id: paymentTransactionId
-                        }
-                    }).select().maybeSingle()
-                    
-                    if (insertErr) {
-                        console.error(`[TELEGRAM ERROR]: Failed to insert new order lead:`, insertErr.message, insertErr)
-                    } else if (insertedLead) {
-                        sessionLead = insertedLead
-                        console.log(`[TELEGRAM DEBUG]: Created new order lead (session expired)`)
-                    }
-                }
-            } else {
-                const { data: insertedLead, error: insertErr } = await supabase.from('leads').insert({
-                    email: emailKey,
-                    source: 'ai_agent',
-                    data: {
-                        platform: 'telegram',
-                        customer: chatId.toString(),
-                        order: orderInfo,
-                        agent_id: agent.id,
-                        user_id: agent.user_id,
-                        current_state: 'sales',
-                        collected_details: {},
-                        payment_transaction_id: paymentTransactionId
-                    }
-                }).select().maybeSingle()
-                
-                if (insertErr) {
-                    console.error(`[TELEGRAM ERROR]: Failed to insert brand new order lead:`, insertErr.message, insertErr)
-                } else if (insertedLead) {
-                    sessionLead = insertedLead
-                    console.log(`[TELEGRAM DEBUG]: Created brand new order lead`)
-                }
-            }
-        }
-
-        if (hasImages) {
-            aiReply = aiReply.replace(/^[📸📷🖼️\s,.:;-]+$/gu, '').trim()
-        }
-
-        // Fallback to prevent Telegram 400 Bad Request on empty/tag-only messages when no images are sent
-        if (!hasImages && (!aiReply || aiReply.trim() === '')) {
-            if (orderMatch) {
-                aiReply = "Order placed successfully! Thank you for shopping with us. 😊"
-            } else {
-                aiReply = "I am checking that for you. What else can I help you with?"
-            }
-        }
-
-        // 3. Save AI Reply (Cleaned) with Exact Tokens
-        await supabase.from('chat_history').insert({
-            agent_id: agent.id,
-            user_external_id: chatId.toString(),
-            role: 'assistant',
-            content: aiReply,
-            tokens_used: tokens
-        })
-
-        console.log(`[AGENT DEBUG V${VERSION}]: AI Reply generated. Tokens: ${tokens}`)
-
-        // 1. Send Text Reply First
+        let sentMessageId: string | null = null
+        // 2. Send Text Reply
         if (aiReply && aiReply.trim() !== '') {
             try {
-                await $fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                const sendRes: any = await $fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                     method: 'POST',
                     body: { chat_id: chatId, text: aiReply }
                 })
+                if (sendRes?.result?.message_id) {
+                    sentMessageId = sendRes.result.message_id.toString()
+                }
             } catch (sendErr: any) {
-                console.warn(`[TELEGRAM SEND WARNING]: Failed to send message via Telegram API (likely mock/simulated chatId or blocked bot):`, sendErr.message)
+                console.warn(`[TELEGRAM SEND WARNING]: Failed to send message via Telegram API:`, sendErr.message)
             }
         }
 
-        // 2. Send Images Second
+        // 3. Send Images (MediaGroup Album for 2-3 images, single photo if 1)
+        let mediaMessageIds: string[] = []
         if (hasImages && imagesToSend.length > 0) {
-            try {
-                const media = imagesToSend.map((url: string) => ({ type: 'photo', media: url }))
-                await $fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
-                    method: 'POST',
-                    body: { chat_id: chatId, media }
-                })
-            } catch (imgErr: any) {
-                console.error('[TELEGRAM IMAGE ERROR]:', imgErr.message)
+            const mediaRes = await sendTelegramMediaGroupReliable(chatId, imagesToSend, botToken)
+            if (Array.isArray(mediaRes)) {
+                mediaMessageIds = mediaRes.map(m => m.message_id ? m.message_id.toString() : '').filter(Boolean)
             }
         }
 
-        return { success: true }
+        // 4. Save AI Reply (Cleaned) with Exact Tokens, Attached Images & Telegram Message IDs
+        const historyContent = (hasImages && imagesToSend.length > 0)
+            ? `${aiReply}\n${imagesToSend.map(u => `[IMAGE: ${u}]`).join('\n')}`
+            : aiReply
+
+        await supabase.from('chat_history').insert({
+            agent_id: agent.id,
+            user_external_id: chatId.toString(),
+            customer_name: customerName,
+            customer_avatar: customerAvatar,
+            role: 'assistant',
+            content: historyContent,
+            images: imagesToSend,
+            tokens_used: tokens,
+            message_id: sentMessageId,
+            media_message_ids: mediaMessageIds
+        })
+
+        console.log(`[AGENT V2 TELEGRAM]: Replied to ${customerName} (${chatId}). State: ${agentRes.state}, Repaired: ${agentRes.repaired || false}`)
+return { success: true }
 
     } catch (e: any) {
         console.error(`[TELEGRAM AGENT ERROR V${VERSION}]:`, e.message || e.statusMessage || String(e))

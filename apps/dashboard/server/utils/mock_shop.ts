@@ -10,7 +10,18 @@ export interface MockProduct {
     size: string
     color: string
     price: number
+    regular_price?: number
     stock_quantity: number
+    image?: string
+    images?: Array<{ 
+        role: string
+        url: string
+        color?: string
+        size?: string
+        quantity?: number
+        price?: number
+    }>
+    assigned_agent?: string
 }
 
 // Read from JSON file
@@ -183,13 +194,30 @@ export async function checkMockStockForPrompt(userText: string, behavior?: any):
 
     const itemsToReport = matches.length > 0 ? matches : inventory
 
-    let report = '\n\n[MOCK SHOP REAL-TIME INVENTORY STOCK STATUS]:'
+    let report = '\n\n[MOCK SHOP REAL-TIME INVENTORY STOCK STATUS - ABSOLUTE TRUTH]:'
     itemsToReport.forEach(item => {
-        const status = item.stock_quantity > 0 
-            ? `${item.stock_quantity} in stock` 
+        const totalStatus = item.stock_quantity > 0 
+            ? `${item.stock_quantity} total in stock` 
             : 'OUT OF STOCK'
-        report += `\n- Product: "${item.name}" | Size: "${item.size}" | Color: "${item.color}" | Price: ৳${item.price} | Stock: ${status}`
+        
+        let variantsBreakdown = ''
+        if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+            const variantSummaries = item.images
+                .filter(img => img.color || img.quantity !== undefined || img.size)
+                .map(img => {
+                    const c = img.color || 'Standard'
+                    const s = img.size || item.size || 'Standard'
+                    const q = img.quantity !== undefined ? `${img.quantity} in stock` : (item.stock_quantity > 0 ? `${item.stock_quantity} in stock` : '0 in stock')
+                    return `${c} (Size: ${s}, Stock: ${q})`
+                })
+            if (variantSummaries.length > 0) {
+                variantsBreakdown = ` | Specific Variants Breakdown: [${variantSummaries.join('; ')}]`
+            }
+        }
+
+        report += `\n- Product: "${item.name}" | SKU: "${item.sku}" | Available Sizes: "${item.size}" | Price: ৳${item.price} | Total Stock: ${totalStatus}${variantsBreakdown}`
     })
+    report += `\n(CRITICAL INVENTORY RULE: You MUST check the specific variant stock above BEFORE asking for advance delivery payment or confirming any order. If a requested variant has limited stock (e.g. requested 2, but only 1 available in that color/size) or if the requested size is not available in that color, immediately inform the customer about the exact availability and offer available alternatives).`
     
     return report
 }
@@ -409,19 +437,52 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
 
         const inventory = getMockInventory()
         const index = inventory.findIndex(item => {
-            const matchesName = item.name.toLowerCase() === requestedItem.toLowerCase()
-            const matchesSize = !requestedSize || item.size.toLowerCase() === requestedSize.toLowerCase()
-            const matchesColor = !requestedColor || item.color.toLowerCase() === requestedColor.toLowerCase()
+            const matchesName = item.name.toLowerCase() === requestedItem.toLowerCase() || item.sku.toLowerCase() === requestedItem.toLowerCase()
+            
+            // Size match: exact, part of slash/comma list (e.g. "L/XL" matches "L"), or variant image size
+            const itemSizes = (item.size || '').toLowerCase().split(/[\/,\s]+/).map(s => s.trim()).filter(Boolean)
+            const imgSizes = (item.images || []).map(img => (img.size || '').trim().toLowerCase()).filter(Boolean)
+            const matchesSize = !requestedSize || (item.size || '').toLowerCase() === requestedSize.toLowerCase() || itemSizes.includes(requestedSize.toLowerCase()) || imgSizes.includes(requestedSize.toLowerCase())
+            
+            // Color match: top-level color or any image variant color
+            const imgColors = (item.images || []).map(img => (img.color || '').trim().toLowerCase()).filter(Boolean)
+            const matchesColor = !requestedColor || (item.color || '').toLowerCase() === requestedColor.toLowerCase() || imgColors.includes(requestedColor.toLowerCase())
+            
             return matchesName && matchesSize && matchesColor
         })
 
         if (index === -1) {
-            return { success: false, message: `Product "${requestedItem}" (Size: ${requestedSize}, Color: ${requestedColor}) not found in inventory`, deductedPrice: 0 }
+            return { success: false, message: `Product "${requestedItem}" (Size: ${requestedSize || 'N/A'}, Color: ${requestedColor || 'N/A'}) not found in inventory`, deductedPrice: 0 }
         }
 
         const product = inventory[index]
         if (!product) {
             return { success: false, message: 'Product not found', deductedPrice: 0 }
+        }
+
+        // Check if there is a specific variant image matching color and/or size
+        let matchedVariantImg = null
+        if (product.images && product.images.length > 0) {
+            if (requestedColor && requestedSize) {
+                matchedVariantImg = product.images.find(img => 
+                    (img.color || '').trim().toLowerCase() === requestedColor.toLowerCase() && 
+                    (!img.size || (img.size || '').trim().toLowerCase() === requestedSize.toLowerCase())
+                )
+            }
+            if (!matchedVariantImg && requestedColor) {
+                matchedVariantImg = product.images.find(img => (img.color || '').trim().toLowerCase() === requestedColor.toLowerCase())
+            }
+        }
+
+        if (matchedVariantImg && typeof matchedVariantImg.quantity === 'number') {
+            if (matchedVariantImg.quantity < requestedQty) {
+                return {
+                    success: false,
+                    message: `Insufficient stock for color "${requestedColor}". Requested: ${requestedQty}, Available: ${matchedVariantImg.quantity}`,
+                    deductedPrice: 0
+                }
+            }
+            matchedVariantImg.quantity -= requestedQty
         }
 
         if (product.stock_quantity < requestedQty) {
@@ -435,14 +496,245 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
         product.stock_quantity -= requestedQty
         saveMockInventory(inventory)
 
+        const finalItemPrice = (matchedVariantImg && typeof matchedVariantImg.price === 'number' && matchedVariantImg.price > 0) ? matchedVariantImg.price : product.price
         console.log(`[MOCK SHOP]: Successfully deducted ${requestedQty} units of ${product.name} (New Stock: ${product.stock_quantity})`)
         return { 
             success: true, 
-            message: `Successfully reserved ${requestedQty}x ${product.name}`, 
-            deductedPrice: product.price * requestedQty 
+            message: `Successfully reserved ${requestedQty}x ${product.name}${requestedColor ? ` (${requestedColor})` : ''}`, 
+            deductedPrice: finalItemPrice * requestedQty 
         }
     } catch (err: any) {
         console.error('[MOCK SHOP EXCEPTION]:', err)
         return { success: false, message: err.message, deductedPrice: 0 }
     }
+}
+
+// Unified, accurate, and intelligent product image resolver
+export function resolveIntelligentProductImages(
+    allImagesInput: any,
+    userTextInput: any = '',
+    aiReplyInput: any = '',
+    sessionState?: any,
+    requestedIdentifiers: string[] = []
+): string[] {
+    let allImages = allImagesInput
+    let userText = typeof userTextInput === 'string' ? userTextInput : ''
+    let aiReply = typeof aiReplyInput === 'string' ? aiReplyInput : ''
+
+    // Handle polymorphic parameter order: (queryStr, catalogArray)
+    if (typeof allImagesInput === 'string' && Array.isArray(userTextInput)) {
+        userText = allImagesInput
+        allImages = userTextInput
+    }
+
+    if (!allImages || !Array.isArray(allImages) || allImages.length === 0) return []
+
+    // Flatten if passed catalog products instead of raw image objects
+    const flattenedImages: any[] = []
+    for (const item of allImages) {
+        if (item.url && typeof item.url === 'string') {
+            flattenedImages.push(item)
+        } else if (Array.isArray(item.images)) {
+            for (const subImg of item.images) {
+                if (subImg.url) {
+                    flattenedImages.push({
+                        ...subImg,
+                        sku: subImg.sku || item.sku,
+                        name: subImg.name || item.name,
+                        id: subImg.id || item.id
+                    })
+                }
+            }
+        } else if (item.image && typeof item.image === 'string') {
+            flattenedImages.push({
+                sku: item.sku,
+                name: item.name,
+                id: item.id,
+                url: item.image,
+                role: 'hero'
+            })
+        }
+    }
+
+    if (flattenedImages.length === 0) return []
+
+    const u = (userText || '').toLowerCase()
+    const r = (aiReply || '').toLowerCase()
+    const sessProd = (sessionState?.collected_details?.product || sessionState?.collected_details?.item || '').toLowerCase()
+
+    // 1. Group images by unique product
+    const productMap = new Map<string, { key: string; id: string; sku: string; name: string; images: any[] }>()
+    for (const img of flattenedImages) {
+        const prodKey = (img.sku || img.name || img.id || 'default').toLowerCase()
+        if (!productMap.has(prodKey)) {
+            productMap.set(prodKey, {
+                key: prodKey,
+                id: (img.id || '').toLowerCase(),
+                sku: (img.sku || '').toLowerCase(),
+                name: (img.name || '').toLowerCase(),
+                images: []
+            })
+        }
+        productMap.get(prodKey)!.images.push(img)
+    }
+
+    const allProducts = Array.from(productMap.values())
+
+    // 2. Identify target product(s) from context
+    let targetProducts: typeof allProducts = []
+
+    // Priority A: Explicit LLM identifiers (e.g. [SEND_IMAGES: premium-winter-hoodie])
+    if (requestedIdentifiers.length > 0) {
+        targetProducts = allProducts.filter(p => 
+            requestedIdentifiers.some(id => 
+                p.sku === id || p.sku.includes(id) || id.includes(p.sku) ||
+                p.id === id || p.id.includes(id) || id.includes(p.id) ||
+                p.name.includes(id) || id.includes(p.name)
+            )
+        )
+    }
+
+    // Priority B: Product name, SKU, or keywords mentioned in user's CURRENT message
+    if (targetProducts.length === 0 && u) {
+        targetProducts = allProducts.filter(p => {
+            if (p.sku && u.includes(p.sku)) return true
+            if (p.name && u.includes(p.name)) return true
+            // Match significant product keywords (>= 3 chars, e.g. "hoodie", "t-shirt", "shirt", "pant", "jacket")
+            const keywords = p.name.split(/[\s-_]+/).filter(w => w.length >= 3 && !['and', 'for', 'the', 'new', 'men', 'women'].includes(w))
+            return keywords.some(k => u.includes(k))
+        })
+    }
+
+    // Priority C: Product name, SKU, or keywords mentioned in AI reply
+    if (targetProducts.length === 0 && r) {
+        targetProducts = allProducts.filter(p => {
+            if (p.sku && r.includes(p.sku)) return true
+            if (p.name && r.includes(p.name)) return true
+            const keywords = p.name.split(/[\s-_]+/).filter(w => w.length >= 3 && !['and', 'for', 'the', 'new', 'men', 'women'].includes(w))
+            return keywords.some(k => r.includes(k))
+        })
+    }
+
+    // Priority D: Active product in session state
+    if (targetProducts.length === 0 && sessProd) {
+        targetProducts = allProducts.filter(p => 
+            p.sku === sessProd || p.name === sessProd || p.name.includes(sessProd) || sessProd.includes(p.name)
+        )
+    }
+
+    // Candidate pool is strictly isolated to target product(s) if identified
+    let candidatePool = targetProducts.length > 0
+        ? targetProducts.flatMap(p => p.images)
+        : allImages
+
+    // 3. Check for specific color/variant requested in user's CURRENT message
+    const catalogColors = Array.from(new Set(candidatePool.map(img => (img.color || '').trim().toLowerCase()).filter(Boolean)))
+    
+    const colorSynonyms: Record<string, string[]> = {
+        'black and white': ['black and white', 'black & white', 'black white', 'shada kalo', 'সাদা কালো', 'কালো সাদা', 'bw', 'b&w'],
+        'sky blue': ['sky blue', 'sky', 'light blue', 'akashi', 'আকাশি'],
+        'navy blue': ['navy blue', 'navy', 'nevi', 'dark blue', 'নেভি'],
+        'maroon': ['maroon', 'maeon', 'merun', 'marun', 'meron', 'মারুন', 'খয়েরি', 'burgundy'],
+        'red': ['red', 'lal', 'লাল', 'crimson'],
+        'white': ['white', 'wht', 'shada', 'সাদা', 'off-white'],
+        'black': ['black', 'blk', 'kalo', 'কালো'],
+        'blue': ['blue', 'nil', 'নীল'],
+        'green': ['green', 'olive', 'shobuj', 'সবুজ'],
+        'yellow': ['yellow', 'holud', 'হলুদ', 'mustard'],
+        'pink': ['pink', 'golapi', 'গোলাপি', 'rose'],
+        'grey': ['grey', 'gray', 'ash', 'অ্যাশ', 'ধূসর'],
+        'beige': ['beige', 'khaki', 'খাকি']
+    }
+
+    // Sort color keys descending by length so compound names match before single words
+    const allColorKeys = Array.from(new Set([...catalogColors, ...Object.keys(colorSynonyms)]))
+        .sort((a, b) => b.length - a.length)
+
+    let detectedColor = ''
+    for (const key of allColorKeys) {
+        const synonyms = colorSynonyms[key] || [key]
+        const allTerms = [key, ...synonyms]
+        if (allTerms.some(term => u.includes(term))) {
+            detectedColor = key
+            break
+        }
+    }
+
+    // Check if user specifically requested "ALL" photos
+    const isAskingAll = /(all|shob|সব|both|each|collection|every|full|সবগুলো|সবগুলা|সব ছবি|সবগুলো ছবি|সম্পূর্ণ)/i.test(u)
+
+    if (detectedColor) {
+        const matched = candidatePool.filter(img => {
+            const c = (img.color || '').toLowerCase()
+            const synonyms = colorSynonyms[detectedColor] || [detectedColor]
+            return c === detectedColor || synonyms.some(syn => c === syn || (c && syn && (c.includes(syn) || syn.includes(c))))
+        })
+        if (matched.length > 0) {
+            console.log(`[RESOLVE PRODUCT IMAGES]: Exact color match found for "${detectedColor}" (${matched.length} photo(s))`)
+            const limit = isAskingAll ? 10 : 3
+            return matched.slice(0, limit).map(img => img.url)
+        }
+    }
+
+    // 4. Check for specific angle / view requested in userText
+    if (/(back|behind|rear|pechon|pichon|পিছনের|পিছন)/i.test(u)) {
+        const match = candidatePool.find(img => img.role === 'back')
+        if (match) return [match.url]
+    }
+    if (/(front|samne|samner|সামনের|সামনে)/i.test(u)) {
+        const match = candidatePool.find(img => img.role === 'hero')
+        if (match) return [match.url]
+    }
+    if (/(chart|size|measurement|মাপ|সাইজ)/i.test(u)) {
+        const match = candidatePool.find(img => img.role === 'chart')
+        if (match) return [match.url]
+    }
+    if (/(detail|fabric|material|close|কাপড়|ফেব্রিক)/i.test(u)) {
+        const match = candidatePool.find(img => img.role === 'detail')
+        if (match) return [match.url]
+    }
+    if (/(model|wearing|worn|পরা|মডেল)/i.test(u)) {
+        const match = candidatePool.find(img => img.role === 'model')
+        if (match) return [match.url]
+    }
+
+    // 5. Check if user asked for "ALL" photos (Deliver all available images up to album max limit 10)
+    if (isAskingAll) {
+        console.log(`[RESOLVE PRODUCT IMAGES]: User requested ALL photos. Delivering all ${candidatePool.length} available photos.`)
+        return candidatePool.slice(0, 10).map(img => img.url)
+    }
+
+    // 6. Check if user asked for "ANOTHER" / "NEXT" / "MORE" / "DIFFERENT" / "ONNO" / "ARO" image
+    if (/(another|next|more|different|onno|অন্য|aro|আর|আরেক|arekt|2nd|second|other)/i.test(u)) {
+        if (candidatePool.length > 1) {
+            const secondImg = candidatePool[1] || candidatePool.find(img => img.role !== 'hero')
+            if (secondImg) return [secondImg.url]
+        }
+    }
+
+    // 7. Check sessionState for pre-selected color in active order
+    if (sessionState?.collected_details?.color) {
+        const sessCol = (sessionState.collected_details.color || '').toLowerCase()
+        const matched = candidatePool.filter(img => (img.color || '').toLowerCase().includes(sessCol))
+        if (matched.length > 0) return matched.slice(0, 3).map(img => img.url)
+    }
+
+    // 8. General product overview (Curated Power Trio: distinct colors/roles within target product)
+    const distinctList: any[] = []
+    const seenPointers = new Set<string>()
+
+    for (const img of candidatePool) {
+        const key = (img.color || img.role || img.url).toLowerCase()
+        if (!seenPointers.has(key)) {
+            seenPointers.add(key)
+            distinctList.push(img)
+        }
+        if (distinctList.length >= 3) break
+    }
+
+    if (distinctList.length > 0) {
+        return distinctList.map(img => img.url)
+    }
+
+    return candidatePool.slice(0, 3).map(img => img.url)
 }

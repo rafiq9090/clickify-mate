@@ -37,6 +37,7 @@ export const useSupabase = () => {
     let filters: any[] = []
     let orderVal: any = null
     let limitVal: number | null = null
+    let rangeVal: { from: number; to: number } | null = null
     let singleVal = false
     let maybeSingleVal = false
     let countOption: string | null = null
@@ -74,6 +75,10 @@ export const useSupabase = () => {
         filters.push({ type: 'eq', column, value })
         return builder
       },
+      neq: (column: string, value: any) => {
+        filters.push({ type: 'neq', column, value })
+        return builder
+      },
       in: (column: string, values: any[]) => {
         filters.push({ type: 'in', column, values })
         return builder
@@ -82,8 +87,44 @@ export const useSupabase = () => {
         filters.push({ type: 'gte', column, value })
         return builder
       },
+      lte: (column: string, value: any) => {
+        filters.push({ type: 'lte', column, value })
+        return builder
+      },
+      gt: (column: string, value: any) => {
+        filters.push({ type: 'gt', column, value })
+        return builder
+      },
       lt: (column: string, value: any) => {
         filters.push({ type: 'lt', column, value })
+        return builder
+      },
+      is: (column: string, value: any) => {
+        filters.push({ type: 'is', column, value })
+        return builder
+      },
+      not: (column: string, op: string, value: any) => {
+        filters.push({ type: 'not', column, op, value })
+        return builder
+      },
+      filter: (column: string, op: string, value: any) => {
+        if (op === 'eq') filters.push({ type: 'eq', column, value })
+        else if (op === 'neq') filters.push({ type: 'neq', column, value })
+        else if (op === 'is') filters.push({ type: 'is', column, value })
+        else if (op === 'in') filters.push({ type: 'in', column, values: value })
+        else filters.push({ type: op, column, value })
+        return builder
+      },
+      or: (filterString: string) => {
+        filters.push({ type: 'or', value: filterString })
+        return builder
+      },
+      ilike: (column: string, value: any) => {
+        filters.push({ type: 'ilike', column, value })
+        return builder
+      },
+      range: (from: number, to: number) => {
+        rangeVal = { from, to }
         return builder
       },
       order: (column: string, options?: { ascending?: boolean }) => {
@@ -113,6 +154,7 @@ export const useSupabase = () => {
               filters,
               orderVal,
               limitVal,
+              rangeVal,
               singleVal,
               maybeSingleVal,
               countOption

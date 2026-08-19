@@ -64,19 +64,14 @@ export const useInventory = (showToast: Function, askConfirm: Function) => {
     }
 
     const resetToDefaultInventory = () => {
-        askConfirm('Reset Mock Inventory?', 'This will reset your mock inventory to the default four demo products.', async () => {
-            const defaults = [
-                { id: 'item-001', name: 'Blue T-Shirt', sku: 'BLUE-SHIRT-M', size: 'M', color: 'Blue', price: 1200, stock_quantity: 5 },
-                { id: 'item-002', name: 'Blue T-Shirt', sku: 'BLUE-SHIRT-L', size: 'L', color: 'Blue', price: 1200, stock_quantity: 0 },
-                { id: 'item-003', name: 'Black Hoodie', sku: 'BLACK-HOODIE-L', size: 'L', color: 'Black', price: 1800, stock_quantity: 3 },
-                { id: 'item-004', name: 'White Sneakers', sku: 'WHITE-SNEAKERS-42', size: '42', color: 'White', price: 2500, stock_quantity: 10 }
-            ]
+        askConfirm('Clear Inventory?', 'This will remove all products from your catalog.', async () => {
+            const defaults: any[] = []
             mockInventory.value = defaults
             try {
                 await $fetch('/api/admin/inventory', { method: 'POST', body: defaults })
-                showToast('Mock inventory reset to default demo data', 'success')
+                showToast('Catalog cleared', 'success')
             } catch (e: any) {
-                showToast('Failed to reset: ' + e.message, 'error')
+                showToast('Failed to clear: ' + e.message, 'error')
             }
         })
     }

@@ -4,18 +4,22 @@ import { decrypt } from '../../utils/encryption'
 
 export default defineEventHandler(async (event) => {
     const body = await readBody(event)
-    const { platform, token, knowledge } = body
+    const { platform, token, knowledge, name } = body
 
     if (!platform || !token) {
-        throw createError({ statusCode: 400, statusMessage: 'Metadata missing' })
+        throw createError({ statusCode: 400, statusMessage: 'Metadata missing: platform and token are required' })
     }
 
     try {
         const supabase = useSupabaseAdmin()
         
-        // Manual User Extraction (Since you are not using Nuxt Supabase Module)
-        // We look for the user from the event context or the Authorization header
-        const { data: { user: supabaseUser } } = await supabase.auth.getUser(getRequestHeader(event, 'authorization')?.split(' ')[1])
+        // Extract JWT token from Authorization header or cookie
+        const authHeader = getRequestHeader(event, 'authorization')
+        const tokenStr = authHeader?.startsWith('Bearer ') 
+            ? authHeader.substring(7) 
+            : (authHeader?.split(' ')[1] || getCookie(event, 'toolkit_user_auth'))
+
+        const { data: { user: supabaseUser } } = await supabase.auth.getUser(tokenStr)
 
         if (!supabaseUser) {
             throw createError({ statusCode: 401, statusMessage: 'Session expired. Please log in again.' })
@@ -25,21 +29,28 @@ export default defineEventHandler(async (event) => {
         const encryptedToken = encrypt(token)
 
         let externalId = null
+        let detectedName = name || ''
 
-        // 3.5 Auto-detect External ID for Meta Platforms (FB, Messenger, WhatsApp)
+        // Auto-detect External ID and Name for Meta Platforms (FB, Messenger, WhatsApp)
         if (['messenger', 'fb_comment', 'facebook', 'whatsapp'].includes(platform)) {
             try {
                 // 1. Get the main account ID (Page ID or WABA ID)
-                const metaData: any = await $fetch(`https://graph.facebook.com/v19.0/me?fields=id&access_token=${token}`)
+                const metaData: any = await $fetch(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${token}`).catch(() => null)
                 if (metaData?.id) {
                     externalId = metaData.id
+                    if (!detectedName && metaData.name) {
+                        detectedName = metaData.name
+                    }
                     
-                    // 2. For WhatsApp, we specifically need the phone_number_id for messages
+                    // 2. For WhatsApp, specifically fetch phone_number_id
                     if (platform === 'whatsapp') {
                         try {
-                            const phones: any = await $fetch(`https://graph.facebook.com/v19.0/${externalId}/phone_numbers?access_token=${token}`)
+                            const phones: any = await $fetch(`https://graph.facebook.com/v19.0/${externalId}/phone_numbers?access_token=${token}`).catch(() => null)
                             if (phones?.data?.[0]?.id) {
                                 externalId = phones.data[0].id
+                                if (phones.data[0].display_phone_number) {
+                                    detectedName = `${detectedName || 'WhatsApp'} (${phones.data[0].display_phone_number})`
+                                }
                                 console.log(`[AGENT CONNECT]: Auto-detected WhatsApp Phone ID: ${externalId}`)
                             }
                         } catch (phoneErr: any) {
@@ -54,20 +65,25 @@ export default defineEventHandler(async (event) => {
             }
         }
 
-        // 3.6 Auto-detect External ID for Telegram
+        // Auto-detect External ID for Telegram
         if (platform === 'telegram') {
             try {
-                const tgData: any = await $fetch(`https://api.telegram.org/bot${token}/getMe`)
+                const tgData: any = await $fetch(`https://api.telegram.org/bot${token}/getMe`).catch(() => null)
                 if (tgData?.result?.id) {
                     externalId = tgData.result.id.toString()
-                    console.log(`[AGENT CONNECT]: Auto-detected Telegram Bot ID: ${externalId}`)
+                    if (!detectedName && (tgData.result.first_name || tgData.result.username)) {
+                        detectedName = tgData.result.first_name || `@${tgData.result.username}`
+                    }
+                    console.log(`[AGENT CONNECT]: Auto-detected Telegram Bot: ${detectedName} (${externalId})`)
                 }
             } catch (tgErr: any) {
                 console.warn(`[AGENT CONNECT]: Could not fetch Telegram Bot info: ${tgErr.message}`)
             }
         }
 
-        // Check if this token or external_id is already registered to another user
+        const agentLabel = detectedName || `${platform.charAt(0).toUpperCase() + platform.slice(1)} Agent`
+
+        // Check if this external_id is already registered to ANOTHER user
         if (externalId) {
             const { data: existingSameId } = await supabase
                 .from('agent_configs')
@@ -79,59 +95,71 @@ export default defineEventHandler(async (event) => {
                 if (otherUserAgent) {
                     throw createError({
                         statusCode: 409,
-                        statusMessage: `This ${platform} connection (ID: ${externalId}) is already connected by another user or agent.`
+                        statusMessage: `This ${platform} account/bot (ID: ${externalId}) is already connected by another user.`
                     })
                 }
             }
         }
 
-        const { data: allPlatformAgents } = await supabase
-            .from('agent_configs')
-            .select('id, user_id, encrypted_token, platform')
-            .eq('platform', platform)
-
-        if (allPlatformAgents && allPlatformAgents.length > 0) {
-            for (const agentConfig of allPlatformAgents) {
-                if (agentConfig.user_id === user_id) continue
-                try {
-                    const decrypted = await decrypt(agentConfig.encrypted_token)
-                    if (decrypted === token) {
-                        throw createError({
-                            statusCode: 409,
-                            statusMessage: `This webhook key/token is already connected to another user's website agent.`
-                        })
-                    }
-                } catch (decErr) {
-                    console.warn(`[AGENT CONNECT]: Decryption failed for agent config ${agentConfig.id}`)
-                }
+        // Check if this exact user already has this external_id or token -> update it; otherwise insert new agent!
+        let existingUserAgent: any = null
+        if (externalId) {
+            const { data: found } = await supabase
+                .from('agent_configs')
+                .select('*')
+                .eq('user_id', user_id)
+                .eq('external_id', externalId)
+            if (found && found.length > 0) {
+                existingUserAgent = found[0]
             }
         }
 
-        const { data, error } = await supabase.from('agent_configs').upsert({
-            platform,
-            user_id: user_id,
-            encrypted_token: encryptedToken,
-            external_id: externalId,
-            knowledge: knowledge || '',
-            is_active: true,
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id,platform' }).select()
+        let activeAgent: any = null
 
-        if (error) throw error
+        if (existingUserAgent) {
+            // Update existing agent configuration
+            const { data, error } = await supabase
+                .from('agent_configs')
+                .update({
+                    name: agentLabel,
+                    encrypted_token: encryptedToken,
+                    knowledge: knowledge || existingUserAgent.knowledge || '',
+                    is_active: true,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existingUserAgent.id)
+                .select()
+            if (error) throw error
+            activeAgent = (data as any)?.[0] || existingUserAgent
+        } else {
+            // Insert brand new agent row (supports MULTIPLE agents on the same platform!)
+            const { data, error } = await supabase
+                .from('agent_configs')
+                .insert({
+                    user_id: user_id,
+                    name: agentLabel,
+                    platform,
+                    encrypted_token: encryptedToken,
+                    external_id: externalId,
+                    knowledge: knowledge || '',
+                    product_images: [],
+                    is_active: true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .select()
+            if (error) throw error
+            activeAgent = (data as any)?.[0]
+        }
 
-        const activeAgent = (data as any)?.[0]
         const agentId = activeAgent?.id
 
         const host = getRequestHeader(event, 'host')
         const protocol = host?.includes('localhost') ? 'http' : 'https'
         const siteUrl = `${protocol}://${host}`
 
-        const config = useRuntimeConfig()
-        const verifyToken = config.public.verifyToken
-
-        // 4. If Facebook/Messenger, AUTOMATICALLY subscribe the App to the Page
+        // Automatic Meta Subscription
         if (['messenger', 'fb_comment', 'facebook'].includes(platform) && externalId) {
-            console.log(`[AGENT AUTO-SYNC]: Subscribing App to Page ${externalId}`)
             try {
                 await $fetch(`https://graph.facebook.com/v19.0/${externalId}/subscribed_apps`, {
                     method: 'POST',
@@ -139,62 +167,37 @@ export default defineEventHandler(async (event) => {
                         subscribed_fields: 'feed,messages,messaging_postbacks',
                         access_token: token
                     }
-                })
-                console.log(`[AGENT AUTO-SYNC]: SUCCESS! Meta is now pushing real-time data for Page ${externalId}`)
+                }).catch(() => null)
+                console.log(`[AGENT AUTO-SYNC]: Subscribed Meta App to Page ${externalId}`)
             } catch (fbErr: any) {
-                console.error(`[AGENT AUTO-SYNC]: Failed to subscribe to Meta: ${fbErr.message}`)
+                console.error(`[AGENT AUTO-SYNC]: Meta subscription note: ${fbErr.message}`)
             }
         }
 
-        // 5. If Telegram, AUTOMATICALLY register the Webhook
+        // Automatic Telegram Webhook Registration
         if (platform === 'telegram' && agentId) {
-            const webhookUrl = `${siteUrl}/webhook/telegram?agent_id=${agentId}`
-            console.log(`[AGENT AUTO-SYNC]: Registering Webhook: ${webhookUrl}`)
-
+            const webhookUrl = `${siteUrl}/api/agents/telegram?agent_id=${agentId}`
             try {
                 await $fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
                     method: 'POST',
                     body: { url: webhookUrl }
-                })
-                console.log(`[AGENT AUTO-SYNC]: SUCCESS! Telegram now points to this Agent ID: ${agentId}`)
+                }).catch(() => null)
+                console.log(`[AGENT AUTO-SYNC]: Registered Telegram Webhook: ${webhookUrl}`)
             } catch (tgErr: any) {
-                console.error(`[AGENT AUTO-SYNC]: Failed to sync with Telegram: ${tgErr.message}`)
+                console.error(`[AGENT AUTO-SYNC]: Telegram webhook note: ${tgErr.message}`)
             }
-        }
-
-        // 5. Unified Terminal Logs for Meta Platforms (WhatsApp, FB, Messenger)
-        if (['whatsapp', 'messenger', 'fb_comment', 'facebook'].includes(platform) && agentId) {
-            const endpoint = platform === 'whatsapp' ? 'whatsapp' : 'facebook'
-            const smartUrl = `${siteUrl}/api/agents/${endpoint}`
-            const manualUrl = `${smartUrl}?agent_id=${agentId}`
-
-            console.log(`\n==================================================`)
-            console.log(`[META SETUP]: NEW ${platform.toUpperCase()} CONNECTION!`)
-            console.log(`VERIFY TOKEN: ${verifyToken}`)
-            console.log(`--------------------------------------------------`)
-            console.log(`SMART URL (Recommended): ${smartUrl}`)
-            if (externalId) {
-                console.log(`(We auto-detected ID: ${externalId})`)
-            }
-            console.log(`MANUAL URL (Fallback): ${manualUrl}`)
-            console.log(`(Use the Manual URL if the Smart URL fails to find your agent)`)
-            
-            if (platform !== 'whatsapp') {
-                console.log(`SUBSCRIPTIONS: messages, messaging_postbacks, feed`)
-            }
-            console.log(`==================================================\n`)
         }
 
         return {
             success: true,
             agent_id: agentId,
-            message: platform === 'telegram' 
-                ? 'Agent established and synced with Telegram.' 
-                : 'Agent established! Please update your Meta Webhook with the ID shown in the terminal.'
+            agent_name: agentLabel,
+            message: `${agentLabel} connected successfully!`
         }
 
     } catch (e: any) {
         console.error('[AGENT CONNECT ERROR]:', e.message)
+        if (e.statusCode) throw e
         throw createError({ statusCode: 500, statusMessage: e.message })
     }
 })

@@ -1,15 +1,29 @@
 <template>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-    <div v-for="stat in stats" :key="stat.label" class="bg-surface/40 border border-outline/60 p-6 md:p-8 rounded-[2rem] md:rounded-[1.5rem] shadow-md hover:shadow-primary/20 transition-all group overflow-hidden relative">
-      <div class="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors"></div>
-      <div class="flex items-center justify-between mb-4">
-        <span class="material-symbols-outlined text-3xl" :class="stat.color">{{ stat.icon }}</span>
-        <span class="text-[10px] font-black text-secondary uppercase tracking-widest flex items-center gap-1">
-          <span class="material-symbols-outlined text-sm">trending_up</span> {{ stat.growth }}
-        </span>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div 
+      v-for="stat in stats" 
+      :key="stat.label" 
+      class="relative overflow-hidden rounded-2xl bg-surface border border-outline/70 p-6 shadow-sm hover:shadow-md transition-all duration-300 group hover:border-primary/40"
+    >
+      <!-- Background subtle glow -->
+      <div class="absolute -right-6 -top-6 w-28 h-28 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+      
+      <div class="relative z-10">
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-primary/10 text-primary border border-primary/15 transition-transform duration-300 group-hover:scale-110 shadow-sm">
+            <span class="material-symbols-outlined text-2xl" :class="stat.color">{{ stat.icon }}</span>
+          </div>
+          <span v-if="stat.growth" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <span class="material-symbols-outlined text-sm">trending_up</span>
+            {{ stat.growth }}
+          </span>
+        </div>
+        
+        <div>
+          <div class="text-3xl font-bold tracking-tight text-on-surface mb-1">{{ stat.value }}</div>
+          <p class="text-xs font-medium uppercase tracking-wider text-on-surface-variant">{{ stat.label }}</p>
+        </div>
       </div>
-      <div class="text-4xl font-black tracking-tighter mb-1 text-on-surface">{{ stat.value }}</div>
-      <div class="text-[11px] font-black uppercase tracking-widest text-on-surface-variant">{{ stat.label }}</div>
     </div>
   </div>
 </template>

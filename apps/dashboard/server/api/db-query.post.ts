@@ -9,14 +9,15 @@ export default defineEventHandler(async (event) => {
     table, 
     action, 
     queryData, 
-    filters, 
+    filters = [], 
     orderVal, 
     limitVal, 
+    rangeVal,
     singleVal, 
     maybeSingleVal, 
     countOption, 
     onConflictVal 
-  } = body
+  } = body || {}
 
   // Extract JWT token from header or cookie
   const authHeader = getRequestHeader(event, 'authorization')
@@ -32,12 +33,13 @@ export default defineEventHandler(async (event) => {
 
     // Row-level Security: enforce user_id restriction for user-owned agent configurations
     if (table === 'agent_configs') {
+      const activeFilters = Array.isArray(filters) ? filters : []
       if (action === 'select' || action === 'delete' || action === 'update') {
-        const userFilterIndex = filters.findIndex((f: any) => f.column === 'user_id')
+        const userFilterIndex = activeFilters.findIndex((f: any) => f.column === 'user_id')
         if (userFilterIndex !== -1) {
-          filters[userFilterIndex].value = decoded.id
+          activeFilters[userFilterIndex].value = decoded.id
         } else {
-          filters.push({ type: 'eq', column: 'user_id', value: decoded.id })
+          activeFilters.push({ type: 'eq', column: 'user_id', value: decoded.id })
         }
       } else if (action === 'insert' || action === 'upsert') {
         const injectUser = (item: any) => {
@@ -59,8 +61,10 @@ export default defineEventHandler(async (event) => {
       filters,
       orderVal,
       limitVal,
+      rangeVal,
       singleVal,
       maybeSingleVal,
+      countOption,
       onConflictVal
     })
 
@@ -68,16 +72,10 @@ export default defineEventHandler(async (event) => {
       return { data: null, error: { message: result.error }, count: 0 }
     }
 
-    // Mock count return for pagination queries
-    let count = 0
-    if (countOption === 'exact' && Array.isArray(result.data)) {
-      count = result.data.length
-    }
-
     return {
       data: result.data,
       error: null,
-      count
+      count: result.count !== undefined ? result.count : (Array.isArray(result.data) ? result.data.length : 0)
     }
   } catch (err: any) {
     console.error('[DB QUERY ENDPOINT EXCEPTION]:', err)

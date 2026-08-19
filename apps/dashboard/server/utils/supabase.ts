@@ -24,14 +24,19 @@ export const useSupabaseAdmin = () => {
       let filters: any[] = []
       let orderVal: any = null
       let limitVal: number | null = null
+      let rangeVal: { from: number; to: number } | null = null
       let singleVal = false
       let maybeSingleVal = false
+      let countOption: string | null = null
       let onConflictVal: string | null = null
 
       const builder = {
-        select: (fields = '*') => {
+        select: (fields = '*', options?: { count?: string }) => {
           if (action === 'select') {
             action = 'select'
+          }
+          if (options?.count) {
+            countOption = options.count
           }
           return builder
         },
@@ -61,6 +66,10 @@ export const useSupabaseAdmin = () => {
           filters.push({ type: 'eq', column, value })
           return builder
         },
+        neq: (column: string, value: any) => {
+          filters.push({ type: 'neq', column, value })
+          return builder
+        },
         in: (column: string, values: any[]) => {
           filters.push({ type: 'in', column, values })
           return builder
@@ -69,8 +78,44 @@ export const useSupabaseAdmin = () => {
           filters.push({ type: 'gte', column, value })
           return builder
         },
+        lte: (column: string, value: any) => {
+          filters.push({ type: 'lte', column, value })
+          return builder
+        },
+        gt: (column: string, value: any) => {
+          filters.push({ type: 'gt', column, value })
+          return builder
+        },
         lt: (column: string, value: any) => {
           filters.push({ type: 'lt', column, value })
+          return builder
+        },
+        is: (column: string, value: any) => {
+          filters.push({ type: 'is', column, value })
+          return builder
+        },
+        not: (column: string, op: string, value: any) => {
+          filters.push({ type: 'not', column, op, value })
+          return builder
+        },
+        filter: (column: string, op: string, value: any) => {
+          if (op === 'eq') filters.push({ type: 'eq', column, value })
+          else if (op === 'neq') filters.push({ type: 'neq', column, value })
+          else if (op === 'is') filters.push({ type: 'is', column, value })
+          else if (op === 'in') filters.push({ type: 'in', column, values: value })
+          else filters.push({ type: op, column, value })
+          return builder
+        },
+        or: (filterString: string) => {
+          filters.push({ type: 'or', value: filterString })
+          return builder
+        },
+        ilike: (column: string, value: any) => {
+          filters.push({ type: 'ilike', column, value })
+          return builder
+        },
+        range: (from: number, to: number) => {
+          rangeVal = { from, to }
           return builder
         },
         order: (column: string, options?: { ascending?: boolean }) => {
@@ -98,14 +143,16 @@ export const useSupabaseAdmin = () => {
               filters,
               orderVal,
               limitVal,
+              rangeVal,
               singleVal,
               maybeSingleVal,
+              countOption,
               onConflictVal
             })
             if (onFulfilled) return onFulfilled(res)
             return res
           } catch (err: any) {
-            const formattedErr = { data: null, error: err.message || err }
+            const formattedErr = { data: null, error: err.message || err, count: 0 }
             if (onRejected) return onRejected(formattedErr)
             return formattedErr
           }
@@ -116,6 +163,19 @@ export const useSupabaseAdmin = () => {
   }
 }
 
+function formatColumnExpr(col: string): string {
+  if (!col) return '""'
+  if (col.includes('->>')) {
+    const parts = col.split('->>')
+    return `("${parts[0].trim()}"->>'${parts[1].trim()}')`
+  }
+  if (col.includes('->')) {
+    const parts = col.split('->')
+    return `("${parts[0].trim()}"->'${parts[1].trim()}')`
+  }
+  return `"${col}"`
+}
+
 // Global executor mapping queries to PostgreSQL or MongoDB
 export async function executeQuery(query: {
   table: string
@@ -124,11 +184,13 @@ export async function executeQuery(query: {
   filters: any[]
   orderVal?: any
   limitVal?: number | null
+  rangeVal?: { from: number; to: number } | null
   singleVal?: boolean
   maybeSingleVal?: boolean
+  countOption?: string | null
   onConflictVal?: string | null
 }) {
-  const { table, action, queryData, filters, orderVal, limitVal, singleVal, maybeSingleVal, onConflictVal } = query
+  const { table, action, queryData, filters, orderVal, limitVal, rangeVal, singleVal, maybeSingleVal, countOption, onConflictVal } = query
 
   // Route chat_history to MongoDB
   if (table === 'chat_history') {
@@ -154,7 +216,9 @@ export async function executeQuery(query: {
       if (orderVal) {
         cursor = cursor.sort({ [orderVal.column]: orderVal.ascending ? 1 : -1 })
       }
-      if (limitVal) {
+      if (rangeVal) {
+        cursor = cursor.skip(rangeVal.from).limit(rangeVal.to - rangeVal.from + 1)
+      } else if (limitVal) {
         cursor = cursor.limit(limitVal)
       }
       const data = await cursor.toArray()
@@ -211,50 +275,107 @@ export async function executeQuery(query: {
   let paramIndex = 1
 
   const buildWhereClause = () => {
-    if (filters.length === 0) return ''
+    if (!filters || filters.length === 0) return ''
     const clauses: string[] = []
     for (const f of filters) {
+      const colExpr = f.column ? formatColumnExpr(f.column) : ''
       if (f.type === 'eq') {
-        clauses.push(`"${f.column}" = $${paramIndex++}`)
+        clauses.push(`${colExpr} = $${paramIndex++}`)
+        values.push(f.value)
+      } else if (f.type === 'neq') {
+        clauses.push(`${colExpr} != $${paramIndex++}`)
         values.push(f.value)
       } else if (f.type === 'in') {
-        clauses.push(`"${f.column}" = ANY($${paramIndex++})`)
+        clauses.push(`${colExpr} = ANY($${paramIndex++})`)
         values.push(f.values || f.value)
       } else if (f.type === 'gte') {
-        clauses.push(`"${f.column}" >= $${paramIndex++}`)
+        clauses.push(`${colExpr} >= $${paramIndex++}`)
+        values.push(f.value)
+      } else if (f.type === 'lte') {
+        clauses.push(`${colExpr} <= $${paramIndex++}`)
+        values.push(f.value)
+      } else if (f.type === 'gt') {
+        clauses.push(`${colExpr} > $${paramIndex++}`)
         values.push(f.value)
       } else if (f.type === 'lt') {
-        clauses.push(`"${f.column}" < $${paramIndex++}`)
+        clauses.push(`${colExpr} < $${paramIndex++}`)
         values.push(f.value)
+      } else if (f.type === 'is') {
+        if (f.value === null) {
+          clauses.push(`${colExpr} IS NULL`)
+        } else {
+          clauses.push(`${colExpr} IS ${f.value}`)
+        }
+      } else if (f.type === 'not') {
+        if (f.op === 'is' && f.value === null) {
+          clauses.push(`${colExpr} IS NOT NULL`)
+        } else if (f.op === 'eq') {
+          clauses.push(`${colExpr} != $${paramIndex++}`)
+          values.push(f.value)
+        }
+      } else if (f.type === 'ilike') {
+        clauses.push(`${colExpr} ILIKE $${paramIndex++}`)
+        values.push(f.value)
+      } else if (f.type === 'or') {
+        const orParts = (f.value || '').split(',').map((p: string) => p.trim()).filter(Boolean)
+        const orClauses: string[] = []
+        for (const part of orParts) {
+          const match = part.match(/^([^.]+)\.(eq|neq|ilike|like)\.(.*)$/)
+          if (match) {
+            const cExpr = formatColumnExpr(match[1])
+            const op = match[2].toUpperCase()
+            orClauses.push(`${cExpr} ${op} $${paramIndex++}`)
+            values.push(match[3])
+          }
+        }
+        if (orClauses.length > 0) {
+          clauses.push(`(${orClauses.join(' OR ')})`)
+        }
       }
     }
-    return `WHERE ${clauses.join(' AND ')}`
+    return clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
   }
 
   if (action === 'select') {
     const where = buildWhereClause()
     let orderBy = ''
     if (orderVal) {
-      orderBy = `ORDER BY "${orderVal.column}" ${orderVal.ascending ? 'ASC' : 'DESC'}`
+      orderBy = `ORDER BY ${formatColumnExpr(orderVal.column)} ${orderVal.ascending ? 'ASC' : 'DESC'}`
     }
     let limitStr = ''
-    if (limitVal) {
+    if (rangeVal) {
+      const offset = rangeVal.from || 0
+      const limit = rangeVal.to - rangeVal.from + 1
+      limitStr = `LIMIT ${limit} OFFSET ${offset}`
+    } else if (limitVal) {
       limitStr = `LIMIT ${limitVal}`
     }
+
     sql = `SELECT * FROM public."${table}" ${where} ${orderBy} ${limitStr}`
     const dbRes = await queryPg(sql, values)
     const rows = dbRes.rows
+
+    let totalCount = rows.length
+    if (countOption === 'exact') {
+      try {
+        const countSql = `SELECT COUNT(*) as count FROM public."${table}" ${where}`
+        const countRes = await queryPg(countSql, values.slice(0, paramIndex - 1))
+        totalCount = parseInt(countRes.rows[0]?.count || '0', 10)
+      } catch (countErr) {
+        console.warn('[DB COUNT WARN]:', countErr)
+      }
+    }
 
     if (singleVal) {
       if (rows.length === 0) {
         throw new Error('No rows found')
       }
-      return { data: rows[0], error: null }
+      return { data: rows[0], error: null, count: 1 }
     }
     if (maybeSingleVal) {
-      return { data: rows[0] || null, error: null }
+      return { data: rows[0] || null, error: null, count: rows.length ? 1 : 0 }
     }
-    return { data: rows, error: null }
+    return { data: rows, error: null, count: totalCount }
   }
 
   if (action === 'insert') {

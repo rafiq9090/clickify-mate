@@ -5,11 +5,11 @@ export default defineEventHandler(async (event) => {
      const { data: messages, error } = await client
         .from('leads')
         .select('*')
-        .eq('source', 'contact_form')
         .order('created_at', { ascending: false })
+        .limit(50)
      
      if (error) {
-         return { success: false, error: 'Failed to access leads table', messages: [] }
+         return { success: false, error: error?.message || error, messages: [] }
      }
      
      return { success: true, messages: messages || [] }

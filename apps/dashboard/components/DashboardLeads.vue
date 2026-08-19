@@ -1,233 +1,301 @@
 <template>
-  <section class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-    <div class="flex flex-col lg:flex-col lg:items-left justify-left gap-6 pb-6">
-      <div class="space-y-2">
-        <div class="flex items-left gap-3">
-          <span class="w-2 bg-primary rounded-full animate-pulse shadow-[0_0_12px_rgba(var(--primary-rgb),0.5)]"></span>
-          <h2 class="text-xl md:text-2xl font-black tracking-tight text-on-surface">Customer Orders</h2>
+  <section class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <!-- Header & Controls -->
+    <div class="space-y-4 pb-2 border-b border-outline/40">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <span class="material-symbols-outlined text-xl">shopping_cart</span>
+            </div>
+            <h2 class="text-xl font-bold tracking-tight text-on-surface">Customer Leads & Orders</h2>
+          </div>
+          <p class="text-xs text-on-surface-variant mt-1">
+            Real-time orders and inquiries automatically gathered by your AI agents across all channels.
+          </p>
+        </div>
+
+        <!-- Top Actions -->
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <button 
+            @click="$emit('refresh')"
+            :disabled="loading"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            title="Refresh Leads"
+          >
+            <span class="material-symbols-outlined text-base text-primary" :class="loading ? 'animate-spin' : ''">refresh</span>
+            Refresh
+          </button>
+
+          <button 
+            @click="$emit('export-csv')"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-base text-primary">download</span>
+            Export CSV
+          </button>
+
+          <button 
+            v-if="selectedLeads.length > 0"
+            @click="$emit('bulk-send-to-steadfast')"
+            :disabled="sendingToSteadfast"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all shadow-sm disabled:opacity-50 cursor-pointer animate-in fade-in"
+          >
+            <span class="material-symbols-outlined text-base" :class="sendingToSteadfast ? 'animate-spin' : ''">local_shipping</span>
+            Send {{ selectedLeads.length }} to Courier
+          </button>
         </div>
       </div>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-wrap items-center gap-3">
+
+      <!-- Filters & Search Bar -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2">
         <!-- Search Input -->
-        <div class="relative group w-full lg:w-auto">
-          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-lg group-focus-within:text-primary transition-all">search</span>
+        <div class="md:col-span-5 relative">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-lg">search</span>
           <input 
             :value="searchQuery"
             @input="$emit('update:searchQuery', $event.target.value)"
             type="text" 
-            placeholder="Find leads, orders, info..."
-            class="w-full lg:min-w-[280px] h-10 pl-12 pr-4 bg-white/5 border border-white/10 rounded-2xl text-[11px] font-bold text-white outline-none focus:border-primary/50 focus:bg-primary/10 transition-all placeholder:text-on-surface-variant/30"
+            placeholder="Search by customer, phone, product, or Order ID..."
+            class="w-full h-10 pl-9 pr-8 bg-surface border border-outline rounded-xl text-xs text-on-surface outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-on-surface-variant/50"
           >
-          <button v-if="searchQuery" @click="$emit('update:searchQuery', '')" class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-white transition-colors">
-            <span class="material-symbols-outlined text-sm">close</span>
+          <button 
+            v-if="searchQuery" 
+            @click="$emit('update:searchQuery', '')" 
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant/50 hover:text-on-surface transition-colors cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-base">close</span>
           </button>
         </div>
 
-        <!-- Date Range -->
-        <div class="flex items-center h-10 px-3 bg-white/5 rounded-2xl border border-white/10 group focus-within:border-primary/30 transition-all w-full lg:w-auto overflow-hidden">
-          <span class="material-symbols-outlined text-sm text-on-surface-variant/40 mr-2 flex-shrink-0">calendar_today</span>
+        <!-- Date Range Filter -->
+        <div class="md:col-span-4 flex items-center h-10 px-3 bg-surface border border-outline rounded-xl gap-2">
+          <span class="material-symbols-outlined text-sm text-on-surface-variant/50">calendar_today</span>
           <input 
             :value="startDate"
             @input="$emit('update:startDate', $event.target.value)"
             type="date" 
-            class="bg-transparent text-[10px] font-black text-white outline-none [color-scheme:dark] w-full"
+            class="bg-transparent text-xs text-on-surface outline-none w-full cursor-pointer"
           >
-          <span class="text-on-surface-variant/20 font-bold mx-1">-</span>
+          <span class="text-on-surface-variant/30 font-medium">to</span>
           <input 
             :value="endDate"
             @input="$emit('update:endDate', $event.target.value)"
             type="date" 
-            class="bg-transparent text-[10px] font-black text-white outline-none [color-scheme:dark] w-full"
+            class="bg-transparent text-xs text-on-surface outline-none w-full cursor-pointer"
           >
         </div>
 
-        <!-- Platform Filters -->
-        <div class="flex items-center gap-1 p-1 bg-white/5 rounded-2xl border border-white/10 overflow-x-auto no-scrollbar w-full lg:w-auto">
+        <!-- Platform Tabs Filter -->
+        <div class="md:col-span-3 flex items-center bg-surface-hover/70 p-1 border border-outline rounded-xl overflow-x-auto">
           <button 
             v-for="tab in ['all', 'whatsapp', 'telegram', 'facebook']" 
             :key="tab"
             @click="$emit('update:activeTab', tab)"
-            :class="activeTab === tab ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105' : 'text-on-surface-variant/40 hover:text-on-surface-variant hover:bg-white/5'"
-            class="flex-1 lg:flex-none px-4 lg:px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap"
+            :class="activeTab === tab 
+              ? 'bg-surface text-primary shadow-xs font-semibold' 
+              : 'text-on-surface-variant hover:text-on-surface font-medium'"
+            class="flex-1 py-1.5 px-2.5 rounded-lg text-xs capitalize text-center transition-all truncate cursor-pointer"
           >
             {{ tab }}
           </button>
         </div>
-
-        <button 
-          @click="$emit('export-csv')"
-          class="w-full lg:w-auto h-10 px-6 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/30 active:scale-95 transition-all shadow-xl shadow-primary/10"
-        >
-          <span class="material-symbols-outlined text-sm">download</span>
-          Export CSV
-        </button>
-        <button 
-          v-if="selectedLeads.length > 0"
-          @click="$emit('bulk-send-to-steadfast')"
-          :disabled="sendingToSteadfast"
-          class="w-full lg:w-auto h-10 px-6 bg-orange-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-2xl hover:shadow-orange-600/30 active:scale-95 transition-all shadow-xl shadow-orange-600/10 disabled:opacity-50 animate-in fade-in zoom-in-95 duration-200"
-        >
-          <span class="material-symbols-outlined text-sm" :class="sendingToSteadfast ? 'animate-spin' : ''">local_shipping</span>
-          Send {{ selectedLeads.length }} to Steadfast
-        </button>
       </div>
     </div>
 
-    <div class="bg-surface/40 border border-outline/60 rounded-[0.9rem] overflow-hidden shadow-2xl backdrop-blur-xl relative min-h-[400px]">
+    <!-- Data Table Container -->
+    <div class="bg-surface border border-outline rounded-2xl overflow-hidden shadow-sm relative min-h-[350px]">
       <!-- Loading Overlay -->
-      <div v-if="loading" class="absolute inset-0 z-20 bg-surface/60 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
-        <div class="flex flex-col items-center gap-6">
-          <div class="relative">
-            <div class="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-            <div class="absolute inset-0 w-16 h-16 border-4 border-transparent border-b-secondary rounded-full animate-spin [animation-duration:1.5s]"></div>
-          </div>
-          <div class="flex flex-col items-center gap-1">
-            <span class="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">Syncing Order Data</span>
-            <span class="text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Updating Secure Database...</span>
-          </div>
+      <div v-if="loading" class="absolute inset-0 z-20 bg-surface/70 backdrop-blur-xs flex items-center justify-center animate-in fade-in">
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          <span class="text-xs font-medium text-on-surface-variant">Loading orders...</span>
         </div>
       </div>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-left min-w-[800px]">
+        <table class="w-full text-left border-collapse min-w-[700px]">
           <thead>
-            <tr class="bg-primary/5 border-b border-white/5">
-              <th class="px-2 py-3.5 md:px-4 md:py-4 text-[9px] font-black uppercase tracking-[0.15em] text-primary/60 w-10"></th>
-              <th class="px-2 py-3.5 md:px-4 md:py-4 text-[9px] font-black uppercase tracking-[0.15em] text-primary/60 w-12">
-                <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
+            <tr class="bg-surface-hover/50 border-b border-outline text-xs font-semibold text-on-surface-variant">
+              <th class="py-3 px-3 w-10 text-center"></th>
+              <th class="py-3 px-3 w-10 text-center">
+                <input 
+                  type="checkbox" 
+                  :checked="isAllSelected" 
+                  @change="toggleSelectAll" 
+                  class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20 cursor-pointer" 
+                />
               </th>
-              <th class="px-2 py-3.5 md:px-4 md:py-4 text-[9px] font-black uppercase tracking-[0.15em] text-primary/60 w-12">No.</th>
-              <th class="px-2 py-3.5 md:px-4 md:py-4 text-[9px] font-black uppercase tracking-[0.15em] text-primary/60 w-24">Platform</th>
-              <th class="px-2 py-3.5 md:px-4 md:py-4 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">Customer Info</th>
-              <th class="px-2 py-3.5 md:px-4 md:py-4 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">Order ID</th>
-              <th class="px-2 py-3.5 md:px-4 md:py-4 text-[9px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 w-28">Time</th>
+              <th class="py-3 px-4 w-12 text-center">#</th>
+              <th class="py-3 px-4">Platform</th>
+              <th class="py-3 px-4">Customer & Details</th>
+              <th class="py-3 px-4">Order ID</th>
+              <th class="py-3 px-4 text-right">Date & Time</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-white/5">
+          <tbody class="divide-y divide-outline/50 text-xs">
             <template v-for="(lead, index) in leads" :key="lead.id">
-              <!-- Compact Row -->
               <tr 
                 @click="toggleLeadExpand(lead.id)"
-                class="cursor-pointer hover:bg-primary/5 transition-all group border-b border-white/5"
+                class="hover:bg-surface-hover/40 transition-colors cursor-pointer group"
                 :class="{ 'bg-primary/5': expandedLeads.includes(lead.id) }"
               >
                 <!-- Caret Toggle -->
-                <td class="px-2 py-3 md:px-4 md:py-4 text-center w-10">
-                  <span class="material-symbols-outlined text-sm text-on-surface-variant/40 group-hover:text-primary transition-colors inline-block" :class="{ 'rotate-180': expandedLeads.includes(lead.id) }">expand_more</span>
+                <td class="py-3.5 px-3 text-center">
+                  <span 
+                    class="material-symbols-outlined text-base text-on-surface-variant/50 group-hover:text-primary transition-transform inline-block"
+                    :class="{ 'rotate-180': expandedLeads.includes(lead.id) }"
+                  >
+                    expand_more
+                  </span>
                 </td>
+
                 <!-- Checkbox -->
-                <td class="px-2 py-3 md:px-4 md:py-4 w-12" @click.stop>
-                  <input type="checkbox" :checked="selectedLeads.includes(lead.id)" @change="toggleSelectLead(lead.id)" class="w-3.5 h-3.5 rounded border-outline bg-surface-hover text-primary focus:ring-primary/20 cursor-pointer" />
+                <td class="py-3.5 px-3 text-center" @click.stop>
+                  <input 
+                    type="checkbox" 
+                    :checked="selectedLeads.includes(lead.id)" 
+                    @change="toggleSelectLead(lead.id)" 
+                    class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20 cursor-pointer" 
+                  />
                 </td>
-                <!-- Number -->
-                <td class="px-2 py-3 md:px-4 md:py-4 text-[10px] font-mono font-bold text-white/40">
-                  #{{ (currentPage - 1) * itemsPerPage + index + 1 }}
+
+                <!-- Row Number -->
+                <td class="py-3.5 px-4 text-center font-mono text-on-surface-variant/60 font-medium">
+                  {{ (currentPage - 1) * itemsPerPage + index + 1 }}
                 </td>
-                <!-- Platform -->
-                <td class="px-2 py-3 md:px-4 md:py-4">
-                  <span class="text-[9px] font-black uppercase tracking-widest text-primary/80 bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-lg">{{ lead.data.platform }}</span>
+
+                <!-- Platform Tag -->
+                <td class="py-3.5 px-4">
+                  <span 
+                    class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wider border"
+                    :class="getPlatformBadgeClass(lead.data?.platform)"
+                  >
+                    {{ lead.data?.platform || 'Direct' }}
+                  </span>
                 </td>
+
                 <!-- Customer Info -->
-                <td class="px-2 py-3 md:px-4 md:py-4">
+                <td class="py-3.5 px-4">
                   <div class="flex flex-col gap-0.5">
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-xs font-black text-white capitalize">{{ lead.data.customer }}</span>
-                      <span class="px-1.5 py-0.2 bg-secondary/10 text-secondary text-[7px] font-black rounded uppercase">Lead</span>
-                      <span class="px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider border transition-all"
-                        :class="{
-                          'bg-green-500/10 text-green-400 border-green-500/20': lead.data?.status === 'complete',
-                          'bg-yellow-500/10 text-yellow-400 border-yellow-500/20': lead.data?.status === 'hold',
-                          'bg-red-500/10 text-red-400 border-red-500/20': lead.data?.status === 'cancelled',
-                          'bg-blue-500/10 text-blue-400 border-blue-500/20': !lead.data?.status || lead.data?.status === 'pending'
-                        }">
-                        {{ lead.data?.status || 'pending' }}
+                    <div class="flex items-center gap-2">
+                      <span class="font-semibold text-on-surface capitalize">{{ lead.data?.customer || 'Anonymous Customer' }}</span>
+                      <span 
+                        class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold border"
+                        :class="getStatusBadgeClass(lead.data?.status)"
+                      >
+                        {{ lead.data?.status || 'Pending' }}
                       </span>
                     </div>
-                    <span class="text-[8px] font-medium text-on-surface-variant/40 tracking-wider">{{ lead.email }}</span>
+                    <span class="text-xs text-on-surface-variant truncate max-w-xs">{{ lead.email }}</span>
                   </div>
                 </td>
+
                 <!-- Order ID -->
-                <td class="px-2 py-3 md:px-4 md:py-4" @click.stop>
-                  <div class="inline-flex items-center gap-1 group/id cursor-pointer bg-white/5 border border-white/10 px-2 py-1 rounded-lg hover:border-primary/40 transition-colors" @click="$emit('copy-text', lead.id)" title="Click to copy full Order ID">
-                    <span class="font-mono text-[9px] text-white/50 group-hover/id:text-primary transition-colors">#{{ lead.id.slice(0, 8) }}</span>
-                    <span class="material-symbols-outlined text-[10px] text-white/30 group-hover/id:text-primary transition-colors">content_copy</span>
-                  </div>
+                <td class="py-3.5 px-4" @click.stop>
+                  <button 
+                    @click="$emit('copy-text', lead.id)" 
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline text-on-surface-variant text-xs font-mono transition-colors cursor-pointer group/id"
+                    title="Click to copy full ID"
+                  >
+                    <span>#{{ lead.id.slice(0, 8) }}</span>
+                    <span class="material-symbols-outlined text-xs opacity-50 group-hover/id:opacity-100">content_copy</span>
+                  </button>
                 </td>
+
                 <!-- Time -->
-                <td class="px-2 py-3 md:px-4 md:py-4">
-                  <div class="text-[9px] font-black text-white/70 uppercase tracking-widest flex flex-col whitespace-nowrap">
-                    <span class="whitespace-nowrap">{{ new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
-                    <span class="text-[8px] opacity-40 whitespace-nowrap">{{ new Date(lead.created_at).toLocaleDateString() }}</span>
-                  </div>
+                <td class="py-3.5 px-4 text-right text-on-surface-variant font-medium whitespace-nowrap">
+                  <div>{{ new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</div>
+                  <div class="text-[10px] text-on-surface-variant/60">{{ new Date(lead.created_at).toLocaleDateString() }}</div>
                 </td>
               </tr>
 
-              <!-- Expanded Row Details -->
-              <tr v-if="expandedLeads.includes(lead.id)" class="bg-primary/5/10 border-b border-white/5">
-                <td colspan="7" class="px-4 py-4 md:px-8 md:py-6 bg-surface-container-lowest/30">
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                    
-                    <!-- Order Analysis column -->
-                    <div class="space-y-3">
-                      <h5 class="text-[9px] font-black uppercase tracking-wider text-primary/80 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 bg-primary rounded-full"></span>Order Analysis
-                      </h5>
-                      <div v-if="lead.data.order && lead.data.order.includes(':')" class="flex flex-wrap gap-2 max-w-full">
-                        <div v-for="(part, i) in lead.data.order.split('|')" :key="i" 
-                          class="px-2.5 py-1 bg-white/5 rounded-lg border border-white/5 flex items-center">
-                          <span class="text-[8px] font-black uppercase text-primary/40 mr-1.5">
-                            {{ part.split(':')[0]?.trim() }}:
-                          </span>
-                          <span class="text-[9px] font-bold" 
-                            :class="part.toLowerCase().includes('total') ? 'text-success' : 'text-white'">
-                            {{ part.split(':')[1]?.trim() }}
+              <!-- Expanded Details Row -->
+              <tr v-if="expandedLeads.includes(lead.id)" class="bg-surface-hover/20">
+                <td colspan="7" class="p-4 sm:p-6 bg-surface-hover/30 border-b border-outline">
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
+                    <!-- Order Items Breakdown -->
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline">
+                      <div class="flex items-center gap-1.5 font-semibold text-on-surface">
+                        <span class="material-symbols-outlined text-sm text-primary">receipt_long</span>
+                        <span>Order Items & Inquiry</span>
+                      </div>
+                      <div v-if="lead.data?.order && lead.data.order.includes(':')" class="space-y-1 pt-1">
+                        <div 
+                          v-for="(part, i) in lead.data.order.split('|')" 
+                          :key="i"
+                          class="flex items-center justify-between py-1 border-b border-outline/40 last:border-0"
+                        >
+                          <span class="text-on-surface-variant">{{ part.split(':')[0]?.trim() }}</span>
+                          <span class="font-semibold text-on-surface">{{ part.split(':')[1]?.trim() }}</span>
+                        </div>
+                      </div>
+                      <p v-else class="text-on-surface font-medium pt-1">
+                        {{ lead.data?.order || 'No specific order items listed' }}
+                      </p>
+                    </div>
+
+                    <!-- Courier & Fulfillment -->
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline">
+                      <div class="flex items-center gap-1.5 font-semibold text-on-surface">
+                        <span class="material-symbols-outlined text-sm text-orange-500">local_shipping</span>
+                        <span>Courier Dispatch</span>
+                      </div>
+
+                      <div v-if="lead.data?.tracking_code" class="space-y-1.5 pt-1">
+                        <div class="flex items-center justify-between">
+                          <span class="text-on-surface-variant">Tracking:</span>
+                          <span class="font-mono font-semibold text-orange-500 select-all">{{ lead.data.tracking_code }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                          <span class="text-on-surface-variant">Status:</span>
+                          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                            {{ lead.data.delivery_status || 'Handed Over' }}
                           </span>
                         </div>
                       </div>
-                      <span v-else class="text-[10px] font-bold text-success/80">{{ lead.data.order || 'No order details collected' }}</span>
-                    </div>
-
-                    <!-- Courier Status column -->
-                    <div class="space-y-3">
-                      <h5 class="text-[9px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>Courier Status
-                      </h5>
-                      <div v-if="lead.data?.tracking_code" class="flex flex-col gap-1.5">
-                        <span class="text-[9px] font-mono font-black text-orange-400 select-all flex items-center gap-1">
-                          <span class="material-symbols-outlined text-xs">local_shipping</span>
-                          {{ lead.data.tracking_code }}
-                        </span>
-                        <span class="px-2 py-0.5 bg-green-500/10 text-green-500 text-[8px] font-black rounded uppercase border border-green-500/20 w-max">
-                          {{ lead.data.delivery_status || 'Delivered to Courier' }}
-                        </span>
-                      </div>
-                      <div v-else class="flex flex-col gap-2">
-                        <span class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant/40">Not Booked</span>
-                        <button @click.stop="$emit('send-to-steadfast', lead.id)" :disabled="sendingToSteadfast" class="px-3 py-1.5 bg-orange-500/10 text-orange-500 border border-orange-500/20 hover:bg-orange-500 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-[0.05em] transition-all w-max flex items-center gap-1 disabled:opacity-50">
-                          <span class="material-symbols-outlined text-[11px]">local_shipping</span>
-                          Send to Steadfast
+                      <div v-else class="pt-1 flex flex-col gap-2">
+                        <span class="text-on-surface-variant text-[11px]">Not dispatched to courier yet.</span>
+                        <button 
+                          @click.stop="$emit('send-to-steadfast', lead.id)" 
+                          :disabled="sendingToSteadfast"
+                          class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white border border-orange-500/20 rounded-lg text-xs font-semibold transition-colors cursor-pointer w-max"
+                        >
+                          <span class="material-symbols-outlined text-sm">local_shipping</span>
+                          Dispatch via Steadfast
                         </button>
                       </div>
                     </div>
 
-                    <!-- Actions column -->
-                    <div class="space-y-3">
-                      <h5 class="text-[9px] font-black uppercase tracking-wider text-red-400 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 bg-red-400 rounded-full"></span>Actions
-                      </h5>
-                      <div class="flex items-center gap-2">
-                        <button @click.stop="$emit('open-edit', lead)" class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-primary/20 hover:text-primary transition-all flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-white">
-                          <span class="material-symbols-outlined text-[11px]">edit</span>
+                    <!-- Action Controls -->
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline flex flex-col justify-between">
+                      <div>
+                        <div class="flex items-center gap-1.5 font-semibold text-on-surface mb-2">
+                          <span class="material-symbols-outlined text-sm text-secondary">tune</span>
+                          <span>Record Controls</span>
+                        </div>
+                        <p class="text-[11px] text-on-surface-variant">
+                          Update order status, change details, or archive this customer lead.
+                        </p>
+                      </div>
+
+                      <div class="flex items-center gap-2 pt-2">
+                        <button 
+                          @click.stop="$emit('open-edit', lead)" 
+                          class="flex-1 py-1.5 px-3 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <span class="material-symbols-outlined text-sm">edit</span>
                           Edit
                         </button>
-                        <button @click.stop="$emit('delete', lead.id)" class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-red-500/20 hover:text-red-500 transition-all flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-red-400">
-                          <span class="material-symbols-outlined text-[11px]">delete</span>
+                        <button 
+                          @click.stop="$emit('delete', lead.id)" 
+                          class="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <span class="material-symbols-outlined text-sm">delete</span>
                           Delete
                         </button>
                       </div>
                     </div>
-
                   </div>
                 </td>
               </tr>
@@ -235,46 +303,49 @@
           </tbody>
         </table>
       </div>
-      
-      <!-- Empty State for Filters -->
-      <div v-if="leads.length === 0 && !loading" class="p-20 text-center space-y-4">
-        <span class="material-symbols-outlined text-4xl text-on-surface-variant/20">filter_list_off</span>
-        <p class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40">No orders found for this platform</p>
+
+      <!-- Empty State -->
+      <div v-if="leads.length === 0 && !loading" class="py-16 text-center space-y-2">
+        <span class="material-symbols-outlined text-4xl text-on-surface-variant/30">inventory_2</span>
+        <h4 class="text-sm font-semibold text-on-surface">No records found</h4>
+        <p class="text-xs text-on-surface-variant max-w-sm mx-auto">
+          No customer leads match your current search and platform filter criteria.
+        </p>
       </div>
 
       <!-- Pagination Footer -->
-      <div v-if="totalPages > 1" class="px-8 py-6 bg-white/5 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40">
-          Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, totalLeads) }} of {{ totalLeads }} Records
-        </div>
-        
-        <div class="flex items-center gap-2">
+      <div v-if="totalPages > 1" class="px-5 py-4 bg-surface border-t border-outline flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <span class="text-on-surface-variant">
+          Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, totalLeads) }} of {{ totalLeads }} orders
+        </span>
+
+        <div class="flex items-center gap-1.5">
           <button 
             @click="currentPage > 1 && $emit('update:currentPage', currentPage - 1)"
             :disabled="currentPage === 1"
-            class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary/20 hover:border-primary/40 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            class="p-1.5 rounded-lg border border-outline hover:bg-surface-hover disabled:opacity-40 transition-colors cursor-pointer"
           >
-            <span class="material-symbols-outlined text-sm">chevron_left</span>
+            <span class="material-symbols-outlined text-base">chevron_left</span>
           </button>
-          
-          <div class="flex items-center gap-1">
-            <button 
-              v-for="p in totalPages" 
-              :key="p"
-              @click="$emit('update:currentPage', p)"
-              :class="currentPage === p ? 'bg-primary text-white border-primary' : 'bg-white/5 border-white/10 text-on-surface-variant/60'"
-              class="w-10 h-10 rounded-xl border font-black text-xs flex items-center justify-center transition-all"
-            >
-              {{ p }}
-            </button>
-          </div>
+
+          <button 
+            v-for="p in totalPages" 
+            :key="p"
+            @click="$emit('update:currentPage', p)"
+            :class="currentPage === p 
+              ? 'bg-primary text-white border-primary font-semibold' 
+              : 'border-outline text-on-surface hover:bg-surface-hover font-medium'"
+            class="w-7 h-7 rounded-lg border text-xs flex items-center justify-center transition-colors cursor-pointer"
+          >
+            {{ p }}
+          </button>
 
           <button 
             @click="currentPage < totalPages && $emit('update:currentPage', currentPage + 1)"
             :disabled="currentPage === totalPages"
-            class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary/20 hover:border-primary/40 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+            class="p-1.5 rounded-lg border border-outline hover:bg-surface-hover disabled:opacity-40 transition-colors cursor-pointer"
           >
-            <span class="material-symbols-outlined text-sm">chevron_right</span>
+            <span class="material-symbols-outlined text-base">chevron_right</span>
           </button>
         </div>
       </div>
@@ -348,5 +419,19 @@ const toggleSelectLead = (id) => {
     updated.push(id)
   }
   emit('update:selectedLeads', updated)
+}
+
+const getPlatformBadgeClass = (platform) => {
+  if (platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+  if (platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
+  if (platform === 'facebook' || platform === 'messenger' || platform === 'fb_comment') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+  return 'bg-primary/10 text-primary border-primary/20'
+}
+
+const getStatusBadgeClass = (status) => {
+  if (status === 'complete') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+  if (status === 'hold') return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+  if (status === 'cancelled') return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+  return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
 }
 </script>

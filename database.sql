@@ -300,4 +300,40 @@ CREATE TABLE IF NOT EXISTS public.user_api_keys (
 ALTER TABLE public.user_api_keys ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable all for all user_api_keys" ON public.user_api_keys FOR ALL USING (true);
 
+-- Durable Webhook Events table for multi-instance deduplication
+CREATE TABLE IF NOT EXISTS public.webhook_events (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    agent_id UUID,
+    channel TEXT NOT NULL,
+    external_message_id TEXT NOT NULL,
+    received_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    status TEXT DEFAULT 'received',
+    CONSTRAINT unq_agent_channel_message UNIQUE(agent_id, channel, external_message_id)
+);
 
+CREATE INDEX IF NOT EXISTS idx_webhook_events_lookup ON public.webhook_events (agent_id, channel, external_message_id);
+ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for webhook_events" ON public.webhook_events FOR ALL USING (true);
+
+-- Knowledge Gaps table for merchant review and continuous learning
+CREATE TABLE IF NOT EXISTS public.knowledge_gaps (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    agent_id UUID NOT NULL,
+    question TEXT NOT NULL,
+    normalized_topic TEXT NOT NULL,
+    category TEXT NOT NULL,
+    frequency INTEGER DEFAULT 1,
+    sample_questions JSONB DEFAULT '[]'::jsonb,
+    customer_context TEXT,
+    suggested_answer TEXT,
+    approved_answer TEXT,
+    approved_by TEXT,
+    status TEXT DEFAULT 'detected',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    last_asked_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    approved_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_gaps_agent ON public.knowledge_gaps (agent_id, status, frequency DESC);
+ALTER TABLE public.knowledge_gaps ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for knowledge_gaps" ON public.knowledge_gaps FOR ALL USING (true);
