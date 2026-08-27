@@ -1,13 +1,13 @@
 import { queryPg, getMongo } from './db'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-token-key-change-in-prod-9988'
+const JWT_SECRET = process.env.JWT_SECRET
 
 export const useSupabaseAdmin = () => {
   return {
     auth: {
       getUser: async (token?: string) => {
-        if (!token) {
+        if (!token || !JWT_SECRET) {
           return { data: { user: null }, error: new Error('No token provided') }
         }
         try {
@@ -164,14 +164,22 @@ export const useSupabaseAdmin = () => {
 }
 
 function formatColumnExpr(col: string): string {
-  if (!col) return '""'
+  if (!col || !/^[a-z_][a-z0-9_]*(?:->>?[a-z_][a-z0-9_]*)?$/i.test(col)) {
+    throw new Error('Unsafe database column identifier')
+  }
   if (col.includes('->>')) {
     const parts = col.split('->>')
-    return `("${parts[0].trim()}"->>'${parts[1].trim()}')`
+    const base = parts[0]
+    const key = parts[1]
+    if (!base || !key) throw new Error('Unsafe database column identifier')
+    return `("${base.trim()}"->>'${key.trim()}')`
   }
   if (col.includes('->')) {
     const parts = col.split('->')
-    return `("${parts[0].trim()}"->'${parts[1].trim()}')`
+    const base = parts[0]
+    const key = parts[1]
+    if (!base || !key) throw new Error('Unsafe database column identifier')
+    return `("${base.trim()}"->'${key.trim()}')`
   }
   return `"${col}"`
 }
@@ -191,6 +199,13 @@ export async function executeQuery(query: {
   onConflictVal?: string | null
 }) {
   const { table, action, queryData, filters, orderVal, limitVal, rangeVal, singleVal, maybeSingleVal, countOption, onConflictVal } = query
+
+  if (!/^[a-z_][a-z0-9_]*$/i.test(table)) {
+    throw new Error('Unsafe database table identifier')
+  }
+  if (!['select', 'insert', 'update', 'delete', 'upsert'].includes(action)) {
+    throw new Error('Unsupported database action')
+  }
 
   // Route chat_history to MongoDB
   if (table === 'chat_history') {
@@ -303,15 +318,25 @@ export async function executeQuery(query: {
       } else if (f.type === 'is') {
         if (f.value === null) {
           clauses.push(`${colExpr} IS NULL`)
+        } else if (f.value === true) {
+          clauses.push(`${colExpr} IS TRUE`)
+        } else if (f.value === false) {
+          clauses.push(`${colExpr} IS FALSE`)
         } else {
-          clauses.push(`${colExpr} IS ${f.value}`)
+          throw new Error('Unsafe IS filter value')
         }
       } else if (f.type === 'not') {
         if (f.op === 'is' && f.value === null) {
           clauses.push(`${colExpr} IS NOT NULL`)
+        } else if (f.op === 'is' && f.value === true) {
+          clauses.push(`${colExpr} IS NOT TRUE`)
+        } else if (f.op === 'is' && f.value === false) {
+          clauses.push(`${colExpr} IS NOT FALSE`)
         } else if (f.op === 'eq') {
           clauses.push(`${colExpr} != $${paramIndex++}`)
           values.push(f.value)
+        } else {
+          throw new Error('Unsafe NOT filter')
         }
       } else if (f.type === 'ilike') {
         clauses.push(`${colExpr} ILIKE $${paramIndex++}`)
@@ -320,11 +345,21 @@ export async function executeQuery(query: {
         const orParts = (f.value || '').split(',').map((p: string) => p.trim()).filter(Boolean)
         const orClauses: string[] = []
         for (const part of orParts) {
-          const match = part.match(/^([^.]+)\.(eq|neq|ilike|like)\.(.*)$/)
+          const match = part.match(/^([^.]+)\.(eq|neq|ilike|like|gt|gte|lt|lte)\.(.*)$/i)
           if (match) {
             const cExpr = formatColumnExpr(match[1])
-            const op = match[2].toUpperCase()
-            orClauses.push(`${cExpr} ${op} $${paramIndex++}`)
+            const opRaw = match[2].toLowerCase()
+            let sqlOp = '='
+            if (opRaw === 'eq') sqlOp = '='
+            else if (opRaw === 'neq') sqlOp = '!='
+            else if (opRaw === 'ilike') sqlOp = 'ILIKE'
+            else if (opRaw === 'like') sqlOp = 'LIKE'
+            else if (opRaw === 'gt') sqlOp = '>'
+            else if (opRaw === 'gte') sqlOp = '>='
+            else if (opRaw === 'lt') sqlOp = '<'
+            else if (opRaw === 'lte') sqlOp = '<='
+
+            orClauses.push(`${cExpr} ${sqlOp} $${paramIndex++}`)
             values.push(match[3])
           }
         }
@@ -386,6 +421,7 @@ export async function executeQuery(query: {
     }
 
     const columns = Object.keys(items[0]).filter(k => k !== 'id')
+    if (columns.some(column => !/^[a-z_][a-z0-9_]*$/i.test(column))) throw new Error('Unsafe insert column identifier')
     const valueClauses: string[] = []
 
     for (const item of items) {
@@ -404,6 +440,7 @@ export async function executeQuery(query: {
 
   if (action === 'update') {
     const columns = Object.keys(queryData)
+    if (columns.some(column => !/^[a-z_][a-z0-9_]*$/i.test(column))) throw new Error('Unsafe update column identifier')
     const setClauses: string[] = []
     for (const col of columns) {
       setClauses.push(`"${col}" = $${paramIndex++}`)
@@ -445,7 +482,9 @@ export async function executeQuery(query: {
     }
 
     const columns = Object.keys(items[0])
+    if (columns.some(column => !/^[a-z_][a-z0-9_]*$/i.test(column))) throw new Error('Unsafe upsert column identifier')
     const conflictCols = onConflictVal ? onConflictVal.split(',').map(c => c.trim()) : ['id']
+    if (conflictCols.some(column => !/^[a-z_][a-z0-9_]*$/i.test(column))) throw new Error('Unsafe conflict column identifier')
 
     const valueClauses: string[] = []
     for (const item of items) {

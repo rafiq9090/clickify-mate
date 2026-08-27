@@ -1,3 +1,5 @@
+import net from 'node:net'
+
 export default defineEventHandler(async (event) => {
     try {
         // Get real client IP from request headers
@@ -7,7 +9,7 @@ export default defineEventHandler(async (event) => {
             || ''
 
         // Strip IPv6 local loopback
-        const cleanIp = ip === '::1' || ip === '127.0.0.1' ? '' : ip
+        const cleanIp = ip === '::1' || ip === '127.0.0.1' || !net.isIP(ip) ? '' : ip
 
         // If no real IP (localhost dev), use geojs without specifying IP
         const target = cleanIp ? `https://get.geojs.io/v1/ip/geo/${cleanIp}.json` : `https://get.geojs.io/v1/ip/geo.json`

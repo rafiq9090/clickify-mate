@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody, createError } from 'h3'
+import { requireDashboardRole } from '../utils/auth-session'
 
 interface LeadData {
   id: string
@@ -47,6 +48,7 @@ function parseOrderAmount(orderString: string): number {
 
 export default defineEventHandler(async (event) => {
   try {
+    const user = await requireDashboardRole(event, ['owner', 'admin', 'manager'])
     const body = await readBody(event)
     const { lead_ids } = body
 
@@ -65,36 +67,32 @@ export default defineEventHandler(async (event) => {
       .from('leads')
       .select('*')
       .in('id', lead_ids)
+      .eq('data->>user_id', user.id)
 
-    if (fetchError || !leads || leads.length === 0) {
+    if (fetchError || !leads || leads.length !== new Set(lead_ids).size) {
       throw createError({
-        statusCode: 500,
-        statusMessage: `Failed to fetch leads from server database: ${fetchError?.message || 'Empty set'}`
+        statusCode: 404,
+        statusMessage: 'One or more orders were not found for this shop.'
       })
     }
 
     // 2. RESILIENT CREDENTIAL EXTRACTION: Database Lookups with Request Body Fallbacks
-    const sampleLead = leads[0] as LeadData
-    const ownerUserId = sampleLead.data?.user_id || (sampleLead as any).user_id
-
     let configRow = null
 
     // Try looking up credentials from the database if user_id exists
-    if (ownerUserId) {
-      const { data: foundConfig } = await supabase
-        .from('agent_configs')
-        .select('agent_behavior')
-        .eq('user_id', ownerUserId)
-        .maybeSingle()
+    const { data: foundConfig } = await supabase
+      .from('agent_configs')
+      .select('agent_behavior')
+      .eq('user_id', user.id)
+      .maybeSingle()
 
-      if (foundConfig?.agent_behavior) {
-        configRow = foundConfig
-      }
+    if (foundConfig?.agent_behavior) {
+      configRow = foundConfig
     }
 
-    // Resolve credentials cascading downwards (Request Body -> Database Config)
-    const activeApiKey = (body.api_key && body.api_key.trim()) || configRow?.agent_behavior?.steadfast_api_key
-    const activeSecretKey = (body.secret_key && body.secret_key.trim()) || configRow?.agent_behavior?.steadfast_secret_key
+    // Credentials are server-owned. Never accept merchant secrets from a browser request.
+    const activeApiKey = configRow?.agent_behavior?.steadfast_api_key
+    const activeSecretKey = configRow?.agent_behavior?.steadfast_secret_key
 
     if (!activeApiKey || !activeSecretKey) {
       throw createError({

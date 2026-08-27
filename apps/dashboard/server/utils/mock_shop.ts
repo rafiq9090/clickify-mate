@@ -1,7 +1,50 @@
 import fs from 'fs'
 import path from 'path'
+import net from 'node:net'
+import { lookup } from 'node:dns/promises'
 
 const filePath = path.resolve(process.cwd(), 'server/data/mock_inventory.json')
+
+function isPrivateAddress(address: string): boolean {
+    const normalized = address.toLowerCase().replace(/^::ffff:/, '')
+    if (net.isIPv4(normalized)) {
+        const octets = normalized.split('.').map(Number)
+        const a = octets[0] ?? -1
+        const b = octets[1] ?? -1
+        return a === 0 || a === 10 || a === 127 ||
+            (a === 100 && b >= 64 && b <= 127) ||
+            (a === 169 && b === 254) ||
+            (a === 172 && b >= 16 && b <= 31) ||
+            (a === 192 && b === 168) ||
+            (a === 198 && b >= 18 && b <= 19) || a >= 224
+    }
+    return normalized === '::1' || normalized === '::' ||
+        normalized.startsWith('fc') || normalized.startsWith('fd') ||
+        normalized.startsWith('fe8') || normalized.startsWith('fe9') ||
+        normalized.startsWith('fea') || normalized.startsWith('feb')
+}
+
+async function validateExternalShopUrl(rawUrl: string, provider: string): Promise<string> {
+    const parsed = new URL(rawUrl)
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+        throw new Error('Shop URL must be an HTTP(S) URL without embedded credentials.')
+    }
+    if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+        throw new Error('Production shop integrations require HTTPS.')
+    }
+    const hostname = parsed.hostname.toLowerCase().replace(/\.$/, '')
+    if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+        throw new Error('Private or local shop URLs are not allowed.')
+    }
+    if (provider === 'shopify' && !hostname.endsWith('.myshopify.com')) {
+        throw new Error('Shopify integration must use the exact *.myshopify.com store domain.')
+    }
+    const addresses = net.isIP(hostname) ? [{ address: hostname }] : await lookup(hostname, { all: true, verbatim: true })
+    if (!addresses.length || addresses.some(result => isPrivateAddress(result.address))) {
+        throw new Error('Shop URL resolves to a private or reserved network address.')
+    }
+    return parsed.toString().replace(/\/$/, '')
+}
 
 export interface MockProduct {
     id: string
@@ -69,6 +112,7 @@ export async function checkMockStockForPrompt(userText: string, behavior?: any):
                 if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
                     formattedUrl = 'https://' + formattedUrl
                 }
+                formattedUrl = await validateExternalShopUrl(formattedUrl, 'woocommerce')
                 
                 const auth = Buffer.from(`${apiKey}:${apiSecret || ''}`).toString('base64')
                 
@@ -78,6 +122,7 @@ export async function checkMockStockForPrompt(userText: string, behavior?: any):
                     headers: {
                         Authorization: `Basic ${auth}`
                     },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -105,9 +150,10 @@ export async function checkMockStockForPrompt(userText: string, behavior?: any):
                 if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
                     formattedUrl = 'https://' + formattedUrl
                 }
-                if (!formattedUrl.includes('.myshopify.com') && !formattedUrl.includes('myshopify.com')) {
+                if (!formattedUrl.toLowerCase().includes('.myshopify.com')) {
                     formattedUrl = `https://${apiUrl}.myshopify.com`
                 }
+                formattedUrl = await validateExternalShopUrl(formattedUrl, 'shopify')
 
                 console.log(`[SHOPIFY SHOP INVENTORY]: Querying Shopify store for: "${searchTerms}"`)
                 const res: any = await $fetch(`${formattedUrl}/admin/api/2024-04/products.json`, {
@@ -115,6 +161,7 @@ export async function checkMockStockForPrompt(userText: string, behavior?: any):
                     headers: {
                         'X-Shopify-Access-Token': apiKey
                     },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -145,6 +192,7 @@ export async function checkMockStockForPrompt(userText: string, behavior?: any):
                 if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
                     formattedUrl = 'https://' + formattedUrl
                 }
+                formattedUrl = await validateExternalShopUrl(formattedUrl, 'custom')
 
                 console.log(`[CUSTOM SHOP INVENTORY]: Querying Custom API: "${formattedUrl}/inventory" for: "${searchTerms}"`)
                 const res: any = await $fetch(`${formattedUrl}/inventory`, {
@@ -152,6 +200,7 @@ export async function checkMockStockForPrompt(userText: string, behavior?: any):
                     headers: {
                         Authorization: `Bearer ${apiKey}`
                     },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -264,12 +313,14 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
                 if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
                     formattedUrl = 'https://' + formattedUrl
                 }
+                formattedUrl = await validateExternalShopUrl(formattedUrl, 'woocommerce')
                 const auth = Buffer.from(`${apiKey}:${apiSecret || ''}`).toString('base64')
 
                 console.log(`[WC ORDER CREATION]: Searching for product "${requestedItem}"`)
                 const products: any = await $fetch(`${formattedUrl}/wp-json/wc/v3/products`, {
                     params: { search: requestedItem, per_page: 1 },
                     headers: { Authorization: `Basic ${auth}` },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -304,6 +355,7 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
                     method: 'POST',
                     body: orderData,
                     headers: { Authorization: `Basic ${auth}` },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -319,14 +371,16 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
                 if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
                     formattedUrl = 'https://' + formattedUrl
                 }
-                if (!formattedUrl.includes('.myshopify.com') && !formattedUrl.includes('myshopify.com')) {
+                if (!formattedUrl.toLowerCase().includes('.myshopify.com')) {
                     formattedUrl = `https://${apiUrl}.myshopify.com`
                 }
+                formattedUrl = await validateExternalShopUrl(formattedUrl, 'shopify')
 
                 console.log(`[SHOPIFY ORDER CREATION]: Searching for product "${requestedItem}"`)
                 const res: any = await $fetch(`${formattedUrl}/admin/api/2024-04/products.json`, {
                     params: { title: requestedItem, limit: 1 },
                     headers: { 'X-Shopify-Access-Token': apiKey },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -368,6 +422,7 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
                     method: 'POST',
                     body: orderData,
                     headers: { 'X-Shopify-Access-Token': apiKey },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -384,6 +439,7 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
                 if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
                     formattedUrl = 'https://' + formattedUrl
                 }
+                formattedUrl = await validateExternalShopUrl(formattedUrl, 'custom')
 
                 console.log(`[CUSTOM ORDER CREATION]: Submitting order to Custom API: "${formattedUrl}/orders"`)
                 const orderData = {
@@ -405,6 +461,7 @@ export async function processMockOrderStockDeduction(orderInfo: string, behavior
                         Authorization: `Bearer ${apiKey}`,
                         'Content-Type': 'application/json'
                     },
+                    redirect: 'error',
                     timeout: 5000
                 })
 
@@ -627,8 +684,15 @@ export function resolveIntelligentProductImages(
         ? targetProducts.flatMap(p => p.images)
         : allImages
 
+    // Helper to safely extract image URL from string or object
+    const getUrl = (img: any): string => {
+        if (!img) return ''
+        if (typeof img === 'string') return img
+        return img.url || img.image || ''
+    }
+
     // 3. Check for specific color/variant requested in user's CURRENT message
-    const catalogColors = Array.from(new Set(candidatePool.map(img => (img.color || '').trim().toLowerCase()).filter(Boolean)))
+    const catalogColors = Array.from(new Set(candidatePool.map(img => (img?.color || '').trim().toLowerCase()).filter(Boolean)))
     
     const colorSynonyms: Record<string, string[]> = {
         'black and white': ['black and white', 'black & white', 'black white', 'shada kalo', 'সাদা কালো', 'কালো সাদা', 'bw', 'b&w'],
@@ -665,76 +729,96 @@ export function resolveIntelligentProductImages(
 
     if (detectedColor) {
         const matched = candidatePool.filter(img => {
-            const c = (img.color || '').toLowerCase()
+            const c = (img?.color || '').toLowerCase()
             const synonyms = colorSynonyms[detectedColor] || [detectedColor]
             return c === detectedColor || synonyms.some(syn => c === syn || (c && syn && (c.includes(syn) || syn.includes(c))))
         })
         if (matched.length > 0) {
             console.log(`[RESOLVE PRODUCT IMAGES]: Exact color match found for "${detectedColor}" (${matched.length} photo(s))`)
             const limit = isAskingAll ? 10 : 3
-            return matched.slice(0, limit).map(img => img.url)
+            return matched.slice(0, limit).map(getUrl).filter(Boolean)
         }
     }
 
     // 4. Check for specific angle / view requested in userText
     if (/(back|behind|rear|pechon|pichon|পিছনের|পিছন)/i.test(u)) {
-        const match = candidatePool.find(img => img.role === 'back')
-        if (match) return [match.url]
+        const match = candidatePool.find(img => img?.role === 'back')
+        if (match) {
+            const url = getUrl(match)
+            if (url) return [url]
+        }
     }
     if (/(front|samne|samner|সামনের|সামনে)/i.test(u)) {
-        const match = candidatePool.find(img => img.role === 'hero')
-        if (match) return [match.url]
+        const match = candidatePool.find(img => img?.role === 'hero')
+        if (match) {
+            const url = getUrl(match)
+            if (url) return [url]
+        }
     }
     if (/(chart|size|measurement|মাপ|সাইজ)/i.test(u)) {
-        const match = candidatePool.find(img => img.role === 'chart')
-        if (match) return [match.url]
+        const match = candidatePool.find(img => img?.role === 'chart')
+        if (match) {
+            const url = getUrl(match)
+            if (url) return [url]
+        }
     }
     if (/(detail|fabric|material|close|কাপড়|ফেব্রিক)/i.test(u)) {
-        const match = candidatePool.find(img => img.role === 'detail')
-        if (match) return [match.url]
+        const match = candidatePool.find(img => img?.role === 'detail')
+        if (match) {
+            const url = getUrl(match)
+            if (url) return [url]
+        }
     }
     if (/(model|wearing|worn|পরা|মডেল)/i.test(u)) {
-        const match = candidatePool.find(img => img.role === 'model')
-        if (match) return [match.url]
+        const match = candidatePool.find(img => img?.role === 'model')
+        if (match) {
+            const url = getUrl(match)
+            if (url) return [url]
+        }
     }
 
     // 5. Check if user asked for "ALL" photos (Deliver all available images up to album max limit 10)
     if (isAskingAll) {
         console.log(`[RESOLVE PRODUCT IMAGES]: User requested ALL photos. Delivering all ${candidatePool.length} available photos.`)
-        return candidatePool.slice(0, 10).map(img => img.url)
+        return candidatePool.slice(0, 10).map(getUrl).filter(Boolean)
     }
 
     // 6. Check if user asked for "ANOTHER" / "NEXT" / "MORE" / "DIFFERENT" / "ONNO" / "ARO" image
     if (/(another|next|more|different|onno|অন্য|aro|আর|আরেক|arekt|2nd|second|other)/i.test(u)) {
         if (candidatePool.length > 1) {
-            const secondImg = candidatePool[1] || candidatePool.find(img => img.role !== 'hero')
-            if (secondImg) return [secondImg.url]
+            const secondImg = candidatePool[1] || candidatePool.find(img => img?.role !== 'hero')
+            if (secondImg) {
+                const url = getUrl(secondImg)
+                if (url) return [url]
+            }
         }
     }
 
     // 7. Check sessionState for pre-selected color in active order
     if (sessionState?.collected_details?.color) {
         const sessCol = (sessionState.collected_details.color || '').toLowerCase()
-        const matched = candidatePool.filter(img => (img.color || '').toLowerCase().includes(sessCol))
-        if (matched.length > 0) return matched.slice(0, 3).map(img => img.url)
+        const matched = candidatePool.filter(img => (img?.color || '').toLowerCase().includes(sessCol))
+        if (matched.length > 0) return matched.slice(0, 3).map(getUrl).filter(Boolean)
     }
 
     // 8. General product overview (Curated Power Trio: distinct colors/roles within target product)
-    const distinctList: any[] = []
+    const distinctList: string[] = []
     const seenPointers = new Set<string>()
 
     for (const img of candidatePool) {
-        const key = (img.color || img.role || img.url).toLowerCase()
+        const rawUrl = getUrl(img)
+        if (!rawUrl) continue
+        const key = (typeof img === 'string' ? img : (img?.color || img?.role || rawUrl || '')).toLowerCase()
         if (!seenPointers.has(key)) {
             seenPointers.add(key)
-            distinctList.push(img)
+            distinctList.push(rawUrl)
         }
         if (distinctList.length >= 3) break
     }
 
     if (distinctList.length > 0) {
-        return distinctList.map(img => img.url)
+        return distinctList
     }
 
-    return candidatePool.slice(0, 3).map(img => img.url)
+    return candidatePool.map(getUrl).filter(Boolean).slice(0, 3)
 }

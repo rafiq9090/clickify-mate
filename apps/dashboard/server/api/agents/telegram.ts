@@ -1,14 +1,19 @@
 // server/api/agents/telegram.ts
 import { decrypt } from '../../utils/encryption'
 import { generateAIReply, analyzeSentimentAndPickEmoji } from '../../utils/groq'
-import { processMockOrderStockDeduction, getMockInventory, resolveIntelligentProductImages } from '../../utils/mock_shop'
 import { getFileFromBackblaze } from '../../utils/backblaze'
 import { runAgent } from '../../utils/agent/agent_orchestrator'
 import { sendTelegramReaction } from '../../utils/agent/agent_reactions'
 import { checkAndRecordWebhookEvent } from '../../utils/agent/webhook_dedup'
 import { verifyTelegramSecret } from '../../utils/agent/webhook_auth'
 import { analyzeImage } from '../../utils/agent/vision'
+import { analyzeVideoMessage } from '../../utils/agent/video_processor'
 import type { IncomingAgentEvent } from '../../utils/agent/agent_types'
+
+function safeTelegramError(error: unknown): string {
+    const raw = error instanceof Error ? error.message : String(error || 'Unknown Telegram error')
+    return raw.replace(/bot[^/\s"']+/gi, 'bot[REDACTED]').slice(0, 500)
+}
 
 async function fetchImageBufferAndType(imageUrl: string): Promise<{ buffer: Buffer | null; contentType: string }> {
     if (!imageUrl) return { buffer: null, contentType: 'image/jpeg' }
@@ -101,7 +106,41 @@ async function sendTelegramPhotoReliable(chatId: string | number, imageUrl: stri
     }
 }
 
-async function sendTelegramMediaGroupReliable(chatId: string | number, imageUrls: string[], botToken: string): Promise<any[]> {
+async function sendTelegramMessageWithRetry(
+    chatId: number | string,
+    text: string,
+    botToken: string,
+    retries = 3
+): Promise<boolean> {
+    if (!text || !text.trim()) return true
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            await $fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                body: {
+                    chat_id: chatId,
+                    text: text
+                },
+                timeout: 10000
+            })
+            return true
+        } catch (err: any) {
+            console.warn(`[TELEGRAM SEND ATTEMPT ${attempt} FAILED]:`, safeTelegramError(err))
+            if (attempt === retries) {
+                console.error(`[TELEGRAM SEND FINAL FAILURE]:`, safeTelegramError(err))
+                return false
+            }
+            await new Promise(resolve => setTimeout(resolve, attempt * 600))
+        }
+    }
+    return false
+}
+
+async function sendTelegramMediaGroupReliable(
+    chatId: number | string,
+    imageUrls: string[],
+    botToken: string
+): Promise<any[]> {
     if (!imageUrls || imageUrls.length === 0) return []
 
     // If single image, send standard single photo
@@ -199,9 +238,8 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string, apiKey: st
     return res.text || ''
 }
 
-
 export default defineEventHandler(async (event) => {
-    const VERSION = "1.4.0-MEDIA-SUPPORT"
+    const VERSION = "2.0.0-VIDEO-ENABLED"
 
     if (event.method === 'GET') {
         return {
@@ -220,9 +258,10 @@ export default defineEventHandler(async (event) => {
 
     const isVoice = !!message.voice
     const isPhoto = !!message.photo && message.photo.length > 0
+    const isVideo = !!(message.video || message.video_note || message.animation)
     const hasText = !!message.text
 
-    if (!hasText && !isVoice && !isPhoto) {
+    if (!hasText && !isVoice && !isPhoto && !isVideo) {
         return { success: true }
     }
 
@@ -236,15 +275,13 @@ export default defineEventHandler(async (event) => {
     const chatId = message.chat.id
     const messageId = message.message_id
 
-
     try {
-        const apiKey = await getApiKey('groq_api_key', 'groqApiKey')
+        const apiKey = await getApiKey('groq_api_key', 'groqApiKey') || ''
         const query = getQuery(event)
         const agentId = query.agent_id
 
         console.log(`[AGENT DEBUG V${VERSION}]: Incoming request for Agent ID: ${agentId}`)
 
-        if (!apiKey) throw new Error('System configuration incomplete (Groq API Key missing)')
         if (!agentId) throw new Error('Unauthorized Webhook Call (Missing Agent ID)')
 
         const supabase = useSupabaseAdmin()
@@ -255,33 +292,8 @@ export default defineEventHandler(async (event) => {
                 .from('agent_configs')
                 .select('*')
                 .eq('id', agentId)
-                .maybeSingle()
-
-            if (!error && data) {
-                agent = data
-            }
-        }
-
-        if (!agent && message.chat?.id) {
-            const botId = message.chat.id?.toString()
-            const { data, error } = await supabase
-                .from('agent_configs')
-                .select('*')
-                .eq('external_id', botId)
-                .maybeSingle()
-
-            if (!error && data) {
-                agent = data
-            }
-        }
-
-        if (!agent) {
-            const { data, error } = await supabase
-                .from('agent_configs')
-                .select('*')
                 .eq('platform', 'telegram')
-                .order('updated_at', { ascending: false })
-                .limit(1)
+                .eq('is_active', true)
                 .maybeSingle()
 
             if (!error && data) {
@@ -291,7 +303,7 @@ export default defineEventHandler(async (event) => {
 
         if (!agent) {
             console.error(`[AGENT DEBUG]: Agent ${agentId} not found in DB`)
-            return { success: false, error: 'Agent configuration not found' }
+            throw createError({ statusCode: 404, statusMessage: 'Active Telegram agent configuration not found' })
         }
 
         // 2. Multi-Tenant Durable Webhook Deduplication
@@ -306,44 +318,58 @@ export default defineEventHandler(async (event) => {
             }
         }
 
+        console.log(`[AGENT DEBUG V${VERSION}]: Knowledge Base Length: ${agent.knowledge?.length || 0} characters`)
 
-        // --- SMART FALLBACK: If current agent has no knowledge, find one for this user that does ---
-        if (!agent.knowledge || agent.knowledge.length < 5) {
-            console.log(`[AGENT DEBUG]: Primary agent ${agent.id} has no knowledge. Searching alternatives...`)
+        // 0. ZERO-TOKEN GUARD: CHECK IF AI AUTO-PILOT IS PAUSED / STOPPED FOR THIS CUSTOMER
+        const emailKey = `${chatId}@telegram.org`
+        const { data: leadRows } = await supabase
+            .from('leads')
+            .select('data')
+            .eq('email', emailKey)
+            .eq('data->>agent_id', agent.id)
 
-            // Priority 1: Search by User ID and Platform
-            const { data: userFallback } = await supabase
-                .from('agent_configs')
-                .select('*')
-                .eq('user_id', agent.user_id)
-                .eq('platform', agent.platform)
-                .neq('knowledge', '')
-                .order('updated_at', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-
-            if (userFallback && userFallback.knowledge) {
-                console.log(`[AGENT DEBUG]: Found User-level fallback knowledge: ${userFallback.id}`)
-                agent = userFallback
-            } else if (agent.external_id) {
-                // Priority 2: Deep Sync by External ID (Bot ID)
-                const { data: idFallback } = await supabase
-                    .from('agent_configs')
-                    .select('*')
-                    .eq('external_id', agent.external_id)
-                    .neq('knowledge', '')
-                    .order('updated_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle()
-
-                if (idFallback && idFallback.knowledge) {
-                    console.log(`[AGENT DEBUG]: Found ID-level deep sync knowledge: ${idFallback.id}`)
-                    agent = idFallback
+        let isCustomerAiDisabled = agent.is_active === false
+        if (Array.isArray(leadRows)) {
+            for (const r of leadRows) {
+                if (r.data?.ai_disabled === true) {
+                    isCustomerAiDisabled = true
+                    break
                 }
             }
         }
 
-        console.log(`[AGENT DEBUG V${VERSION}]: Knowledge Base Length: ${agent.knowledge?.length || 0} characters`)
+        if (isCustomerAiDisabled) {
+            console.log(`[AGENT SILENT MODE]: AI Auto-Pilot is PAUSED for customer ${chatId}. Skipping all LLM, vision, and speech inference (0 tokens consumed).`)
+
+            let rawUserText = message.text || message.caption || ''
+            if (!rawUserText) {
+                if (message.voice) rawUserText = '[Voice Message]'
+                else if (message.photo) rawUserText = '[Photo Attachment]'
+                else if (message.video || message.video_note) rawUserText = '[Video Attachment]'
+                else rawUserText = '[Attachment]'
+            }
+
+            const fromObj = message.from || {}
+            const customerName = [fromObj.first_name, fromObj.last_name].filter(Boolean).join(' ') || (fromObj.username ? `@${fromObj.username}` : `Customer #${chatId.toString().slice(0, 6)}`)
+
+            // Insert into chat_history so it appears live in the Dashboard Live Inbox for manual reply
+            await supabase.from('chat_history').insert([
+                {
+                    agent_id: agent.id,
+                    user_external_id: chatId.toString(),
+                    customer_name: customerName,
+                    role: 'user',
+                    content: rawUserText,
+                    created_at: new Date().toISOString()
+                }
+            ])
+
+            return {
+                success: true,
+                aiPaused: true,
+                message: 'AI paused for this customer. 0 tokens consumed. Routed to Live Inbox.'
+            }
+        }
 
         const botToken = await decrypt(agent.encrypted_token)
         console.log(`[AGENT DEBUG V${VERSION}]: Generating reply for ${chatId}`)
@@ -367,7 +393,7 @@ export default defineEventHandler(async (event) => {
             }
         }
 
-        // --- PROCESS MEDIA TYPES IF NECESSARY ---
+        // --- PROCESS MEDIA TYPES (VOICE, PHOTO, VIDEO) ---
         if (message.voice) {
             console.log(`[TELEGRAM DEBUG V${VERSION}]: Processing voice. File ID: ${message.voice.file_id}`)
             try {
@@ -401,6 +427,52 @@ export default defineEventHandler(async (event) => {
             } else {
                 userText = caption || 'User sent an image.'
             }
+        } else if (message.video || message.video_note || message.animation) {
+            const vid = message.video || message.video_note || message.animation
+            const caption = message.caption || ''
+            console.log(`[TELEGRAM DEBUG V${VERSION}]: Processing video. File ID: ${vid.file_id}, Duration: ${vid.duration || 'N/A'}s`)
+            try {
+                let thumbnailBuffer: Buffer | undefined
+                const thumbId = vid.thumbnail?.file_id || vid.thumb?.file_id
+                if (thumbId) {
+                    thumbnailBuffer = await getTelegramFileBuffer(thumbId, botToken)
+                }
+
+                // Check if video is short/lightweight (<= 60s & <= 20MB) for audio transcription
+                const isHeavy = Boolean((vid.duration && vid.duration > 60) || (vid.file_size && vid.file_size > 20 * 1024 * 1024))
+                let videoBuffer: Buffer | undefined
+                if (vid.file_id) {
+                    try {
+                        const fileInfo = await $fetch<any>(`https://api.telegram.org/bot${botToken}/getFile`, {
+                            method: 'POST',
+                            body: { file_id: vid.file_id }
+                        })
+                        if (fileInfo?.ok && fileInfo.result?.file_path) {
+                            // Do not persist Telegram file URLs: they contain the bot token.
+                        }
+                    } catch (fErr) {}
+                }
+
+                if (!isHeavy && !videoBuffer && vid.file_id) {
+                    videoBuffer = await getTelegramFileBuffer(vid.file_id, botToken).catch(() => undefined)
+                }
+
+                const videoRes = await analyzeVideoMessage({
+                    videoBuffer,
+                    thumbnailBuffer,
+                    mimeType: vid.mime_type || 'video/mp4',
+                    duration: vid.duration,
+                    fileSize: vid.file_size,
+                    caption,
+                    groqApiKey: apiKey
+                })
+
+                userText = videoRes.combinedText
+                console.log(`[TELEGRAM DEBUG V${VERSION}]: Video analysis: "${userText}" (Heavy: ${isHeavy})`)
+            } catch (vidErr: any) {
+                console.error('[TELEGRAM VIDEO EXCEPTION]:', vidErr.message)
+                userText = caption || 'User sent a video.'
+            }
         }
 
         // 1. Fetch History (limit to last 24 hours to prevent stale conversations from bleeding into new ones)
@@ -415,30 +487,6 @@ export default defineEventHandler(async (event) => {
             .limit(10)
 
         const history = (historyData || []).reverse()
-
-        // --- FETCH OR CREATE LEAD FOR SESSION STATE ---
-        const emailKey = `${chatId}@telegram.org`
-        const { data: existingLeads } = await supabase
-            .from('leads')
-            .select('*')
-            .eq('email', emailKey)
-            .order('created_at', { ascending: false })
-            .limit(1)
-
-        let sessionLead = null
-        let sessionState = { current_state: 'sales', collected_details: {} }
-
-        if (existingLeads && existingLeads.length > 0) {
-            const latestLead = existingLeads[0]
-            const ageInMs = Date.now() - new Date(latestLead.created_at).getTime()
-            if (ageInMs < 2 * 60 * 60 * 1000) { // 2 hours active session window
-                sessionLead = latestLead
-                sessionState = {
-                    current_state: latestLead.data?.current_state || 'sales',
-                    collected_details: latestLead.data?.collected_details || {}
-                }
-            }
-        }
 
         // --- EXTRACT CUSTOMER NAME & PROFILE PHOTO ---
         const fromUser = message.from || {}
@@ -457,7 +505,8 @@ export default defineEventHandler(async (event) => {
                         body: { file_id: fileId }
                     }).catch(() => null)
                     if (fileInfo?.result?.file_path) {
-                        customerAvatar = `https://api.telegram.org/file/bot${botToken}/${fileInfo.result.file_path}`
+                        // Telegram file URLs contain the bot token and must not be stored.
+                        customerAvatar = ''
                     }
                 }
             } catch (e) {
@@ -465,103 +514,111 @@ export default defineEventHandler(async (event) => {
             }
         }
 
-        // 2. Save User Message with message_id and reply_to context
-        await supabase.from('chat_history').insert({
-            agent_id: agent.id,
-            user_external_id: chatId.toString(),
-            customer_name: customerName,
-            customer_avatar: customerAvatar,
-            role: 'user',
-            content: userText,
-            message_id: message.message_id ? message.message_id.toString() : null,
-            reply_to: replyContext
-        })
-
-        // Check if owner has paused AI auto-reply for this customer or if agent is inactive
-        if (sessionLead?.data?.ai_disabled === true || agent.is_active === false) {
-            console.log(`[TELEGRAM DEBUG]: AI Auto-Pilot is PAUSED for customer ${chatId}. Saved message to inbox. Skipping AI generation.`)
-            return { success: true, ai_paused: true }
-        }
-
-        // --- Clickify AI Agent 2.0 Engine Execution ---
-        const incomingEvent: IncomingAgentEvent = {
+        // 2. DISPATCH TO CLICKIFY AI AGENT 2.0 ORCHESTRATOR
+        const agentEvent: IncomingAgentEvent = {
             channel: 'telegram',
-            eventId: `tg-${message.message_id || Date.now()}`,
+            eventId: `tg_${chatId}_${messageId}_${Date.now()}`,
             customerId: chatId.toString(),
             customerName,
             customerAvatar,
-            messageId: message.message_id ? message.message_id.toString() : '',
+            messageId: messageId ? messageId.toString() : Date.now().toString(),
             text: userText,
-            replyTo: replyContext,
+            media: (message.photo || isVoice || isVideo) ? {
+                type: isVoice ? 'audio' : (isVideo ? 'video' : 'image')
+            } : undefined,
+            replyTo: replyContext ? {
+                messageId: replyContext.message_id,
+                text: replyContext.text,
+                author: replyContext.author
+            } : undefined,
             timestamp: Date.now(),
-            rawPayload: message
+            rawPayload: body
         }
 
-        const agentRes = await runAgent(incomingEvent, agent)
+        const agentResult = await runAgent(agentEvent, agent)
 
-        if (agentRes.aiPaused) {
-            return { success: true, ai_paused: true }
+        if (agentResult.aiPaused) {
+            if (agentResult.text) {
+                await sendTelegramMessageWithRetry(chatId, agentResult.text, botToken)
+            }
+
+            // Save incoming user message to chat_history so it appears live in Inbox
+            await supabase.from('chat_history').insert([
+                {
+                    agent_id: agent.id,
+                    user_external_id: chatId.toString(),
+                    customer_name: customerName,
+                    customer_avatar: customerAvatar,
+                    role: 'user',
+                    content: userText,
+                    created_at: new Date().toISOString()
+                },
+                ...(agentResult.text ? [{
+                    agent_id: agent.id,
+                    user_external_id: chatId.toString(),
+                    customer_name: customerName,
+                    customer_avatar: customerAvatar,
+                    role: 'assistant',
+                    content: agentResult.text,
+                    created_at: new Date().toISOString()
+                }] : [])
+            ])
+
+            return { success: true, aiPaused: true }
         }
 
-        const aiReply = agentRes.text || ''
-        const imagesToSend = agentRes.imagesToSend || []
-        const hasImages = imagesToSend.length > 0
-        const tokens = agentRes.tokensUsed || 0
+        const reply = agentResult.text
 
-        // 1. Send Reaction (Instant Feedback)
-        if (agentRes.reaction?.shouldReact && agentRes.reaction?.emoji && message.message_id) {
-            sendTelegramReaction(chatId, message.message_id, agentRes.reaction.emoji, botToken)
+        // 3. SEND AGENT REACTION (IF DECIDED)
+        if (agentResult.reaction && agentResult.reaction.shouldReact && agentResult.reaction.emoji) {
+            sendTelegramReaction(chatId, messageId, agentResult.reaction.emoji, botToken).catch(() => {})
         }
 
-        let sentMessageId: string | null = null
-        // 2. Send Text Reply
-        if (aiReply && aiReply.trim() !== '') {
+        // 4. SEND RESPONSE TEXT BACK TO TELEGRAM
+        if (reply) {
+            const delivered = await sendTelegramMessageWithRetry(chatId, reply, botToken)
+            if (!delivered) {
+                throw new Error('Telegram delivery failed after retries')
+            }
+        }
+
+        // 5. SEND PRODUCT IMAGES (ALBUM / SINGLE) IF RESOLVED BY AGENT
+        if (agentResult.imagesToSend && agentResult.imagesToSend.length > 0) {
             try {
-                const sendRes: any = await $fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                    method: 'POST',
-                    body: { chat_id: chatId, text: aiReply }
-                })
-                if (sendRes?.result?.message_id) {
-                    sentMessageId = sendRes.result.message_id.toString()
-                }
-            } catch (sendErr: any) {
-                console.warn(`[TELEGRAM SEND WARNING]: Failed to send message via Telegram API:`, sendErr.message)
+                await sendTelegramMediaGroupReliable(chatId, agentResult.imagesToSend, botToken)
+            } catch (err: any) {
+                console.error('[TELEGRAM AGENT IMAGE SEND ERROR]:', err.message)
             }
         }
 
-        // 3. Send Images (MediaGroup Album for 2-3 images, single photo if 1)
-        let mediaMessageIds: string[] = []
-        if (hasImages && imagesToSend.length > 0) {
-            const mediaRes = await sendTelegramMediaGroupReliable(chatId, imagesToSend, botToken)
-            if (Array.isArray(mediaRes)) {
-                mediaMessageIds = mediaRes.map(m => m.message_id ? m.message_id.toString() : '').filter(Boolean)
+        // 6. SAVE CHAT HISTORY (User Message + Assistant Response)
+        const nowMs = Date.now()
+        await supabase.from('chat_history').insert([
+            {
+                agent_id: agent.id,
+                user_external_id: chatId.toString(),
+                customer_name: customerName,
+                role: 'user',
+                content: userText,
+                created_at: new Date(nowMs - 50).toISOString()
+            },
+            {
+                agent_id: agent.id,
+                user_external_id: chatId.toString(),
+                customer_name: customerName,
+                role: 'assistant',
+                content: reply,
+                created_at: new Date(nowMs).toISOString()
             }
-        }
+        ])
 
-        // 4. Save AI Reply (Cleaned) with Exact Tokens, Attached Images & Telegram Message IDs
-        const historyContent = (hasImages && imagesToSend.length > 0)
-            ? `${aiReply}\n${imagesToSend.map(u => `[IMAGE: ${u}]`).join('\n')}`
-            : aiReply
+        console.log(`[AGENT V2 TELEGRAM]: Replied to ${customerName} (${chatId}). State: ${agentResult.state}, Repaired: ${agentResult.repaired || false}`)
+        return { success: true }
 
-        await supabase.from('chat_history').insert({
-            agent_id: agent.id,
-            user_external_id: chatId.toString(),
-            customer_name: customerName,
-            customer_avatar: customerAvatar,
-            role: 'assistant',
-            content: historyContent,
-            images: imagesToSend,
-            tokens_used: tokens,
-            message_id: sentMessageId,
-            media_message_ids: mediaMessageIds
-        })
-
-        console.log(`[AGENT V2 TELEGRAM]: Replied to ${customerName} (${chatId}). State: ${agentRes.state}, Repaired: ${agentRes.repaired || false}`)
-return { success: true }
-
-    } catch (e: any) {
-        console.error(`[TELEGRAM AGENT ERROR V${VERSION}]:`, e.message || e.statusMessage || String(e))
-        console.error(e)
-        return { success: false, error: e.message || e.statusMessage || String(e) }
+    } catch (err: any) {
+        const safeError = safeTelegramError(err)
+        console.error(`[TELEGRAM AGENT ERROR V${VERSION}]:`, safeError)
+        if (err?.statusCode) throw err
+        throw createError({ statusCode: 502, statusMessage: 'Telegram message processing or delivery failed', data: { error: safeError } })
     }
 })

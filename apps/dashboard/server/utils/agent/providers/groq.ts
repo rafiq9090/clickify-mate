@@ -4,8 +4,8 @@ import { getApiKeyList } from '../../settings'
 
 export class GroqModelProvider implements AgentModelProvider {
     name = 'groq'
-    private defaultModel = 'qwen/qwen3.6-27b'
-    private fallbackModels = ['qwen/qwen3.6-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b']
+    private defaultModel = 'openai/gpt-oss-20b'
+    private fallbackModels = ['openai/gpt-oss-20b', 'qwen/qwen3.6-27b', 'openai/gpt-oss-120b']
 
     async generate(options: GenerateOptions): Promise<ModelResult> {
         const keys = await getApiKeyList('groq_api_key', 'groqApiKey')
@@ -164,6 +164,7 @@ export class GroqModelProvider implements AgentModelProvider {
                         provider: 'groq'
                     }
                 } catch (err: any) {
+                    console.error('[GROQ TOOL CALL ERROR]:', err?.data || err?.message)
                     lastErr = err
                     if (err?.status === 429) {
                         // Rate limited on this model/key, continue to next

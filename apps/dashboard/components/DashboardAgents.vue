@@ -4,9 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline/40">
       <div>
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            <span class="material-symbols-outlined text-xl">smart_toy</span>
-          </div>
+          
           <h2 class="text-xl font-bold tracking-tight text-on-surface">Connected AI Agents</h2>
         </div>
         <p class="text-xs text-on-surface-variant mt-1">
@@ -19,7 +17,6 @@
           @click="$emit('switch-tab', 'catalog')"
           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
         >
-          <span class="material-symbols-outlined text-base text-secondary">photo_library</span>
           <span>Open Product Catalog</span>
         </button>
 
@@ -50,10 +47,10 @@
           <div class="flex items-start justify-between gap-3 mb-4">
             <div class="flex items-center gap-3">
               <div 
-                class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-transform group-hover:scale-105"
+                class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
                 :class="getPlatformIconClass(agent.platform)"
               >
-                <span class="material-symbols-outlined">{{ getPlatformIcon(agent.platform) }}</span>
+                <PlatformIcon :platform="agent.platform" custom-class="w-6 h-6" />
               </div>
               <div class="min-w-0">
                 <h3 class="text-sm font-bold text-on-surface truncate capitalize flex items-center gap-1.5" :title="agent.name || formatPlatformName(agent.platform)">
@@ -83,7 +80,6 @@
                 :class="agent.is_active ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'"
                 :title="agent.is_active ? 'Click to Pause this Agent' : 'Click to Start / Resume this Agent'"
               >
-                <span class="w-1.5 h-1.5 rounded-full" :class="agent.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
                 <span>{{ agent.is_active ? 'Active (Click to Pause)' : 'Paused (Click to Start)' }}</span>
               </button>
             </div>
@@ -135,7 +131,6 @@
           <div v-show="!agent.activeCardTab || agent.activeCardTab === 'knowledge'" class="mb-4 space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-xs font-medium text-on-surface-variant flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm text-primary">psychology</span>
                 Product Instructions &amp; Rules
               </span>
               <button 
@@ -164,10 +159,8 @@
           <div v-show="agent.activeCardTab === 'catalog'" class="mb-4 space-y-3">
             <div class="flex items-center justify-between">
               <span class="text-xs font-medium text-on-surface flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-sm text-secondary">photo_library</span>
                 Connected Products ({{ getAgentCatalogProducts(agent).length }})
               </span>
-              <span class="text-[10px] text-emerald-500 font-semibold font-mono">B2 Cloud Ready</span>
             </div>
 
             <!-- List of Synchronized Catalog Products -->
@@ -447,6 +440,8 @@ const formatPlatformName = (platform) => {
   if (platform === 'telegram') return 'Telegram'
   if (platform === 'messenger') return 'Messenger'
   if (platform === 'fb_comment') return 'Facebook Comments'
+  if (platform === 'instagram') return 'Instagram DM'
+  if (platform === 'ig_comment') return 'Instagram Comments'
   return platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Direct'
 }
 
@@ -454,13 +449,17 @@ const getPlatformIcon = (platform) => {
   if (platform === 'whatsapp') return 'chat'
   if (platform === 'telegram') return 'send'
   if (platform === 'messenger') return 'forum'
+  if (platform === 'instagram' || platform === 'ig_comment') return 'photo_camera'
   return 'chat_bubble'
 }
 
 const getPlatformIconClass = (platform) => {
-  if (platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-  if (platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-  if (platform === 'messenger' || platform === 'facebook') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+  const p = (platform || '').toLowerCase()
+  if (p === 'whatsapp') return 'bg-emerald-500/10 text-emerald-500'
+  if (p === 'telegram') return 'bg-sky-500/10 text-sky-500'
+  if (p === 'messenger') return 'bg-blue-500/10 text-blue-500'
+  if (p === 'facebook' || p === 'fb_comment') return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+  if (p === 'instagram' || p === 'ig_comment') return 'bg-pink-500/10 text-pink-500'
   return 'bg-primary/10 text-primary'
 }
 

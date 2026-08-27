@@ -1,5 +1,6 @@
 import { useSupabaseAdmin } from '../supabase'
 import { createCourierParcel } from './tools/courier'
+import { queryPg } from '../db'
 
 export interface CourierJobState {
     status: 'pending' | 'processing' | 'completed' | 'retry_required' | 'failed'
@@ -40,12 +41,12 @@ export async function processDurableCourierQueue(): Promise<{ processed: number;
         const now = Date.now()
         const nowIso = new Date(now).toISOString()
 
-        // Fetch recent leads that might have uncompleted courier jobs
+        // Scan oldest first so a busy shop cannot starve older retry jobs.
         const { data: leads, error } = await supabase
             .from('leads')
             .select('id, email, data')
-            .order('created_at', { ascending: false })
-            .limit(20)
+            .order('created_at', { ascending: true })
+            .limit(500)
 
         if (error || !Array.isArray(leads)) {
             isProcessingQueue = false
@@ -112,13 +113,17 @@ export async function processDurableCourierQueue(): Promise<{ processed: number;
                 }
             }
 
-            const { error: claimErr } = await supabase
-                .from('leads')
-                .update({ data: claimingData })
-                .eq('id', lead.id)
+            const claimed = await queryPg(
+                `UPDATE public.leads
+                    SET data = $2::jsonb
+                  WHERE id = $1
+                    AND COALESCE(data->'courier_job'->>'status', '') = $3
+                    AND COALESCE(data->'courier_job'->>'worker_id', '') = $4
+                  RETURNING id`,
+                [lead.id, JSON.stringify(claimingData), String(job.status || ''), String(job.worker_id || '')]
+            )
 
-            if (claimErr) {
-                console.warn(`[COURIER QUEUE]: Failed to claim Order ${lead.id}: ${claimErr.message}`)
+            if (!claimed.rows[0]) {
                 continue
             }
 

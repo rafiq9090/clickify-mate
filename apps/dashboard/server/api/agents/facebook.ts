@@ -7,6 +7,8 @@ import { useSupabaseAdmin } from '../../utils/supabase'
 import { checkAndRecordWebhookEvent } from '../../utils/agent/webhook_dedup'
 import { verifyMetaSignature } from '../../utils/agent/webhook_auth'
 import { analyzeImage } from '../../utils/agent/vision'
+import { analyzeVideoMessage } from '../../utils/agent/video_processor'
+import { analyzeCommentToxicity } from '../../utils/agent/comment_moderator'
 
 interface DownloadedMedia {
     buffer: Buffer
@@ -124,24 +126,33 @@ export default defineEventHandler(async (event) => {
     const pageId = entry.id
     const supabase = useSupabaseAdmin()
 
-    // Find agent by ID or Page ID
+    // Find agent by ID or Page ID (supports facebook, messenger, fb_comment)
     let agent = null
+    const fbPlatforms = ['facebook', 'messenger', 'fb_comment']
     if (agentId) {
-        const { data } = await supabase.from('agent_configs').select('*').eq('id', agentId).maybeSingle()
+        const { data } = await supabase
+            .from('agent_configs')
+            .select('*')
+            .eq('id', agentId)
+            .in('platform', fbPlatforms)
+            .eq('is_active', true)
+            .maybeSingle()
         agent = data
     }
     if (!agent && pageId) {
-        const { data } = await supabase.from('agent_configs').select('*').eq('external_id', pageId).maybeSingle()
-        agent = data
-    }
-    if (!agent) {
-        const { data } = await supabase.from('agent_configs').select('*').eq('platform', 'facebook').order('updated_at', { ascending: false }).limit(1).maybeSingle()
+        const { data } = await supabase
+            .from('agent_configs')
+            .select('*')
+            .eq('external_id', pageId)
+            .in('platform', fbPlatforms)
+            .eq('is_active', true)
+            .maybeSingle()
         agent = data
     }
 
     if (!agent) {
-        console.error(`[FACEBOOK DEBUG V${VERSION}]: No Facebook agent configured in DB.`)
-        return { success: false }
+        console.error(`[FACEBOOK DEBUG V${VERSION}]: No active Facebook/Messenger agent found in DB for Page ID ${pageId} (agentId: ${agentId || 'none'}).`)
+        throw createError({ statusCode: 404, statusMessage: 'No matching active Facebook agent' })
     }
 
     const pageAccessToken = await decrypt(agent.encrypted_token)
@@ -169,6 +180,50 @@ export default defineEventHandler(async (event) => {
         })
         if (isDuplicate) {
             return { success: true, duplicate: true }
+        }
+
+        // 0. ZERO-TOKEN GUARD: CHECK IF AI AUTO-PILOT IS PAUSED / STOPPED FOR THIS CUSTOMER
+        const emailKey = `${senderId}@facebook.org`
+        const { data: leadRows } = await supabase
+            .from('leads')
+            .select('data')
+            .eq('email', emailKey)
+            .eq('data->>agent_id', agent.id)
+
+        let isCustomerAiDisabled = agent.is_active === false
+        if (Array.isArray(leadRows)) {
+            for (const r of leadRows) {
+                if (r.data?.ai_disabled === true) {
+                    isCustomerAiDisabled = true
+                    break
+                }
+            }
+        }
+
+        if (isCustomerAiDisabled) {
+            console.log(`[AGENT SILENT MODE]: AI Auto-Pilot is PAUSED for Messenger customer ${senderId}. Skipping all LLM, vision, and speech inference (0 tokens consumed).`)
+
+            let rawUserText = message.text || ''
+            if (!rawUserText && message.attachments && message.attachments.length > 0) {
+                const attType = message.attachments[0].type
+                rawUserText = `[${attType} attachment]`
+            }
+
+            await supabase.from('chat_history').insert([
+                {
+                    agent_id: agent.id,
+                    user_external_id: senderId,
+                    role: 'user',
+                    content: rawUserText || '[Message]',
+                    created_at: new Date().toISOString()
+                }
+            ])
+
+            return {
+                success: true,
+                aiPaused: true,
+                message: 'AI paused for this customer. 0 tokens consumed. Routed to Live Inbox.'
+            }
         }
 
         let userText = message.text || ''
@@ -200,6 +255,20 @@ export default defineEventHandler(async (event) => {
                     console.error('[FACEBOOK IMAGE ERROR]:', imgErr.message)
                 }
                 if (!userText) userText = 'User sent an image.'
+            } else if (attachmentType === 'video' && payload.url && pageAccessToken && apiKey) {
+                try {
+                    mediaUrl = payload.url
+                    const vidMedia = await downloadMediaFromUrl(mediaUrl, pageAccessToken)
+                    const videoRes = await analyzeVideoMessage({
+                        videoBuffer: vidMedia.buffer,
+                        mimeType: vidMedia.contentType || 'video/mp4',
+                        groqApiKey: apiKey
+                    })
+                    userText = videoRes.combinedText
+                } catch (vidErr: any) {
+                    console.error('[FACEBOOK VIDEO ERROR]:', vidErr.message)
+                }
+                if (!userText) userText = 'User sent a video.'
             }
         }
 
@@ -342,15 +411,74 @@ export default defineEventHandler(async (event) => {
 
                 const senderId = commentValue.from?.id
                 const senderName = commentValue.from?.name || `Facebook User (${senderId})`
+                const senderAvatar = pageAccessToken
+                    ? `https://graph.facebook.com/v19.0/${senderId}/picture?type=normal&access_token=${pageAccessToken}`
+                    : ''
                 const commentText = commentValue.message || ''
 
                 if (!senderId || senderId === pageId || !commentText) continue
 
-                // Save User Comment
+                // 🛡️ 1. Real-Time Bad / Toxic / Scam / Spam Comment Moderation
+                const toxicity = analyzeCommentToxicity(commentText)
+                const shouldAutoDelete = toxicity.isBad && agent.agent_behavior?.fb_delete_negatives !== false
+
+                if (shouldAutoDelete) {
+                    console.log(`[FB AUTO-MODERATION DETECTED]: Bad comment from ${senderName} (${senderId}): "${commentText}" | Reason: ${toxicity.reason}`)
+
+                    // 1. Delete or Hide comment on Facebook Page via Meta Graph API
+                    if (pageAccessToken && commentId) {
+                        try {
+                            await $fetch(`https://graph.facebook.com/v19.0/${commentId}?access_token=${pageAccessToken}`, {
+                                method: 'DELETE'
+                            })
+                            console.log(`[FB AUTO-MODERATION SUCCESS]: Deleted comment ${commentId} from Facebook Page.`)
+                        } catch (delErr: any) {
+                            console.warn(`[FB AUTO-MODERATION]: Delete failed, hiding comment: ${delErr.message}`)
+                            await $fetch(`https://graph.facebook.com/v19.0/${commentId}?access_token=${pageAccessToken}`, {
+                                method: 'POST',
+                                body: { is_hidden: true }
+                            }).catch(() => {})
+                        }
+                    }
+
+                    // 2. Save Deleted Comment in chat_history with profile name & picture
+                    await supabase.from('chat_history').insert({
+                        agent_id: agent.id,
+                        user_external_id: senderId,
+                        customer_name: senderName,
+                        customer_avatar: senderAvatar,
+                        role: 'user',
+                        content: `🚨 [AUTO-DELETED BAD COMMENT: ${toxicity.reason}]\n"${commentText}"`,
+                        message_id: commentId
+                    })
+
+                    // 3. Save Moderated Lead / Incident Log for Dashboard display
+                    await supabase.from('leads').insert({
+                        email: `${senderId}@fbcomment.meta`,
+                        status: 'deleted_comment',
+                        data: {
+                            agent_id: agent.id,
+                            platform: 'fb_comment',
+                            customer_name: senderName,
+                            customer_avatar: senderAvatar,
+                            comment_id: commentId,
+                            comment_text: commentText,
+                            moderation_reason: toxicity.reason,
+                            action_taken: 'deleted',
+                            deleted_at: new Date().toISOString()
+                        }
+                    })
+
+                    // Do not reply to toxic comments
+                    continue
+                }
+
+                // Save Normal User Comment
                 await supabase.from('chat_history').insert({
                     agent_id: agent.id,
                     user_external_id: senderId,
                     customer_name: senderName,
+                    customer_avatar: senderAvatar,
                     role: 'user',
                     content: commentText,
                     message_id: commentId
@@ -411,15 +539,16 @@ export default defineEventHandler(async (event) => {
                     if (agentRes.aiPaused) continue
 
                     aiReply = agentRes.text || ''
+                }
 
-                    // React to Facebook Comment
-                    if (agentRes.reaction?.shouldReact && agentRes.reaction?.emoji && commentId && pageAccessToken) {
-                        const fbReaction = agentRes.reaction.emoji === '❤️' ? 'LOVE' : 'LIKE'
-                        $fetch(`https://graph.facebook.com/v19.0/${commentId}/reactions?access_token=${pageAccessToken}`, {
-                            method: 'POST',
-                            body: { type: fbReaction }
-                        }).catch(() => {})
-                    }
+                // 2. React to Facebook Comment Based on Sentiment (LOVE for praise, LIKE for inquiries)
+                if (commentId && pageAccessToken) {
+                    const isPositiveLove = /(?:love|sundor|bhalo|awesome|darun|best|great|nice|ধন্যবাদ|সুন্দর|ভালো|দারুণ|অনেক সুন্দর|পছন্দ|jossh)/i.test(commentText)
+                    const fbReaction = isPositiveLove ? 'LOVE' : 'LIKE'
+                    $fetch(`https://graph.facebook.com/v19.0/${commentId}/reactions?access_token=${pageAccessToken}`, {
+                        method: 'POST',
+                        body: { type: fbReaction }
+                    }).catch(() => {})
                 }
 
                 // 2. Post Safe Reply Comment

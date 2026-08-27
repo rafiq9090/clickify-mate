@@ -1,4 +1,5 @@
 export default defineEventHandler(async (event) => {
+  requireAdminSession(event)
   const client = useSupabaseAdmin()
   
   // Get visitors active within the last 30 minutes

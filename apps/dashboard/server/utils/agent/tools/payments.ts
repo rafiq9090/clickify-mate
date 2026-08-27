@@ -1,5 +1,6 @@
 export interface PaymentVerificationResult {
     valid: boolean
+    reviewRequired?: boolean
     trxId: string
     amount: number
     method: 'bKash' | 'Nagad' | 'Rocket' | 'Bank' | 'COD'
@@ -16,7 +17,7 @@ export async function verifyPayment(args: {
 }): Promise<PaymentVerificationResult> {
     const trxId = (args.trxId || '').trim()
     const method = (args.method || 'bKash') as any
-    const amount = args.amount || 150
+    const amount = args.amount || 0
 
     if (!trxId) {
         return {
@@ -28,7 +29,8 @@ export async function verifyPayment(args: {
         }
     }
 
-    // Basic format validation (bKash/Nagad TrxIDs are 8-12 alphanumeric characters)
+    // A transaction ID or screenshot is untrusted input. Format checks can help a
+    // reviewer find typos, but only a provider API response can complete an order.
     const isValidFormat = /^[A-Za-z0-9]{8,15}$/.test(trxId)
 
     if (!isValidFormat) {
@@ -42,12 +44,13 @@ export async function verifyPayment(args: {
     }
 
     return {
-        valid: true,
+        valid: false,
+        reviewRequired: true,
         trxId,
         amount,
         method,
         senderPhone: args.senderPhone,
         timestamp: new Date().toISOString(),
-        message: `Payment of ৳${amount} via ${method} (TrxID: ${trxId}) verified successfully!`
+        message: `Transaction ID ${trxId} has a plausible format but is not verified. Use the order's hosted checkout link, or send this proof for manual merchant review. The order must remain unpaid.`
     }
 }

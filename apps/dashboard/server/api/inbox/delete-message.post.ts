@@ -1,7 +1,9 @@
 // server/api/inbox/delete-message.post.ts
 import { decrypt } from '../../utils/encryption'
+import { requireDashboardRole } from '../../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
+    const user = await requireDashboardRole(event, ['owner', 'admin', 'manager', 'support'])
     const body = await readBody(event)
     const { id, message_id, media_message_ids, user_external_id, agent_id, platform, permanent } = body || {}
 
@@ -13,12 +15,14 @@ export default defineEventHandler(async (event) => {
     let agent: any = null
 
     if (agent_id) {
-        const { data } = await supabase.from('agent_configs').select('*').eq('id', agent_id).maybeSingle()
+        const { data } = await supabase.from('agent_configs').select('*').eq('id', agent_id).eq('user_id', user.id).maybeSingle()
         agent = data
     } else {
-        const { data } = await supabase.from('agent_configs').select('*').eq('platform', platform || 'telegram').maybeSingle()
+        const { data } = await supabase.from('agent_configs').select('*').eq('user_id', user.id).eq('platform', platform || 'telegram').maybeSingle()
         agent = data
     }
+
+    if (!agent) throw createError({ statusCode: 404, statusMessage: 'Owned agent was not found.' })
 
     let deletedFromPlatform = false
 
@@ -54,15 +58,15 @@ export default defineEventHandler(async (event) => {
     // 2. Update or delete in chat_history database table
     try {
         if (permanent && id) {
-            await supabase.from('chat_history').delete().eq('id', id)
+            await supabase.from('chat_history').delete().eq('id', id).eq('agent_id', agent.id)
         } else if (id) {
             await supabase.from('chat_history').update({
                 is_deleted: true,
                 deleted_at: new Date().toISOString()
-            }).eq('id', id)
+            }).eq('id', id).eq('agent_id', agent.id)
         } else if (user_external_id && permanent) {
             // Delete entire thread
-            await supabase.from('chat_history').delete().eq('user_external_id', user_external_id)
+            await supabase.from('chat_history').delete().eq('user_external_id', user_external_id).eq('agent_id', agent.id)
         }
     } catch (dbErr: any) {
         console.warn('[DELETE HISTORY DB WARNING]:', dbErr.message)

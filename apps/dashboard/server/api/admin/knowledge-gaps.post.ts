@@ -1,45 +1,11 @@
 import { useSupabaseAdmin } from '../../utils/supabase'
-import { getAdminAuthToken } from '../../utils/auth-token'
-import jwt from 'jsonwebtoken'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-token-key-change-in-prod-9988'
-
-function verifyAdminSession(event: any): { isAuthorized: boolean; userId?: string } {
-    // 1. Check admin cookie
-    const adminCookie = getCookie(event, 'toolkit_admin_auth')
-    const expectedAdminToken = getAdminAuthToken()
-    if (adminCookie && adminCookie === expectedAdminToken) {
-        return { isAuthorized: true, userId: 'admin_master' }
-    }
-
-    // 2. Check user JWT token from cookie or Authorization header
-    const authHeader = getHeader(event, 'authorization') || getHeader(event, 'Authorization')
-    const userCookie = getCookie(event, 'toolkit_user_auth')
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : userCookie
-
-    if (token) {
-        try {
-            const decoded: any = jwt.verify(token, JWT_SECRET)
-            if (decoded && (decoded.id || decoded.email)) {
-                return { isAuthorized: true, userId: decoded.id || decoded.email }
-            }
-        } catch (e) {
-            // Invalid JWT
-        }
-    }
-
-    return { isAuthorized: false }
-}
+import { requireAdminSession } from '../../utils/auth-session'
+import { syncKnowledgeGapToStore } from '../../utils/agent/rag/knowledge_indexer'
+import { shopIdForAgent } from '../../utils/catalog-store'
 
 export default defineEventHandler(async (event) => {
-    // 🛡️ Admin RBAC Authorization Guard
-    const auth = verifyAdminSession(event)
-    if (!auth.isAuthorized) {
-        throw createError({
-            statusCode: 401,
-            statusMessage: 'Unauthorized. Admin permissions required to modify store knowledge.'
-        })
-    }
+    const auth = requireAdminSession(event)
+    const adminIdentity = `system:${auth.username}`
 
     const supabase = useSupabaseAdmin()
     if (!supabase || !supabase.from) {
@@ -87,7 +53,7 @@ export default defineEventHandler(async (event) => {
                     action: 'ROLLBACK',
                     restored_from_version: rollback_to_version,
                     topic: `Restored from Version ${rollback_to_version}`,
-                    approved_by: auth.userId || 'admin'
+                    approved_by: adminIdentity
                 }
             ].slice(-30) // Keep last 30 snapshots
 
@@ -118,7 +84,7 @@ export default defineEventHandler(async (event) => {
                 .from('knowledge_gaps')
                 .update({
                     status: 'rejected',
-                    approved_by: auth.userId || 'admin',
+                    approved_by: adminIdentity,
                     last_asked_at: new Date().toISOString()
                 })
                 .eq('id', gap_id)
@@ -150,7 +116,7 @@ export default defineEventHandler(async (event) => {
             .update({
                 status: 'published',
                 approved_answer: finalAnswer,
-                approved_by: auth.userId || 'admin',
+                approved_by: adminIdentity,
                 approved_at: new Date().toISOString()
             })
             .eq('id', gap_id)
@@ -176,7 +142,7 @@ export default defineEventHandler(async (event) => {
                     created_at: new Date().toISOString(),
                     gap_id: gap.id,
                     topic: gap.normalized_topic || gap.question,
-                    approved_by: auth.userId || 'admin'
+                    approved_by: adminIdentity
                 }
             ].slice(-30)
 
@@ -196,9 +162,28 @@ export default defineEventHandler(async (event) => {
                 .eq('id', agent.id)
         }
 
+        // 3. Auto-sync to Multi-Tenant Vector RAG Knowledge Store
+        try {
+            const shopId = await shopIdForAgent(gap.agent_id)
+            if (shopId) {
+                syncKnowledgeGapToStore({
+                    id: gap.id,
+                    shopId,
+                    agentId: gap.agent_id,
+                    question: gap.normalized_topic || gap.question,
+                    approvedAnswer: finalAnswer,
+                    category: gap.category
+                }).catch(err => {
+                    console.warn(`[KNOWLEDGE_GAP_RAG_SYNC_WARN]: ${err.message}`)
+                })
+            }
+        } catch (syncErr: any) {
+            console.warn(`[KNOWLEDGE_GAP_RAG_ERROR]: ${syncErr.message}`)
+        }
+
         return {
             success: true,
-            message: `Knowledge gap "${gap.normalized_topic || gap.question}" published successfully with version snapshot!`
+            message: `Knowledge gap "${gap.normalized_topic || gap.question}" published successfully with version snapshot & RAG vector sync!`
         }
     } catch (e: any) {
         return { success: false, error: e.message }

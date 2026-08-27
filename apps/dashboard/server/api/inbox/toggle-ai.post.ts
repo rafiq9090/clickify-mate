@@ -1,5 +1,9 @@
 // server/api/inbox/toggle-ai.post.ts
+import { useSupabaseAdmin } from '../../utils/supabase'
+import { requireDashboardRole } from '../../utils/auth-session'
+
 export default defineEventHandler(async (event) => {
+    const user = await requireDashboardRole(event, ['owner', 'admin', 'manager', 'support'])
     const body = await readBody(event)
     const { user_external_id, platform, agent_id, ai_disabled } = body || {}
 
@@ -8,36 +12,45 @@ export default defineEventHandler(async (event) => {
     }
 
     const supabase = useSupabaseAdmin()
-    const targetPlatform = platform || 'telegram'
+    const targetPlatform = (platform || 'telegram').toLowerCase()
     const emailKey = `${user_external_id}@${targetPlatform}.org`
+    const isAiDisabled = Boolean(ai_disabled)
 
-    // Look up existing lead
-    const { data: existingLeads } = await supabase
+    // Look up all matching leads for this customer
+    const { data: allMatchingLeads } = await supabase
         .from('leads')
         .select('*')
-        .eq('email', emailKey)
+        .eq('data->>user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(1)
 
-    if (existingLeads && existingLeads.length > 0) {
-        const lead = existingLeads[0]
-        const updatedData = {
-            ...(lead.data || {}),
-            ai_disabled: Boolean(ai_disabled)
+    let updatedCount = 0
+    if (Array.isArray(allMatchingLeads) && allMatchingLeads.length > 0) {
+        for (const lead of allMatchingLeads) {
+            const leadEmail = lead.email || ''
+            const leadCustomer = lead.data?.customer || ''
+            if (
+                leadEmail === emailKey ||
+                leadEmail.startsWith(`${user_external_id}@`) ||
+                leadCustomer === user_external_id.toString()
+            ) {
+                const updatedData = {
+                    ...(lead.data || {}),
+                    ai_disabled: isAiDisabled
+                }
+
+                await supabase
+                    .from('leads')
+                    .update({ data: updatedData })
+                    .eq('id', lead.id)
+
+                updatedCount++
+            }
         }
+    }
 
-        const { error } = await supabase
-            .from('leads')
-            .update({ data: updatedData })
-            .eq('id', lead.id)
-
-        if (error) {
-            console.error('[TOGGLE AI LEAD ERROR]:', error.message)
-            throw createError({ statusCode: 500, statusMessage: 'Failed to update AI state: ' + error.message })
-        }
-    } else {
-        // Create new lead with AI state
-        const { error } = await supabase
+    if (updatedCount === 0) {
+        // Create new lead state
+        await supabase
             .from('leads')
             .insert({
                 email: emailKey,
@@ -46,19 +59,17 @@ export default defineEventHandler(async (event) => {
                     platform: targetPlatform,
                     customer: user_external_id.toString(),
                     agent_id: agent_id || null,
-                    ai_disabled: Boolean(ai_disabled)
+                    user_id: user.id,
+                    ai_disabled: isAiDisabled
                 }
             })
-
-        if (error) {
-            console.error('[TOGGLE AI INSERT LEAD ERROR]:', error.message)
-            throw createError({ statusCode: 500, statusMessage: 'Failed to create lead state: ' + error.message })
-        }
     }
 
     return {
         success: true,
         user_external_id,
-        ai_disabled: Boolean(ai_disabled)
+        platform: targetPlatform,
+        ai_disabled: isAiDisabled,
+        updatedCount
     }
 })

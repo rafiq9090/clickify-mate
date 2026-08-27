@@ -1,4 +1,4 @@
-import { useCookie, useNuxtApp, useRuntimeConfig } from '#app'
+import { useNuxtApp, useState } from '#app'
 
 export const useSupabase = () => {
   const nuxtApp = useNuxtApp()
@@ -6,29 +6,25 @@ export const useSupabase = () => {
     return nuxtApp._supabase
   }
 
-  // Client-side cookie to track the JWT token
-  const authToken = useCookie('toolkit_user_auth')
+  const authUser = useState<any | null>('clickify-dashboard-user', () => null)
+  let sessionLoaded = false
+  let pendingRecovery: { email: string; token: string } | null = null
 
-  const getUserFromToken = () => {
-    const val = authToken.value
-    if (!val) return null
+  const normalizeUser = (user: any) => user ? {
+    ...user,
+    identities: Array.isArray(user.identities) ? user.identities : [{ id: user.id }]
+  } : null
+
+  const refreshUser = async (force = false) => {
+    if (sessionLoaded && !force) return authUser.value
     try {
-      const base64Url = val.split('.')[1]
-      if (!base64Url) return null
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-      const payload = JSON.parse(atob(base64))
-      if (payload.exp && Date.now() >= payload.exp * 1000) {
-        authToken.value = null
-        return null
-      }
-      return {
-        id: payload.id,
-        email: payload.email,
-        identities: [{ id: payload.id }]
-      }
-    } catch (e) {
-      return null
+      const response: any = await $fetch('/api/auth/session')
+      authUser.value = normalizeUser(response?.user)
+    } catch {
+      authUser.value = null
     }
+    sessionLoaded = true
+    return authUser.value
   }
 
   const queryBuilder = (table: string) => {
@@ -159,9 +155,7 @@ export const useSupabase = () => {
               maybeSingleVal,
               countOption
             },
-            headers: {
-              Authorization: `Bearer ${authToken.value || ''}`
-            }
+            credentials: 'same-origin'
           })
           if (onFulfilled) return onFulfilled(res)
           return res
@@ -180,12 +174,12 @@ export const useSupabase = () => {
     from: queryBuilder,
     auth: {
       getUser: async () => {
-        const user = getUserFromToken()
+        const user = await refreshUser()
         return { data: { user }, error: user ? null : new Error('No session') }
       },
       getSession: async () => {
-        const user = getUserFromToken()
-        return { data: { session: user ? { user, access_token: authToken.value } : null }, error: null }
+        const user = await refreshUser()
+        return { data: { session: user ? { user } : null }, error: null }
       },
       signUp: async ({ email, password }: any) => {
         try {
@@ -194,9 +188,9 @@ export const useSupabase = () => {
             body: { email, password }
           })
           if (res.success) {
-            authToken.value = res.token
-            const user = getUserFromToken()
-            return { data: { user, session: { access_token: res.token, user } }, error: null }
+            authUser.value = normalizeUser(res.user)
+            sessionLoaded = true
+            return { data: { user: authUser.value, session: { user: authUser.value } }, error: null }
           }
           return { data: null, error: new Error(res.error || 'Signup failed') }
         } catch (err: any) {
@@ -210,9 +204,9 @@ export const useSupabase = () => {
             body: { email, password }
           })
           if (res.success) {
-            authToken.value = res.token
-            const user = getUserFromToken()
-            return { data: { user, session: { access_token: res.token, user } }, error: null }
+            authUser.value = normalizeUser(res.user)
+            sessionLoaded = true
+            return { data: { user: authUser.value, session: { user: authUser.value } }, error: null }
           }
           return { data: null, error: new Error(res.error || 'Login failed') }
         } catch (err: any) {
@@ -220,44 +214,50 @@ export const useSupabase = () => {
         }
       },
       signOut: async () => {
-        authToken.value = null
         await $fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+        authUser.value = null
+        sessionLoaded = true
         return { error: null }
       },
       resetPasswordForEmail: async (email: string) => {
-        console.log(`[LOCAL DEV AUTH]: Password reset requested for ${email}. Seeded recovery code: '123456'`)
-        return { data: {}, error: null }
+        try {
+          const data: any = await $fetch('/api/auth/request-password-reset', {
+            method: 'POST',
+            body: { email }
+          })
+          if (data?.developmentCode) console.info(`[AUTH DEV]: Reset code ${data.developmentCode}`)
+          return { data, error: null }
+        } catch (error: any) {
+          return { data: null, error: new Error(error.data?.statusMessage || error.message || 'Reset request failed') }
+        }
       },
       verifyOtp: async ({ email, token }: any) => {
-        if (token === '123456') {
-          const dummyUser = { id: '00000000-0000-0000-0000-000000000000', email }
-          return { data: { user: dummyUser, session: { access_token: 'dummy', user: dummyUser } }, error: null }
-        }
-        return { data: null, error: new Error('Invalid OTP') }
+        pendingRecovery = { email, token }
+        return { data: { user: null, session: null }, error: null }
       },
-      updateUser: async ({ password }: any) => {
+      updateUser: async ({ password, current_password, currentPassword }: any) => {
         try {
-          const res: any = await $fetch('/api/auth/update-password', {
-            method: 'POST',
-            body: { password },
-            headers: {
-              Authorization: `Bearer ${authToken.value || ''}`
-            }
-          })
-          return { data: { user: getUserFromToken() }, error: res.success ? null : new Error(res.error) }
+          const endpoint = pendingRecovery ? '/api/auth/reset-password' : '/api/auth/update-password'
+          const body = pendingRecovery
+            ? { ...pendingRecovery, password }
+            : { password, currentPassword: currentPassword || current_password }
+          const res: any = await $fetch(endpoint, { method: 'POST', body })
+          if (pendingRecovery) pendingRecovery = null
+          if (endpoint.endsWith('update-password')) {
+            authUser.value = null
+            sessionLoaded = true
+          }
+          return { data: { user: authUser.value }, error: res.success ? null : new Error(res.error) }
         } catch (err: any) {
-          return { data: null, error: new Error(err.message) }
+          return { data: null, error: new Error(err.data?.statusMessage || err.message) }
         }
       },
       signInWithOAuth: async () => {
-        const dummyToken = 'dummy-oauth-token'
-        authToken.value = dummyToken
-        window.location.href = '/'
-        return { data: {}, error: null }
+        return { data: null, error: new Error('OAuth is not configured for this deployment.') }
       },
       onAuthStateChange: (callback: any) => {
-        const user = getUserFromToken()
-        callback(user ? 'SIGNED_IN' : 'SIGNED_OUT', user ? { user, access_token: authToken.value } : null)
+        const user = authUser.value
+        callback(user ? 'SIGNED_IN' : 'SIGNED_OUT', user ? { user } : null)
         return { data: { subscription: { unsubscribe: () => {} } } }
       }
     }

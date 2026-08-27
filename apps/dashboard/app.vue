@@ -1,13 +1,6 @@
 <script setup>
 import { onMounted } from 'vue'
 
-useHead({
-  script: [
-    { src: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js', async: true },
-    { src: 'https://docs.opencv.org/4.10.0/opencv.js', async: true, onload: 'window.cvReady = true' }
-  ]
-})
-
 // Handle Global Auth Errors (like expired links)
 onMounted(() => {
   const hash = window.location.hash

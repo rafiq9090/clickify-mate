@@ -7,6 +7,7 @@ import { useSupabaseAdmin } from '../../utils/supabase'
 import { checkAndRecordWebhookEvent } from '../../utils/agent/webhook_dedup'
 import { verifyMetaSignature } from '../../utils/agent/webhook_auth'
 import { analyzeImage } from '../../utils/agent/vision'
+import { analyzeVideoMessage } from '../../utils/agent/video_processor'
 
 async function getMetaMediaUrl(mediaId: string, pageAccessToken: string) {
     const res = await $fetch<any>(`https://graph.facebook.com/v19.0/${mediaId}`, {
@@ -107,31 +108,32 @@ export default defineEventHandler(async (event) => {
 
         // 1. Try to find by direct ID (from URL)
         if (agentId) {
-            const { data } = await supabase.from('agent_configs').select('*').eq('id', agentId).maybeSingle()
+            const { data } = await supabase.from('agent_configs').select('*').eq('id', agentId).eq('platform', 'whatsapp').eq('is_active', true).maybeSingle()
             agent = data
         }
 
         // 2. Try to find by Phone ID (Meta's ID)
         if (!agent && phoneNumberId) {
-            const { data } = await supabase.from('agent_configs').select('*').eq('external_id', phoneNumberId).maybeSingle()
+            const { data } = await supabase.from('agent_configs').select('*').eq('external_id', phoneNumberId).eq('platform', 'whatsapp').eq('is_active', true).maybeSingle()
             agent = data
         }
 
-        // 3. Fallback: Most recent WhatsApp agent
+        // 3. Fallback: Find any active WhatsApp agent and sync phone number ID
         if (!agent) {
-            const { data } = await supabase
-                .from('agent_configs')
-                .select('*')
-                .eq('platform', 'whatsapp')
-                .order('updated_at', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-            agent = data
+            const { data } = await supabase.from('agent_configs').select('*').eq('platform', 'whatsapp').eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle()
+            if (data) {
+                agent = data
+                if (phoneNumberId) {
+                    supabase.from('agent_configs').update({ external_id: phoneNumberId }).eq('id', data.id).then(() => {
+                        console.log(`[AGENT AUTO-SYNC]: Linked WhatsApp Phone Number ID ${phoneNumberId} to agent ${data.id}`)
+                    }).catch(() => {})
+                }
+            }
         }
 
         if (!agent) {
             console.error(`[WHATSAPP DEBUG V${VERSION}]: No WhatsApp agent found in DB.`)
-            return { success: false }
+            throw createError({ statusCode: 404, statusMessage: 'No matching active WhatsApp agent' })
         }
 
         // Multi-Tenant Durable Deduplication
@@ -142,6 +144,55 @@ export default defineEventHandler(async (event) => {
         })
         if (isDuplicate) {
             return { success: true, duplicate: true }
+        }
+
+        let customerName = value.contacts?.[0]?.profile?.name || `Customer +${from}`
+
+        // 0. ZERO-TOKEN GUARD: CHECK IF AI AUTO-PILOT IS PAUSED / STOPPED FOR THIS CUSTOMER
+        const emailKey = `${from}@whatsapp.org`
+        const { data: leadRows } = await supabase
+            .from('leads')
+            .select('data')
+            .eq('email', emailKey)
+            .eq('data->>agent_id', agent.id)
+
+        let isCustomerAiDisabled = agent.is_active === false
+        if (Array.isArray(leadRows)) {
+            for (const r of leadRows) {
+                if (r.data?.ai_disabled === true) {
+                    isCustomerAiDisabled = true
+                    break
+                }
+            }
+        }
+
+        if (isCustomerAiDisabled) {
+            console.log(`[AGENT SILENT MODE]: AI Auto-Pilot is PAUSED for WhatsApp customer ${from}. Skipping all LLM, vision, and speech inference (0 tokens consumed).`)
+
+            let rawUserText = message.text?.body || message.caption || ''
+            if (!rawUserText) {
+                if (messageType === 'audio') rawUserText = '[Voice Note]'
+                else if (messageType === 'image') rawUserText = '[Photo Attachment]'
+                else if (messageType === 'video') rawUserText = '[Video Attachment]'
+                else rawUserText = '[Attachment]'
+            }
+
+            await supabase.from('chat_history').insert([
+                {
+                    agent_id: agent.id,
+                    user_external_id: from,
+                    customer_name: customerName,
+                    role: 'user',
+                    content: rawUserText,
+                    created_at: new Date().toISOString()
+                }
+            ])
+
+            return {
+                success: true,
+                aiPaused: true,
+                message: 'AI paused for this customer. 0 tokens consumed. Routed to Live Inbox.'
+            }
         }
 
         const pageAccessToken = await decrypt(agent.encrypted_token)
@@ -179,9 +230,28 @@ export default defineEventHandler(async (event) => {
                 }
             }
             if (!userText) userText = caption || 'User sent an image.'
+        } else if (messageType === 'video') {
+            const mediaId = message.video?.id
+            const caption = message.video?.caption || ''
+            if (mediaId && pageAccessToken && apiKey) {
+                try {
+                    mediaUrl = await getMetaMediaUrl(mediaId, pageAccessToken)
+                    const videoBuffer = await downloadMetaMedia(mediaUrl, pageAccessToken)
+                    const videoRes = await analyzeVideoMessage({
+                        videoBuffer,
+                        mimeType: message.video?.mime_type || 'video/mp4',
+                        caption,
+                        groqApiKey: apiKey
+                    })
+                    userText = videoRes.combinedText
+                } catch (vidErr: any) {
+                    console.error('[WHATSAPP VIDEO ERROR]:', vidErr.message)
+                }
+            }
+            if (!userText) userText = caption || 'User sent a video.'
         }
 
-        const customerName = value.contacts?.[0]?.profile?.name || `WhatsApp User (${from})`
+        customerName = value.contacts?.[0]?.profile?.name || `WhatsApp User (${from})`
 
         // 1. Save User Message to chat_history
         await supabase.from('chat_history').insert({

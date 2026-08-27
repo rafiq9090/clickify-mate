@@ -38,3 +38,38 @@ export const sendAdminAlert = async (subject: string, message: string) => {
         console.error('[MAILER ERROR]: Failed to send alert email:', err.message)
     }
 }
+
+function escapeHtml(value: string) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+}
+
+export async function sendPasswordResetEmail(email: string, code: string) {
+    const resendKey = process.env.RESEND_API_KEY
+    const from = process.env.AUTH_EMAIL_FROM || 'Clickify Mate <auth@resend.dev>'
+    if (!resendKey) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('Password reset email delivery is not configured.')
+        }
+        console.info(`[AUTH DEV]: Password reset code for ${email}: ${code}`)
+        return
+    }
+
+    await $fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${resendKey}`,
+            'Content-Type': 'application/json'
+        },
+        body: {
+            from,
+            to: email,
+            subject: 'Your Clickify Mate password reset code',
+            html: `<p>Your password reset code is:</p><p style="font-size:24px;font-weight:700;letter-spacing:3px">${escapeHtml(code)}</p><p>This code expires in 15 minutes. If you did not request it, ignore this email.</p>`
+        }
+    })
+}

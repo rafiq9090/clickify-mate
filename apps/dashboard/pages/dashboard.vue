@@ -140,7 +140,7 @@
     <!-- Main Content Container -->
     <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
       <!-- Top Header Bar -->
-      <header class="h-16 px-6 bg-surface/80 backdrop-blur-md border-b border-outline flex items-center justify-between sticky top-0 z-10">
+      <header class="h-16 px-6 bg-surface/80 backdrop-blur-md border-b border-outline flex items-center justify-between sticky top-0 z-40">
         <div class="flex items-center gap-3">
           <span class="text-xs text-on-surface-variant">Dashboard</span>
           <span class="text-xs text-on-surface-variant/40">/</span>
@@ -148,16 +148,6 @@
         </div>
 
         <div class="flex items-center gap-3">
-          <!-- Backend Status Indicator -->
-          <div class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border"
-            :class="backendStatus === 'operational'
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'"
-          >
-            <span class="w-2 h-2 rounded-full bg-current" :class="backendStatus === 'operational' ? 'animate-pulse' : ''"></span>
-            <span>{{ backendStatus === 'operational' ? 'AI Engine Online' : 'AI Offline' }}</span>
-          </div>
-
           <!-- Notification Bell & Flyout Dropdown -->
           <div class="relative">
             <button 
@@ -174,13 +164,17 @@
               </span>
             </button>
 
+            <!-- Backdrop to close on outside click -->
+            <div v-if="showNotifications" class="fixed inset-0 z-40" @click="showNotifications = false"></div>
+
             <!-- Notification Center Dropdown Flyout -->
             <Transition name="fade">
               <div 
                 v-if="showNotifications" 
-                class="absolute right-0 top-12 w-80 sm:w-96 bg-surface/95 backdrop-blur-xl border border-outline rounded-2xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-150"
+                class="absolute right-0 top-12 w-80 sm:w-96 bg-surface border border-outline rounded-2xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-150 text-on-surface"
               >
-                <div class="p-3.5 border-b border-outline/50 flex items-center justify-between">
+                <!-- Top Header -->
+                <div class="p-3.5 bg-surface-hover/70 border-b border-outline flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-base text-primary">notifications_active</span>
                     <span class="font-bold text-xs text-on-surface">Live Store Alerts</span>
@@ -193,7 +187,7 @@
                     <button 
                       v-if="unreadNotificationsCount > 0"
                       @click="markAllNotificationsAsRead" 
-                      class="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                      class="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
                     >
                       Mark read
                     </button>
@@ -208,30 +202,35 @@
                 </div>
 
                 <!-- Filter tabs -->
-                <div class="px-3 pt-2 pb-1 border-b border-outline/30 flex items-center gap-1">
+                <div class="px-3 pt-2 pb-1.5 bg-surface border-b border-outline/50 flex items-center gap-1">
                   <button 
-                    v-for="filter in ['all', 'orders', 'stock']"
-                    :key="filter"
-                    @click="notificationFilter = filter"
-                    class="px-2.5 py-1 rounded-lg text-[11px] font-semibold capitalize transition-colors cursor-pointer"
-                    :class="notificationFilter === filter ? 'bg-primary text-white shadow-2xs' : 'text-on-surface-variant hover:bg-surface-hover'"
+                    v-for="filter in [
+                      { id: 'all', label: 'All Alerts' },
+                      { id: 'orders', label: 'Orders' },
+                      { id: 'stock', label: 'Stock Alerts' },
+                      { id: 'support', label: 'Support' }
+                    ]"
+                    :key="filter.id"
+                    @click="notificationFilter = filter.id"
+                    class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                    :class="notificationFilter === filter.id ? 'bg-primary text-white shadow-2xs' : 'text-on-surface-variant hover:bg-surface-hover hover:text-on-surface'"
                   >
-                    {{ filter === 'all' ? 'All Alerts' : (filter === 'orders' ? 'Orders' : 'Stock Alerts') }}
+                    {{ filter.label }}
                   </button>
                 </div>
 
                 <!-- Notifications list -->
-                <div class="max-h-80 overflow-y-auto divide-y divide-outline/30 scrollbar-none">
+                <div class="max-h-80 overflow-y-auto divide-y divide-outline/50 scrollbar-none bg-surface">
                   <div 
                     v-for="notif in filteredNotifications" 
                     :key="notif.id"
                     @click="handleNotificationClick(notif)"
-                    class="p-3 hover:bg-surface-hover/70 transition-colors cursor-pointer flex gap-3 items-start"
-                    :class="!notif.read ? 'bg-primary/5' : ''"
+                    class="p-3 transition-colors cursor-pointer flex gap-3 items-start"
+                    :class="!notif.read ? 'bg-primary/10 hover:bg-primary/15' : 'bg-surface hover:bg-surface-hover/70'"
                   >
                     <div 
                       class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base"
-                      :class="notif.type === 'order' ? 'bg-emerald-500/15 text-emerald-500' : (notif.type === 'low_stock' ? 'bg-amber-500/15 text-amber-500' : (notif.type === 'out_of_stock' ? 'bg-rose-500/15 text-rose-500' : 'bg-primary/15 text-primary'))"
+                      :class="notif.type === 'order' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : (notif.type === 'support' ? 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' : (notif.type === 'low_stock' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : (notif.type === 'out_of_stock' ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400' : 'bg-primary/15 text-primary')))"
                     >
                       <span class="material-symbols-outlined text-base">{{ notif.icon }}</span>
                     </div>
@@ -239,9 +238,9 @@
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center justify-between gap-1">
                         <span class="text-xs font-bold text-on-surface truncate">{{ notif.title }}</span>
-                        <span class="text-[10px] text-on-surface-variant/70 shrink-0">{{ notif.timeAgo }}</span>
+                        <span class="text-[10px] text-on-surface-variant font-medium shrink-0">{{ notif.timeAgo }}</span>
                       </div>
-                      <p class="text-[11px] text-on-surface-variant mt-0.5 leading-snug">{{ notif.message }}</p>
+                      <p class="text-[11px] text-on-surface-variant mt-0.5 leading-snug line-clamp-2">{{ notif.message }}</p>
                     </div>
 
                     <span v-if="!notif.read" class="w-2 h-2 rounded-full bg-primary shrink-0 mt-1"></span>
@@ -305,7 +304,7 @@
           @remove-product="removeProduct"
         />
 
-        <!-- 4. Customer Leads / Orders Tab -->
+        <!-- 4. Customer Leads & Inquiries Tab -->
         <DashboardLeads
           v-else-if="currentMenu === 'leads'"
           :key="'leads'"
@@ -328,8 +327,10 @@
           @update:endDate="val => { endDate = val; currentPage = 1; fetchLeads() }"
           @update:activeTab="val => { activeTab = val; currentPage = 1; fetchLeads() }"
           @update:selectedLeads="val => selectedLeads = val"
+          @open-create-lead="openCreateLeadModal"
           @open-edit="openEditModal"
           @delete="deleteLead"
+          @bulk-delete="bulkDeleteLeads"
           @send-to-steadfast="sendToSteadfast"
           @bulk-send-to-steadfast="bulkSendToSteadfast"
           @export-csv="exportCSV"
@@ -363,7 +364,14 @@
           @copy-text="copyText"
         />
 
-        <!-- 6. Integrations & Courier Tab -->
+        <!-- 6. Payment Gateway Tab -->
+        <DashboardPaymentGateways
+          v-else-if="currentMenu === 'payment-gateways'"
+          :key="'payment-gateways'"
+          @show-toast="({ message, type }) => showToast(message, type)"
+        />
+
+        <!-- 7. Integrations & Courier Tab -->
         <DashboardIntegrations
           v-else-if="currentMenu === 'integrations'"
           :key="'integrations'"
@@ -383,9 +391,10 @@
           @add-product="addProduct"
           @remove-product="removeProduct"
           @copy-text="copyText"
+          @switch-tab="val => currentMenu = val"
         />
 
-        <!-- 7. Webhook Tools Tab -->
+        <!-- 8. Webhook Tools Tab -->
         <DashboardWebhooks
           v-else-if="currentMenu === 'webhooks'"
           :key="'webhooks'"
@@ -431,13 +440,14 @@
             <!-- Platform Selector -->
             <div class="space-y-2">
               <label class="text-xs font-medium text-on-surface-variant">Select Messaging Channel</label>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <button 
                   v-for="p in [
-                    { id: 'whatsapp', label: 'WhatsApp', icon: 'chat' },
-                    { id: 'telegram', label: 'Telegram', icon: 'send' },
-                    { id: 'messenger', label: 'Messenger', icon: 'forum' },
-                    { id: 'fb_comment', label: 'Comments', icon: 'chat_bubble' }
+                    { id: 'whatsapp', label: 'WhatsApp' },
+                    { id: 'telegram', label: 'Telegram' },
+                    { id: 'messenger', label: 'Messenger' },
+                    { id: 'instagram', label: 'Instagram' },
+                    { id: 'fb_comment', label: 'Comments' }
                   ]"
                   :key="p.id"
                   type="button"
@@ -445,9 +455,9 @@
                   :class="connectPlatform === p.id 
                     ? 'bg-primary text-white border-primary shadow-xs font-semibold' 
                     : 'bg-surface-hover border-outline text-on-surface-variant hover:text-on-surface'"
-                  class="p-2.5 rounded-xl border text-center text-xs flex flex-col items-center gap-1 transition-all cursor-pointer"
+                  class="p-2.5 rounded-xl border text-center text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <span class="material-symbols-outlined text-lg">{{ p.icon }}</span>
+                  <PlatformIcon :platform="p.id" custom-class="w-5 h-5" />
                   <span class="truncate">{{ p.label }}</span>
                 </button>
               </div>
@@ -564,26 +574,181 @@
       </Transition>
     </Teleport>
 
+    <!-- Create Manual Lead / Order Modal -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showCreateLeadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between border-b border-outline/40 pb-3">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-xl text-primary">add_shopping_cart</span>
+                <h3 class="text-base font-bold text-on-surface">Add New Order / Lead</h3>
+              </div>
+              <button @click="showCreateLeadModal = false" class="p-1 text-on-surface-variant hover:bg-surface-hover rounded-lg transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div class="space-y-1">
+                <label class="font-medium text-on-surface-variant">Customer Name *</label>
+                <input 
+                  v-model="newLeadForm.customer" 
+                  placeholder="e.g. Md Rafiqul Islam"
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label class="font-medium text-on-surface-variant">Phone Number</label>
+                <input 
+                  v-model="newLeadForm.phone" 
+                  placeholder="e.g. 01712345678"
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label class="font-medium text-on-surface-variant">Email (Optional)</label>
+                <input 
+                  v-model="newLeadForm.email" 
+                  placeholder="e.g. customer@example.com"
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label class="font-medium text-on-surface-variant">Platform / Channel</label>
+                <select 
+                  v-model="newLeadForm.platform" 
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                >
+                  <option value="direct">Direct / Phone Call</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="telegram">Telegram</option>
+                  <option value="facebook">Facebook Messenger</option>
+                  <option value="instagram">Instagram DM</option>
+                </select>
+              </div>
+
+              <div class="sm:col-span-2 space-y-1">
+                <label class="font-medium text-on-surface-variant">Order Items & Description</label>
+                <textarea 
+                  v-model="newLeadForm.order" 
+                  rows="2" 
+                  placeholder="e.g. Item: Maroon T-shirt (L) | Qty: 1 | Price: ৳1,000"
+                  class="w-full bg-surface-hover border border-outline rounded-xl p-2.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors resize-none"
+                ></textarea>
+              </div>
+
+              <div class="space-y-1">
+                <label class="font-medium text-on-surface-variant">Total Amount (৳)</label>
+                <input 
+                  v-model="newLeadForm.price" 
+                  placeholder="e.g. 1150"
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label class="font-medium text-on-surface-variant">Order Status</label>
+                <select 
+                  v-model="newLeadForm.status" 
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="complete">Complete</option>
+                  <option value="hold">On Hold</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <div class="sm:col-span-2 space-y-1">
+                <label class="font-medium text-on-surface-variant">Delivery Address</label>
+                <input 
+                  v-model="newLeadForm.address" 
+                  placeholder="e.g. House 12, Road 4, Dhanmondi, Dhaka"
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div class="sm:col-span-2 space-y-1">
+                <label class="font-medium text-on-surface-variant">Payment Transaction ID (Optional)</label>
+                <input 
+                  v-model="newLeadForm.payment_transaction_id" 
+                  placeholder="e.g. BK987654321"
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-2 border-t border-outline/40">
+              <button 
+                @click="showCreateLeadModal = false" 
+                class="flex-1 py-2 rounded-xl border border-outline text-xs font-semibold hover:bg-surface-hover transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                @click="saveNewLead" 
+                :disabled="creatingLead"
+                class="flex-1 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-accent transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {{ creatingLead ? 'Creating...' : 'Save Order' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Edit Lead / Order Modal -->
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+          <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
             <div class="flex items-center justify-between border-b border-outline/40 pb-3">
-              <h3 class="text-base font-bold text-on-surface">Edit Customer Order</h3>
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-xl text-primary">edit_note</span>
+                <h3 class="text-base font-bold text-on-surface">Edit Customer Order</h3>
+              </div>
               <button @click="showEditModal = false" class="p-1 text-on-surface-variant hover:bg-surface-hover rounded-lg transition-colors cursor-pointer">
                 <span class="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <div class="space-y-3 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div class="space-y-1">
-                <label class="font-medium text-on-surface-variant">Order / Customer Notes</label>
+                <label class="font-medium text-on-surface-variant">Customer Name</label>
+                <input 
+                  v-model="editLeadCustomer" 
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label class="font-medium text-on-surface-variant">Phone Number</label>
+                <input 
+                  v-model="editLeadPhone" 
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div class="sm:col-span-2 space-y-1">
+                <label class="font-medium text-on-surface-variant">Order Items & Notes</label>
                 <textarea 
                   v-model="editOrderText" 
-                  rows="3" 
-                  class="w-full bg-surface-hover border border-outline rounded-xl p-3 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors resize-none"
+                  rows="2" 
+                  class="w-full bg-surface-hover border border-outline rounded-xl p-2.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors resize-none"
                 ></textarea>
+              </div>
+
+              <div class="sm:col-span-2 space-y-1">
+                <label class="font-medium text-on-surface-variant">Delivery Address</label>
+                <input 
+                  v-model="editLeadAddress" 
+                  class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
+                />
               </div>
 
               <div class="space-y-1">
@@ -609,7 +774,7 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-2 pt-2">
+            <div class="flex items-center gap-2 pt-2 border-t border-outline/40">
               <button 
                 @click="showEditModal = false" 
                 class="flex-1 py-2 rounded-xl border border-outline text-xs font-semibold hover:bg-surface-hover transition-colors cursor-pointer"
@@ -698,6 +863,7 @@ import DashboardAgents from '~/components/DashboardAgents.vue'
 import DashboardCatalog from '~/components/DashboardCatalog.vue'
 import DashboardLeads from '~/components/DashboardLeads.vue'
 import DashboardOrders from '~/components/DashboardOrders.vue'
+import DashboardPaymentGateways from '~/components/DashboardPaymentGateways.vue'
 import DashboardIntegrations from '~/components/DashboardIntegrations.vue'
 import DashboardWebhooks from '~/components/DashboardWebhooks.vue'
 
@@ -720,6 +886,7 @@ const menuItems = [
   { id: 'catalog', label: 'Product Catalog', icon: 'inventory_2' },
   { id: 'leads', label: 'Customer Orders', icon: 'shopping_cart' },
   { id: 'orders', label: 'Paid Orders', icon: 'payments' },
+  { id: 'payment-gateways', label: 'Payment Gateways', icon: 'account_balance_wallet' },
   { id: 'integrations', label: 'Settings & Courier', icon: 'settings' },
   { id: 'webhooks', label: 'Webhook Tools', icon: 'hub' }
 ]
@@ -743,63 +910,226 @@ watch(currentMenu, (newTab) => {
 
 const loading = ref(true)
 
-// Notifications Center State
+// Notifications Center State (100% Functional Live Store Data with Persistent Read/Clear State)
 const showNotifications = ref(false)
 const notificationFilter = ref('all')
-const notifications = ref([
-  {
-    id: 'notif-init-1',
-    type: 'order',
-    icon: 'shopping_cart',
-    title: 'Order Confirmed',
-    message: 'Md Rafiqul Islam booked 1× Maroon t-shirt (L) — ৳1,150',
-    time: new Date(),
-    timeAgo: 'Recently',
-    read: false
-  },
-  {
-    id: 'notif-init-2',
-    type: 'low_stock',
-    icon: 'warning',
-    title: 'Low Stock Alert',
-    message: 'T-shirt (Red, XL) has only 1 unit remaining in stock!',
-    time: new Date(Date.now() - 3600000),
-    timeAgo: '1 hr ago',
-    read: true
-  }
-])
+const notifications = ref([])
+const readNotificationIds = ref(new Set())
+const clearedNotificationIds = ref(new Set())
+
+const loadNotificationPreferences = () => {
+  if (typeof window === 'undefined') return
+  try {
+    const savedRead = localStorage.getItem('clickify_read_notifs')
+    if (savedRead) {
+      readNotificationIds.value = new Set(JSON.parse(savedRead))
+    }
+    const savedCleared = localStorage.getItem('clickify_cleared_notifs')
+    if (savedCleared) {
+      clearedNotificationIds.value = new Set(JSON.parse(savedCleared))
+    }
+  } catch (e) {}
+}
+
+const saveNotificationPreferences = () => {
+  if (typeof window === 'undefined') return
+  try {
+    // Keep max 200 IDs to avoid localStorage bloat
+    const readArr = Array.from(readNotificationIds.value).slice(-200)
+    const clearedArr = Array.from(clearedNotificationIds.value).slice(-200)
+    localStorage.setItem('clickify_read_notifs', JSON.stringify(readArr))
+    localStorage.setItem('clickify_cleared_notifs', JSON.stringify(clearedArr))
+  } catch (e) {}
+}
+
+const formatTimeAgo = (dateInput) => {
+  if (!dateInput) return 'Recently'
+  const date = new Date(dateInput)
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 const unreadNotificationsCount = computed(() => notifications.value.filter(n => !n.read).length)
 
 const addNotification = (item) => {
+  const notifId = item.id || ('notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6))
+  if (clearedNotificationIds.value.has(notifId)) return
+
+  const isAlreadyRead = readNotificationIds.value.has(notifId)
   const notif = {
-    id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    id: notifId,
     type: item.type || 'order',
     icon: item.icon || 'notifications',
     title: item.title,
     message: item.message,
     time: new Date(),
     timeAgo: 'Just now',
-    read: false
+    read: isAlreadyRead
   }
   notifications.value.unshift(notif)
   if (notifications.value.length > 50) notifications.value.pop()
 }
 
+const fetchRealNotifications = async () => {
+  try {
+    const notifs = []
+
+    // 1. Fetch Real Recent Orders & Support Requests from Supabase
+    const { data: recentLeads } = await supabase
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(15)
+
+    if (recentLeads && recentLeads.length > 0) {
+      recentLeads.forEach(lead => {
+        const d = lead.data || {}
+        const customer = d.customer || lead.email?.split('@')[0] || 'Customer'
+        const order = d.order || ''
+        const trx = d.payment_transaction_id
+        const isDefect = d.support_status === 'priority_defect'
+        const isLongVid = d.support_status === 'long_video_review'
+        const isHandoff = d.ai_disabled || d.handoff_reason
+
+        if (isDefect) {
+          const notifId = 'notif-defect-' + lead.id
+          if (!clearedNotificationIds.value.has(notifId)) {
+            notifs.push({
+              id: notifId,
+              type: 'support',
+              icon: 'report_problem',
+              title: 'Defect Report / Complaint',
+              message: `⚠️ ${customer} sent a defect report/video: "${(d.complaint_details || '').slice(0, 60)}"`,
+              time: new Date(lead.created_at),
+              timeAgo: formatTimeAgo(lead.created_at),
+              read: readNotificationIds.value.has(notifId),
+              leadId: lead.id
+            })
+          }
+        } else if (isLongVid) {
+          const notifId = 'notif-vid-' + lead.id
+          if (!clearedNotificationIds.value.has(notifId)) {
+            notifs.push({
+              id: notifId,
+              type: 'support',
+              icon: 'video_library',
+              title: 'Video Review Required',
+              message: `🎥 ${customer} uploaded an unboxing/customer video for review.`,
+              time: new Date(lead.created_at),
+              timeAgo: formatTimeAgo(lead.created_at),
+              read: readNotificationIds.value.has(notifId),
+              leadId: lead.id
+            })
+          }
+        } else if (isHandoff) {
+          const notifId = 'notif-handoff-' + lead.id
+          if (!clearedNotificationIds.value.has(notifId)) {
+            notifs.push({
+              id: notifId,
+              type: 'support',
+              icon: 'support_agent',
+              title: 'Human Support Requested',
+              message: `👤 ${customer} requested to speak with a human agent.`,
+              time: new Date(lead.created_at),
+              timeAgo: formatTimeAgo(lead.created_at),
+              read: readNotificationIds.value.has(notifId),
+              leadId: lead.id
+            })
+          }
+        } else if (order && order !== 'Inquiry') {
+          const notifId = 'notif-order-' + lead.id
+          if (!clearedNotificationIds.value.has(notifId)) {
+            notifs.push({
+              id: notifId,
+              type: 'order',
+              icon: 'shopping_cart',
+              title: d.status === 'complete' ? 'Order Completed' : 'Order Placed',
+              message: `${customer} booked: ${order}${trx ? ` (TrxID: ${trx})` : ''}`,
+              time: new Date(lead.created_at),
+              timeAgo: formatTimeAgo(lead.created_at),
+              read: readNotificationIds.value.has(notifId) || d.status === 'complete',
+              leadId: lead.id
+            })
+          }
+        }
+      })
+    }
+
+    // 2. Real Stock Inventory Alerts
+    if (Array.isArray(mockInventory.value)) {
+      mockInventory.value.forEach(item => {
+        if (item.stock_quantity === 0) {
+          const notifId = 'notif-stock-out-' + item.id
+          if (!clearedNotificationIds.value.has(notifId)) {
+            notifs.push({
+              id: notifId,
+              type: 'out_of_stock',
+              icon: 'production_quantity_limits',
+              title: 'Out of Stock Alert',
+              message: `🚨 "${item.name}" is completely out of stock!`,
+              time: new Date(),
+              timeAgo: 'Live',
+              read: readNotificationIds.value.has(notifId)
+            })
+          }
+        } else if (item.stock_quantity > 0 && item.stock_quantity <= 3) {
+          const notifId = 'notif-stock-low-' + item.id
+          if (!clearedNotificationIds.value.has(notifId)) {
+            notifs.push({
+              id: notifId,
+              type: 'low_stock',
+              icon: 'warning',
+              title: 'Low Stock Alert',
+              message: `⚠️ "${item.name}" has only ${item.stock_quantity} units remaining!`,
+              time: new Date(),
+              timeAgo: 'Live',
+              read: readNotificationIds.value.has(notifId)
+            })
+          }
+        }
+      })
+    }
+
+    // Sort by newest first
+    notifs.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+    notifications.value = notifs
+  } catch (e) {
+    console.error('Error fetching live notifications:', e)
+  }
+}
+
 const markAllNotificationsAsRead = () => {
-  notifications.value.forEach(n => (n.read = true))
+  notifications.value.forEach(n => {
+    n.read = true
+    readNotificationIds.value.add(n.id)
+  })
+  saveNotificationPreferences()
 }
 
 const clearAllNotifications = () => {
+  notifications.value.forEach(n => {
+    clearedNotificationIds.value.add(n.id)
+  })
   notifications.value = []
+  saveNotificationPreferences()
 }
 
 const handleNotificationClick = (notif) => {
   notif.read = true
+  readNotificationIds.value.add(notif.id)
+  saveNotificationPreferences()
   if (notif.type === 'order') {
     currentMenu.value = 'leads'
   } else if (notif.type === 'stock' || notif.type === 'low_stock' || notif.type === 'out_of_stock') {
     currentMenu.value = 'catalog'
+  } else if (notif.type === 'support') {
+    currentMenu.value = 'inbox'
   }
   showNotifications.value = false
 }
@@ -810,6 +1140,9 @@ const filteredNotifications = computed(() => {
   }
   if (notificationFilter.value === 'stock') {
     return notifications.value.filter(n => n.type === 'stock' || n.type === 'low_stock' || n.type === 'out_of_stock')
+  }
+  if (notificationFilter.value === 'support') {
+    return notifications.value.filter(n => n.type === 'support')
   }
   return notifications.value
 })
@@ -980,8 +1313,28 @@ const connectingAgent = ref(false)
 const showDeleteModal = ref(false)
 const targetAgentId = ref(null)
 
+// Create Manual Lead State
+const showCreateLeadModal = ref(false)
+const creatingLead = ref(false)
+const newLeadForm = reactive({
+  customer: '',
+  phone: '',
+  email: '',
+  address: '',
+  order: '',
+  price: '',
+  platform: 'direct',
+  status: 'pending',
+  payment_transaction_id: ''
+})
+
+// Edit Lead State (Full Fields)
 const showEditModal = ref(false)
 const editingLead = ref(null)
+const editLeadCustomer = ref('')
+const editLeadPhone = ref('')
+const editLeadEmail = ref('')
+const editLeadAddress = ref('')
 const editOrderText = ref('')
 const editLeadStatus = ref('pending')
 const editTransactionId = ref('')
@@ -1001,7 +1354,7 @@ const verifyToken = computed(() => {
 })
 
 const metaCallbackUrl = computed(() => {
-  if (typeof window === 'undefined') return ''
+  if (typeof window === 'undefined') return 'https://your-domain.com/api/agents/facebook'
   return `${window.location.origin}/api/agents/facebook`
 })
 
@@ -1033,17 +1386,39 @@ const generatingApiKey = ref(false)
 
 // Toast
 const toast = ref({ show: false, message: '', type: 'success' })
+let toastTimer = null
 const showToast = (message, type = 'success') => {
   toast.value = { show: true, message, type }
-  setTimeout(() => (toast.value.show = false), 3000)
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.value.show = false
+  }, 3000)
 }
 
 // ----------------- Methods -----------------
 
-const copyText = (text) => {
-  if (!text) return
-  navigator.clipboard.writeText(text)
-  showToast('Copied to clipboard', 'info')
+const copyText = async (text, label = 'Copied') => {
+  if (!text) {
+    showToast('Nothing to copy', 'warning')
+    return
+  }
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    showToast(`${label || 'Text'} copied to clipboard!`, 'success')
+  } catch (e) {
+    showToast('Failed to copy', 'error')
+  }
 }
 
 const checkBackendStatus = async () => {
@@ -1083,12 +1458,8 @@ const handleConnectAgent = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Please login to connect agents')
 
-    const { data: { session } } = await supabase.auth.getSession()
-    const authToken = session?.access_token || useCookie('toolkit_user_auth').value
-
     const res = await $fetch('/api/agents/connect', {
       method: 'POST',
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       body: {
         name: connectAgentName.value,
         platform: connectPlatform.value,
@@ -1156,41 +1527,60 @@ const fetchAgents = async () => {
 }
 
 const updateKnowledge = async (agent) => {
+  if (!agent?.id) return
   try {
-    const { error } = await supabase
-      .from('agent_configs')
-      .update({
-        knowledge: agent.knowledge,
-        product_images: agent.product_images,
-        agent_behavior: agent.agent_behavior
-      })
-      .eq('id', agent.id)
+    const rawImages = Array.isArray(agent.product_images)
+      ? agent.product_images
+          .map(img => typeof img === 'string' ? img.trim() : (img?.url || '').trim())
+          .filter(url => url.length > 0)
+      : []
 
-    if (error) throw error
-    agent.isDirty = false
-    showToast('Agent instructions synced live', 'success')
+    const res = await $fetch('/api/agents/update', {
+      method: 'POST',
+      body: {
+        id: agent.id,
+        knowledge: agent.knowledge || '',
+        product_images: rawImages,
+        agent_behavior: agent.agent_behavior || {}
+      }
+    })
+
+    if (res?.success) {
+      agent.isDirty = false
+      showToast('Agent instructions synced live', 'success')
+    } else {
+      throw new Error(res?.message || 'Update failed')
+    }
   } catch (e) {
-    showToast('Update failed: ' + e.message, 'error')
+    const msg = e?.data?.statusMessage || e?.data?.message || e?.message || 'Failed to sync knowledge'
+    showToast('Update failed: ' + msg, 'error')
   }
 }
 
 const toggleAgentStatus = async (agent) => {
-  if (!agent) return
+  if (!agent?.id) return
   try {
     const newStatus = !agent.is_active
-    const { error } = await supabase
-      .from('agent_configs')
-      .update({ is_active: newStatus })
-      .eq('id', agent.id)
+    const res = await $fetch('/api/agents/update', {
+      method: 'POST',
+      body: {
+        id: agent.id,
+        is_active: newStatus
+      }
+    })
 
-    if (error) throw error
-    agent.is_active = newStatus
-    showToast(
-      newStatus ? `Agent "${agent.name || 'Bot'}" resumed & started!` : `Agent "${agent.name || 'Bot'}" paused!`,
-      newStatus ? 'success' : 'warning'
-    )
+    if (res?.success) {
+      agent.is_active = newStatus
+      showToast(
+        newStatus ? `Agent "${agent.name || 'Bot'}" resumed & started!` : `Agent "${agent.name || 'Bot'}" paused!`,
+        newStatus ? 'success' : 'warning'
+      )
+    } else {
+      throw new Error(res?.message || 'Failed to toggle status')
+    }
   } catch (e) {
-    showToast('Failed to toggle agent status: ' + e.message, 'error')
+    const msg = e?.data?.statusMessage || e?.data?.message || e?.message || 'Action failed'
+    showToast('Failed to toggle agent status: ' + msg, 'error')
   }
 }
 
@@ -1294,8 +1684,75 @@ const fetchOrders = async () => {
   }
 }
 
+const openCreateLeadModal = () => {
+  Object.assign(newLeadForm, {
+    customer: '',
+    phone: '',
+    email: '',
+    address: '',
+    order: '',
+    price: '',
+    platform: 'direct',
+    status: 'pending',
+    payment_transaction_id: ''
+  })
+  showCreateLeadModal.value = true
+}
+
+const saveNewLead = async () => {
+  if (!newLeadForm.customer) {
+    showToast('Customer name is required', 'warning')
+    return
+  }
+  creatingLead.value = true
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    const emailValue = newLeadForm.email || (newLeadForm.phone ? `${newLeadForm.phone}@${newLeadForm.platform || 'direct'}.com` : `manual-${Date.now()}@direct.com`)
+
+    const payload = {
+      email: emailValue,
+      data: {
+        user_id: user?.id,
+        customer: newLeadForm.customer,
+        phone: newLeadForm.phone,
+        address: newLeadForm.address,
+        order: newLeadForm.order,
+        price: newLeadForm.price,
+        platform: newLeadForm.platform,
+        status: newLeadForm.status,
+        payment_transaction_id: newLeadForm.payment_transaction_id || null,
+        collected_details: {
+          name: newLeadForm.customer,
+          phone: newLeadForm.phone,
+          address: newLeadForm.address,
+          items: newLeadForm.order,
+          total_price: newLeadForm.price,
+          trxId: newLeadForm.payment_transaction_id || null
+        }
+      }
+    }
+
+    const { error } = await supabase.from('leads').insert([payload])
+    if (error) throw error
+
+    showToast('Customer Lead & Order created!', 'success')
+    showCreateLeadModal.value = false
+    await fetchLeads()
+    await fetchOrders()
+    await fetchRealNotifications()
+  } catch (err) {
+    showToast('Failed to create lead: ' + err.message, 'error')
+  } finally {
+    creatingLead.value = false
+  }
+}
+
 const openEditModal = (item) => {
   editingLead.value = item
+  editLeadCustomer.value = item.data?.customer || ''
+  editLeadPhone.value = item.data?.phone || ''
+  editLeadEmail.value = item.email || ''
+  editLeadAddress.value = item.data?.address || ''
   editOrderText.value = item.data?.order || ''
   editLeadStatus.value = item.data?.status || 'pending'
   editTransactionId.value = item.data?.payment_transaction_id || ''
@@ -1305,36 +1762,77 @@ const openEditModal = (item) => {
 const saveLeadEdit = async () => {
   if (!editingLead.value) return
   try {
+    const existingData = editingLead.value.data || {}
     const updatedData = {
-      ...editingLead.value.data,
+      ...existingData,
+      customer: editLeadCustomer.value,
+      phone: editLeadPhone.value,
+      address: editLeadAddress.value,
       order: editOrderText.value,
       status: editLeadStatus.value,
-      payment_transaction_id: editTransactionId.value || null
+      payment_transaction_id: editTransactionId.value || null,
+      collected_details: {
+        ...(existingData.collected_details || {}),
+        name: editLeadCustomer.value,
+        phone: editLeadPhone.value,
+        address: editLeadAddress.value,
+        items: editOrderText.value,
+        trxId: editTransactionId.value || null
+      }
     }
 
     const { error } = await supabase
       .from('leads')
-      .update({ data: updatedData })
+      .update({ 
+        email: editLeadEmail.value || editingLead.value.email,
+        data: updatedData 
+      })
       .eq('id', editingLead.value.id)
 
     if (error) throw error
-    showToast('Order details updated', 'success')
+    showToast('Order details updated successfully', 'success')
     showEditModal.value = false
     await fetchLeads()
     await fetchOrders()
+    await fetchRealNotifications()
   } catch (e) {
     showToast('Save failed: ' + e.message, 'error')
   }
 }
 
 const deleteLead = async (id) => {
+  if (!confirm('Are you sure you want to delete this customer lead?')) return
   try {
     const { error } = await supabase.from('leads').delete().eq('id', id)
     if (error) throw error
     showToast('Lead removed', 'info')
     await fetchLeads()
+    await fetchRealNotifications()
   } catch (e) {
     showToast('Delete failed: ' + e.message, 'error')
+  }
+}
+
+const bulkDeleteLeads = async () => {
+  if (selectedLeads.value.length === 0) return
+  const count = selectedLeads.value.length
+  if (!confirm(`Are you sure you want to delete ${count} selected order(s)? This action cannot be undone.`)) {
+    return
+  }
+  try {
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .in('id', selectedLeads.value)
+
+    if (error) throw error
+    showToast(`Successfully deleted ${count} selected orders`, 'success')
+    selectedLeads.value = []
+    await fetchLeads()
+    await fetchOrders()
+    await fetchRealNotifications()
+  } catch (err) {
+    showToast('Bulk delete failed: ' + err.message, 'error')
   }
 }
 
@@ -1534,6 +2032,7 @@ const handleLogout = async () => {
 
 onMounted(async () => {
   try {
+    loadNotificationPreferences()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       userEmail.value = user.email
@@ -1542,12 +2041,14 @@ onMounted(async () => {
       await fetchLeads()
       await fetchOrders()
       await fetchApiKeys()
+      await fetchRealNotifications()
       checkBackendStatus()
 
       // Realtime Polling Engine (every 5 seconds)
       realtimeSyncInterval = setInterval(async () => {
         await fetchInventory(true)
         await checkNewOrdersRealtime()
+        await fetchRealNotifications()
       }, 5000)
     } else {
       navigateTo('/login')

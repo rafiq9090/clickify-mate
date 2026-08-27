@@ -3,9 +3,7 @@
     <!-- Header -->
     <div class="pb-2 border-b border-outline/40">
       <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-          <span class="material-symbols-outlined text-xl">settings</span>
-        </div>
+        
         <h2 class="text-xl font-bold tracking-tight text-on-surface">Store Settings &amp; Integrations</h2>
       </div>
       <p class="text-xs text-on-surface-variant mt-1">
@@ -18,9 +16,7 @@
       <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
         <div class="flex items-center justify-between border-b border-outline/40 pb-3">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
-              <span class="material-symbols-outlined text-xl">local_shipping</span>
-            </div>
+           
             <div>
               <h3 class="text-sm font-bold text-on-surface">Steadfast Courier Logistics</h3>
               <p class="text-xs text-on-surface-variant">Automate parcel booking and tracking code generation directly from customer orders.</p>
@@ -57,53 +53,32 @@
         </div>
       </div>
 
-      <!-- 2. Payment Accounts & Gateways Card -->
-      <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
-        <div class="flex items-center justify-between border-b border-outline/40 pb-3">
+      <!-- 2. Payment Accounts moved to the dedicated secure workspace -->
+      <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-              <span class="material-symbols-outlined text-xl">payments</span>
-            </div>
+            
             <div>
-              <h3 class="text-sm font-bold text-on-surface">Payment &amp; Mobile Banking Accounts</h3>
-              <p class="text-xs text-on-surface-variant">Accounts provided to customers during chat for advance payments or full checkout.</p>
+              <h3 class="text-sm font-bold text-on-surface">Payment Gateway Accounts</h3>
+              <p class="text-xs text-on-surface-variant">bKash, Nagad, and Stripe merchant accounts have a separate encrypted settings area.</p>
             </div>
           </div>
 
-          <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-            bKash / Nagad / Gateway
-          </span>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div class="space-y-1">
-            <label class="font-medium text-on-surface-variant">bKash Merchant / Personal Number</label>
-            <input 
-              :value="integrations.sslcommerz_store_id"
-              @input="$emit('update:integration-field', { field: 'sslcommerz_store_id', value: $event.target.value })"
-              placeholder="e.g. 017XXXXXXXX (Personal / Merchant)" 
-              class="w-full bg-surface-hover border border-outline rounded-xl px-3.5 py-2.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors" 
-            />
-          </div>
-
-          <div class="space-y-1">
-            <label class="font-medium text-on-surface-variant">Nagad / Rocket Number</label>
-            <input 
-              :value="integrations.sslcommerz_store_password"
-              @input="$emit('update:integration-field', { field: 'sslcommerz_store_password', value: $event.target.value })"
-              placeholder="e.g. 018XXXXXXXX" 
-              class="w-full bg-surface-hover border border-outline rounded-xl px-3.5 py-2.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors" 
-            />
-          </div>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700"
+            @click="$emit('switch-tab', 'payment-gateways')"
+          >
+            Manage gateways
+            <span class="material-symbols-outlined text-base">arrow_forward</span>
+          </button>
         </div>
       </div>
 
       <!-- 3. External Store Sync (Shopify / WooCommerce) -->
       <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
         <div class="flex items-center gap-3 border-b border-outline/40 pb-3">
-          <div class="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-            <span class="material-symbols-outlined text-xl">store</span>
-          </div>
+          
           <div>
             <h3 class="text-sm font-bold text-on-surface">Store Connection (Optional)</h3>
             <p class="text-xs text-on-surface-variant">Choose your product inventory source.</p>
@@ -151,9 +126,7 @@
       <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline/40 pb-3">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <span class="material-symbols-outlined text-xl">vpn_key</span>
-            </div>
+           
             <div>
               <h3 class="text-sm font-bold text-on-surface">Developer API Tokens</h3>
               <p class="text-xs text-on-surface-variant">Use API keys to automatically pull leads and orders into your custom website.</p>
@@ -214,7 +187,6 @@
         :disabled="savingIntegrations" 
         class="w-full py-3.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
       >
-        <span class="material-symbols-outlined text-base">save</span>
         {{ savingIntegrations ? 'Saving Changes...' : 'Save All Settings' }}
       </button>
     </div>
@@ -234,6 +206,7 @@ defineEmits([
   'save-integrations',
   'generate-api-key',
   'delete-api-key',
-  'copy-text'
+  'copy-text',
+  'switch-tab'
 ])
 </script>

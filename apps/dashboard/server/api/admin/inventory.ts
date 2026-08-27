@@ -1,36 +1,23 @@
 import { defineEventHandler, readBody, createError } from 'h3'
-import { getMockInventory, saveMockInventory } from '../../utils/mock_shop'
+import { requireDashboardRole } from '../../utils/auth-session'
+import { listCatalogForUser, replaceCatalogForUser } from '../../utils/catalog-store'
 
 export default defineEventHandler(async (event) => {
-    const method = event.method
+  const user = await requireDashboardRole(event, ['owner', 'admin', 'manager'])
 
-    if (method === 'GET') {
-        try {
-            return getMockInventory()
-        } catch (e: any) {
-            throw createError({
-                statusCode: 500,
-                statusMessage: e.message || 'Failed to read mock inventory'
-            })
-        }
-    }
+  if (event.method === 'GET') return listCatalogForUser(user.id)
 
-    if (method === 'POST') {
-        try {
-            const body = await readBody(event)
-            if (!Array.isArray(body)) {
-                throw createError({
-                    statusCode: 400,
-                    statusMessage: 'Invalid inventory format, must be an array of products'
-                })
-            }
-            saveMockInventory(body)
-            return { success: true, message: 'Mock inventory updated successfully', inventory: body }
-        } catch (e: any) {
-            throw createError({
-                statusCode: 500,
-                statusMessage: e.message || 'Failed to update mock inventory'
-            })
-        }
+  if (event.method === 'POST') {
+    const body = await readBody(event)
+    if (!Array.isArray(body)) {
+      throw createError({ statusCode: 400, statusMessage: 'Inventory must be an array of products.' })
     }
+    if (body.length > 500) {
+      throw createError({ statusCode: 413, statusMessage: 'A catalog update can contain at most 500 products.' })
+    }
+    const inventory = await replaceCatalogForUser(user.id, body)
+    return { success: true, message: 'Catalog synchronized successfully.', inventory }
+  }
+
+  throw createError({ statusCode: 405, statusMessage: 'Method not allowed.' })
 })

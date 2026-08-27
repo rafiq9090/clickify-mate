@@ -1,6 +1,7 @@
 import { H3Event } from 'h3'
 
 export default defineEventHandler(async (event: H3Event) => {
+  requireAdminSession(event)
   const client = useSupabaseAdmin()
 
   try {
@@ -61,15 +62,15 @@ export default defineEventHandler(async (event: H3Event) => {
         .gte('created_at', startOfYesterday.toISOString())
         .lt('created_at', startOfToday.toISOString())
 
-     const todayTokens = todayStats?.reduce((sum, r) => sum + (r.total_tokens || 0), 0) || 0
-     const yesterdayTokens = yesterdayStats?.reduce((sum, r) => sum + (r.total_tokens || 0), 0) || 0
+     const todayTokens = todayStats?.reduce((sum: number, r: { total_tokens?: number }) => sum + (r.total_tokens || 0), 0) || 0
+     const yesterdayTokens = yesterdayStats?.reduce((sum: number, r: { total_tokens?: number }) => sum + (r.total_tokens || 0), 0) || 0
 
      // Calculate total from database sum for all-time
      const { data: allTimeStats } = await client
         .from('token_usage')
         .select('total_tokens')
 
-     const allTimeTokens = allTimeStats?.reduce((sum, r) => sum + (r.total_tokens || 0), 0) || 0
+     const allTimeTokens = allTimeStats?.reduce((sum: number, r: { total_tokens?: number }) => sum + (r.total_tokens || 0), 0) || 0
 
      return {
          success: true,

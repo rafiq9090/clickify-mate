@@ -2,6 +2,7 @@ import { generateAIReply } from '../utils/groq'
 import { getApiKey } from '../utils/settings'
 
 export default defineEventHandler(async (event): Promise<any> => {
+    requireAdminSession(event)
     const apiKey = await getApiKey('groq_api_key', 'groqApiKey')
     if (!apiKey) {
         return { error: 'No valid Groq API Key found in settings or process.env' }

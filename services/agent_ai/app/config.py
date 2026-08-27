@@ -3,7 +3,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: Optional[str] = "postgresql://postgres:postgrespassword@localhost:5432/clickify_mate"
+    DATABASE_URL: Optional[str] = None
     IMAGE_VERIFIER_URL: Optional[str] = "localhost:5002"
 
     # Supabase (Legacy)

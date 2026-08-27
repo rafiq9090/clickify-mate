@@ -1,6 +1,5 @@
 <script setup>
 const isScrolled = ref(false)
-const auth = useCookie('toolkit_admin_auth')
 
 const handleScroll = () => {
   if (process.client) {
@@ -35,8 +34,8 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
-const handleLogout = () => {
-    auth.value = null
+const handleLogout = async () => {
+    await $fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     navigateTo('/admin/login')
 }
 </script>

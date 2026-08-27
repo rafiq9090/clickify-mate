@@ -29,6 +29,13 @@ export async function createCourierParcel(
 ): Promise<CourierParcelResult> {
     const creds = await getSteadfastCredentials()
     if (!creds.apiKey || !creds.secretKey) {
+        if (process.env.NODE_ENV === 'production') {
+            return {
+                success: false,
+                status: 'configuration_required',
+                message: 'Courier credentials are not configured. Parcel booking was not attempted.'
+            }
+        }
         return {
             success: true,
             consignmentId: `MOCK-${Date.now()}`,
@@ -106,6 +113,13 @@ export async function getTrackingStatus(trackingCode: string): Promise<{
 
     const creds = await getSteadfastCredentials()
     if (!creds.apiKey || !creds.secretKey) {
+        if (process.env.NODE_ENV === 'production') {
+            return {
+                trackingCode,
+                status: 'unknown',
+                message: 'কুরিয়ার ট্র্যাকিং এখনো কনফিগার করা হয়নি। সাপোর্ট টিমের সাথে যোগাযোগ করুন।'
+            }
+        }
         return {
             trackingCode,
             status: 'booked',

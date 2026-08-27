@@ -5,9 +5,7 @@
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-              <span class="material-symbols-outlined text-xl">payments</span>
-            </div>
+            
             <h2 class="text-xl font-bold tracking-tight text-on-surface">Verified Paid Orders</h2>
           </div>
           <p class="text-xs text-on-surface-variant mt-1">

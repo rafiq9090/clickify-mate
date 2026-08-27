@@ -1,6 +1,18 @@
+import crypto from 'crypto'
 import { clearSettingsCache } from '../../utils/settings'
+import { requireAdminSession } from '../../utils/auth-session'
+
+const COLLECTION_TABLES: Record<string, string> = {
+  templates: 'templates',
+  trends: 'trends',
+  navigation: 'navigation',
+  ads: 'ads',
+  blog: 'blogs',
+  settings: 'settings'
+}
 
 export default defineEventHandler(async (event) => {
+  requireAdminSession(event)
   const query = getQuery(event)
   const action = query.action
   const supabase = useSupabaseAdmin()
@@ -23,9 +35,7 @@ export default defineEventHandler(async (event) => {
     const sensitiveKeys = ['groq_api_key', 'gemini_api_key', 'tinyurl_api_token', 'supabase_service_role_key']
     const safeSettings = { ...rawSettings }
     for (const key of sensitiveKeys) {
-      if (safeSettings[key] && typeof safeSettings[key] === 'string' && safeSettings[key].length > 4) {
-        safeSettings[key] = '••••••••' + safeSettings[key].slice(-4)
-      }
+      if (typeof safeSettings[key] === 'string' && safeSettings[key]) safeSettings[key] = '••••••••'
     }
 
     return {
@@ -44,13 +54,14 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event)
     const { collection, data } = body
 
-    if (!collection || !data) {
+    if (!collection || !Array.isArray(data) || data.length > 500) {
       throw createError({ statusCode: 400, statusMessage: 'Collection and data are required' })
     }
 
     // Since we are replacing the whole state (like we did with JSON), 
     // we use upsert which handles both insert and update if IDs match.
-    const table = collection === 'blog' ? 'blogs' : collection
+    const table = COLLECTION_TABLES[collection]
+    if (!table) throw createError({ statusCode: 400, statusMessage: 'Collection is not allowed' })
 
     // EXCEPTION: "settings" table uses a single row with GENERATED ALWAYS ID.
     // If we include the ID in the upsert, Postgres will block it.
@@ -59,6 +70,15 @@ export default defineEventHandler(async (event) => {
     if (collection === 'settings' && data[0]) {
       const { id, created_at, ...sanitized } = data[0]
       const targetId = id || 1; // Force ID 1 if not present
+      const sensitiveKeys = ['groq_api_key', 'gemini_api_key', 'tinyurl_api_token', 'supabase_service_role_key']
+      const { data: existing } = await supabase.from('settings').select('*').eq('id', targetId).maybeSingle()
+      for (const key of sensitiveKeys) {
+        const value = sanitized[key]
+        if (typeof value === 'string' && value.startsWith('••••••••')) {
+          if (existing?.[key]) sanitized[key] = existing[key]
+          else delete sanitized[key]
+        }
+      }
       const result = await supabase.from('settings').upsert({ id: targetId, ...sanitized })
       clearSettingsCache()
       error = result.error
@@ -92,7 +112,8 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Collection and ID are required' })
     }
 
-    const table = collection === 'blog' ? 'blogs' : collection
+    const table = COLLECTION_TABLES[String(collection)]
+    if (!table) throw createError({ statusCode: 400, statusMessage: 'Collection is not allowed' })
     const { error } = await supabase.from(table as string).delete().eq('id', id);
     if (error) {
       throw createError({ statusCode: 500, statusMessage: `Failed to delete from ${collection}: ${error.message}` })

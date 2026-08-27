@@ -4,9 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline/40">
       <div>
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            <span class="material-symbols-outlined text-xl">hub</span>
-          </div>
+          
           <h2 class="text-xl font-bold tracking-tight text-on-surface">Webhook &amp; Bot Tools</h2>
         </div>
         <p class="text-xs text-on-surface-variant mt-1">
@@ -14,59 +12,90 @@
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold border border-emerald-500/20">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          Webhook Server Ready
-        </span>
-      </div>
+      
     </div>
 
     <!-- 1. Meta / Social Channels Webhook Credentials -->
     <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
       <div class="flex items-center gap-3 border-b border-outline/40 pb-3">
-        <div class="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-          <span class="material-symbols-outlined text-xl">link</span>
-        </div>
+       
         <div>
-          <h3 class="text-sm font-bold text-on-surface">Meta (WhatsApp &amp; Messenger) Webhook Credentials</h3>
-          <p class="text-xs text-on-surface-variant">Paste these two fields in your Meta App at <a href="https://developers.facebook.com" target="_blank" class="text-primary hover:underline font-semibold">developers.facebook.com</a>.</p>
+          <h3 class="text-sm font-bold text-on-surface">Meta (Instagram, Messenger &amp; WhatsApp) Webhook Credentials</h3>
+          <p class="text-xs text-on-surface-variant">Paste these fields in your Meta App at <a href="https://developers.facebook.com" target="_blank" class="text-primary hover:underline font-semibold">developers.facebook.com</a> under Webhooks.</p>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
         <div class="space-y-1.5">
-          <label class="font-medium text-on-surface-variant">1. Callback URL</label>
+          <label class="font-medium text-on-surface-variant flex items-center gap-1.5">
+            <PlatformIcon platform="whatsapp" custom-class="w-3.5 h-3.5 text-emerald-500" />
+            1. WhatsApp Callback URL
+          </label>
           <div class="flex items-center gap-2 bg-surface-hover px-3.5 py-2.5 rounded-xl border border-outline">
-            <span class="font-mono text-xs text-on-surface flex-1 truncate select-all">{{ metaCallbackUrl }}</span>
+            <span class="font-mono text-xs text-on-surface flex-1 truncate select-all">{{ whatsappCallbackUrl }}</span>
             <button 
-              @click="$emit('copy-text', metaCallbackUrl)" 
+              @click="handleCopy(whatsappCallbackUrl, 'WhatsApp Callback URL')" 
               class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-              title="Copy URL"
+              title="Copy WhatsApp URL"
             >
-              <span class="material-symbols-outlined text-base">content_copy</span>
+              <span class="material-symbols-outlined text-base">{{ copiedKey === 'WhatsApp Callback URL' ? 'check' : 'content_copy' }}</span>
             </button>
           </div>
         </div>
 
         <div class="space-y-1.5">
-          <label class="font-medium text-on-surface-variant">2. Verify Token</label>
+          <label class="font-medium text-on-surface-variant flex items-center gap-1.5">
+            <PlatformIcon platform="messenger" custom-class="w-3.5 h-3.5 text-blue-500" />
+            2. Messenger / FB Callback URL
+          </label>
           <div class="flex items-center gap-2 bg-surface-hover px-3.5 py-2.5 rounded-xl border border-outline">
-            <span class="font-mono text-xs font-semibold text-on-surface flex-1 truncate">
-              {{ showWebhookToken ? verifyToken : '••••••••••••••••' }}
+            <span class="font-mono text-xs text-on-surface flex-1 truncate select-all">{{ safeMetaCallbackUrl }}</span>
+            <button 
+              @click="handleCopy(safeMetaCallbackUrl, 'Messenger / FB Callback URL')" 
+              class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+              title="Copy FB URL"
+            >
+              <span class="material-symbols-outlined text-base">{{ copiedKey === 'Messenger / FB Callback URL' ? 'check' : 'content_copy' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="font-medium text-on-surface-variant flex items-center gap-1.5">
+            <PlatformIcon platform="instagram" custom-class="w-3.5 h-3.5 text-pink-500" />
+            3. Instagram Callback URL
+          </label>
+          <div class="flex items-center gap-2 bg-surface-hover px-3.5 py-2.5 rounded-xl border border-outline">
+            <span class="font-mono text-xs text-on-surface flex-1 truncate select-all">{{ instagramCallbackUrl }}</span>
+            <button 
+              @click="handleCopy(instagramCallbackUrl, 'Instagram Callback URL')" 
+              class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+              title="Copy Instagram URL"
+            >
+              <span class="material-symbols-outlined text-base">{{ copiedKey === 'Instagram Callback URL' ? 'check' : 'content_copy' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="font-medium text-on-surface-variant">4. Verify Token</label>
+          <div class="flex items-center gap-2 bg-surface-hover px-3.5 py-2.5 rounded-xl border border-outline">
+            <span class="font-mono text-xs font-semibold text-on-surface flex-1 truncate select-all">
+              {{ showWebhookToken ? safeVerifyToken : '••••••••••••••••' }}
             </span>
             <button 
               @click="showWebhookToken = !showWebhookToken" 
               class="text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              :title="showWebhookToken ? 'Hide Token' : 'Show Token'"
             >
               <span class="material-symbols-outlined text-base">{{ showWebhookToken ? 'visibility_off' : 'visibility' }}</span>
             </button>
             <button 
-              @click="$emit('copy-text', verifyToken)" 
+              @click="handleCopy(safeVerifyToken, 'Verify Token')" 
               class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
               title="Copy Token"
             >
-              <span class="material-symbols-outlined text-base">content_copy</span>
+              <span class="material-symbols-outlined text-base">{{ copiedKey === 'Verify Token' ? 'check' : 'content_copy' }}</span>
             </button>
           </div>
         </div>
@@ -77,9 +106,7 @@
     <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline/40 pb-3">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-            <span class="material-symbols-outlined text-xl">smart_toy</span>
-          </div>
+         
           <div>
             <h3 class="text-sm font-bold text-on-surface">Interactive AI Response Tester</h3>
             <p class="text-xs text-on-surface-variant">Type a test question to verify your AI agent's replies, prices, and stock knowledge.</p>
@@ -155,9 +182,7 @@
     <!-- 3. Custom Webhook Forwarding (Optional) -->
     <div v-if="selectedAgentForConfig" class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
       <div class="flex items-center gap-3 border-b border-outline/40 pb-3">
-        <div class="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-500">
-          <span class="material-symbols-outlined text-xl">forward_to_inbox</span>
-        </div>
+        
         <div>
           <h3 class="text-sm font-bold text-on-surface">Event Forwarding (Optional)</h3>
           <p class="text-xs text-on-surface-variant">Forward customer orders and messages to your external CRM or server.</p>
@@ -201,7 +226,7 @@ const props = defineProps({
   verifyToken: { type: String, required: true }
 })
 
-defineEmits([
+const emit = defineEmits([
   'update:testPayloadAgentId',
   'update:testPayloadBody',
   'verify-webhook',
@@ -211,8 +236,51 @@ defineEmits([
 ])
 
 const showWebhookToken = ref(false)
+const copiedKey = ref('')
+
+const safeVerifyToken = computed(() => {
+  return props.verifyToken || 'clickify_secure_verify'
+})
+
+const safeMetaCallbackUrl = computed(() => {
+  if (props.metaCallbackUrl) return props.metaCallbackUrl
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/api/agents/facebook`
+  }
+  return 'https://your-domain.com/api/agents/facebook'
+})
+
+const instagramCallbackUrl = computed(() => {
+  const base = safeMetaCallbackUrl.value
+  if (!base) return ''
+  return base.replace(/\/agents\/(facebook|whatsapp|messenger)$/, '/agents/instagram')
+})
+
+const whatsappCallbackUrl = computed(() => {
+  const base = safeMetaCallbackUrl.value
+  if (!base) return ''
+  return base.replace(/\/agents\/(facebook|instagram|messenger)$/, '/agents/whatsapp')
+})
 
 const selectedAgentForConfig = computed(() => {
   return props.agents.find(a => a.id === props.testPayloadAgentId)
 })
+
+const handleCopy = async (text, label) => {
+  if (!text) return
+  copiedKey.value = label
+  setTimeout(() => {
+    if (copiedKey.value === label) copiedKey.value = ''
+  }, 2000)
+
+  // Emit to parent (triggers global toast)
+  emit('copy-text', text, label)
+
+  // Direct clipboard fallback
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    }
+  } catch (e) {}
+}
 </script>

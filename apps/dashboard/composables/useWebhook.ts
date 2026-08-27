@@ -11,7 +11,7 @@ export const useWebhook = (agents: any) => {
 
     const verifyToken = computed(() => {
         const config = useRuntimeConfig()
-        return (config.public as any)?.verifyToken || 'clickify_secure_verify'
+        return (config.public as any)?.verifyToken || ''
     })
 
     // Auto-detect if current origin serves Rust (port 5004) or TypeScript (port 3000)

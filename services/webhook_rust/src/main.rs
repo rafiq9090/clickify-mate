@@ -171,10 +171,10 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgrespassword@localhost:5432/clickify_mate".to_string());
+        .expect("DATABASE_URL must be configured");
     let encryption_key = std::env::var("AGENT_ENCRYPTION_KEY")
         .or_else(|_| std::env::var("ENCRYPTION_KEY"))
-        .unwrap_or_else(|_| "0000000000000000000000000000000000000000000000000000000000000000".to_string());
+        .expect("AGENT_ENCRYPTION_KEY must be configured");
 
     println!("[+] Connecting to Postgres database...");
     let pool = PgPool::connect(&database_url)
@@ -188,7 +188,6 @@ async fn main() {
     let app = Router::new()
         .route("/health", axum::routing::get(health_handler))
         .route("/metrics", axum::routing::get(metrics_handler))
-        .route("/decrypt", post(decrypt_handler))
         .route("/webhook/telegram", post(telegram::handle_telegram))
         .route("/webhook/facebook", post(facebook::handle_facebook))
         .with_state(state);

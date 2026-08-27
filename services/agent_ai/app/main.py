@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Response, status, BackgroundTasks
+from fastapi import FastAPI, Request, Response, status, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from app.config import settings
 from app.services.supabase_db import supabase_service
@@ -8,6 +8,8 @@ from app.services.steadfast import steadfast_service
 from app.services.telephony import telephony_service
 from app.services.image_verifier import image_verifier_service
 import httpx
+import os
+import secrets
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,11 +17,20 @@ app = FastAPI(title="AIReplyAgent Microservice Backend", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[origin.strip() for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if origin.strip()],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def require_legacy_mutation_access(request: Request):
+    """The Python mutation handlers are retained only for controlled migration tests."""
+    if os.getenv("ENABLE_LEGACY_MUTATIONS", "false").lower() != "true":
+        raise HTTPException(status_code=410, detail="Legacy mutation endpoint is disabled")
+    expected = os.getenv("INTERNAL_SERVICE_TOKEN", "")
+    provided = request.headers.get("x-internal-service-token", "")
+    if not expected or not secrets.compare_digest(provided, expected):
+        raise HTTPException(status_code=401, detail="Unauthorized internal service request")
 
 @app.get("/api/status")
 def health_check():
@@ -149,6 +160,7 @@ async def receive_whatsapp_event(request: Request, background_tasks: BackgroundT
     """
     Accept webhook notifications from Meta.
     """
+    require_legacy_mutation_access(request)
     body = await request.json()
     background_tasks.add_task(process_incoming_whatsapp_message, body)
     return {"status": "queued"}
@@ -159,6 +171,7 @@ async def receive_payment_webhook(request: Request):
     Listens for payment confirmations (e.g. bKash / SSLCommerz).
     Auto-triggers Steadfast Courier shipment and place an automated validation phone call.
     """
+    require_legacy_mutation_access(request)
     body = await request.json()
     transaction_status = body.get("status")
     customer_phone = body.get("phone")
@@ -249,7 +262,8 @@ def parse_lead_order(lead_data: dict):
     }
 
 @app.post("/api/steadfast/send-orders")
-async def send_orders_to_steadfast(request: SendToSteadfastRequest):
+async def send_orders_to_steadfast(request: SendToSteadfastRequest, http_request: Request):
+    require_legacy_mutation_access(http_request)
     results = []
     for lead_id in request.lead_ids:
         try:

@@ -1,0 +1,17 @@
+groups:
+  - name: clickify-production
+    rules:
+      - alert: DashboardUnavailable
+        expr: up{job="dashboard"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Clickify Mate dashboard is unavailable
+      - alert: DashboardMemoryHigh
+        expr: clickify_process_resident_memory_bytes > 1073741824
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Clickify Mate dashboard memory exceeds 1 GiB

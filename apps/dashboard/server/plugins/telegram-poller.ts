@@ -2,8 +2,13 @@
 import { decrypt } from '../utils/encryption'
 
 export default defineNitroPlugin((nitroApp) => {
-  // Only activate in local development / dev mode or when explicitly enabled
-  const isDev = process.env.NODE_ENV !== 'production'
+  // Production uses Telegram webhooks. Long polling must be an explicit,
+  // single-instance operational choice because getUpdates disables webhooks.
+  const pollingEnabled = process.env.TELEGRAM_POLLING_ENABLED === 'true'
+  if (!pollingEnabled) {
+    console.log('[TELEGRAM POLLER]: Disabled. Set TELEGRAM_POLLING_ENABLED=true only for a dedicated poller instance.')
+    return
+  }
   
   console.log('[TELEGRAM POLLER]: Initializing automatic local Telegram long-polling service...')
 
@@ -47,14 +52,20 @@ export default defineNitroPlugin((nitroApp) => {
 
           if (res?.ok && Array.isArray(res.result) && res.result.length > 0) {
             for (const update of res.result) {
-              offset = update.update_id + 1
-
               // Process message internally via local endpoint
               try {
-                await $fetch(`http://localhost:3000/api/agents/telegram?agent_id=${agent.id}`, {
+                const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET || ''
+                const result: any = await $fetch(`http://127.0.0.1:3000/api/agents/telegram?agent_id=${agent.id}`, {
                   method: 'POST',
+                  headers: {
+                    ...(secretToken ? { 'x-telegram-bot-api-secret-token': secretToken } : {})
+                  },
                   body: update
                 })
+                if (result?.success !== true) {
+                  throw new Error('Agent endpoint did not acknowledge delivery')
+                }
+                offset = update.update_id + 1
                 console.log(`[TELEGRAM POLLER]: Processed message from chat ${update.message?.chat?.id}`)
               } catch (procErr: any) {
                 console.error(`[TELEGRAM POLLER ERROR]: Failed to process update ${update.update_id}:`, procErr.message)

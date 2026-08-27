@@ -4,9 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline/40">
       <div>
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-            <span class="material-symbols-outlined text-xl">inventory_2</span>
-          </div>
+         
           <h2 class="text-xl font-bold tracking-tight text-on-surface">Product Catalog &amp; Cloud Stock</h2>
         </div>
         <p class="text-xs text-on-surface-variant mt-1">
@@ -265,7 +263,6 @@
           <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div class="flex items-center justify-between border-b border-outline/40 pb-3">
               <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-xl text-primary">add_shopping_cart</span>
                 <h3 class="text-base font-bold text-on-surface">{{ isEditing ? 'Edit Product & Gallery' : 'Add New Product' }}</h3>
               </div>
               <button @click="showAddModal = false" class="p-1 rounded-lg text-on-surface-variant hover:bg-surface-hover transition-colors cursor-pointer">
@@ -382,7 +379,6 @@
               <div class="space-y-2.5 pt-2 border-t border-outline/40">
                 <div class="flex items-center justify-between">
                   <span class="font-semibold text-xs text-on-surface flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-sm text-secondary">photo_library</span>
                     Product Photo Gallery ({{ (productForm.images || []).length }})
                   </span>
                   <div class="flex items-center gap-1.5">
@@ -531,7 +527,7 @@
                             class="text-[9px] font-bold px-1.5 py-0.5 rounded-md border shadow-2xs"
                             :class="img.quantity > 3 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : (img.quantity > 0 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20')"
                           >
-                            {{ img.quantity > 3 ? '🟢 In Stock' : (img.quantity > 0 ? '🟡 Low Stock' : '🔴 Out of Stock') }}
+                            {{ img.quantity > 3 ? 'In Stock' : (img.quantity > 0 ? '🟡 Low Stock' : '🔴 Out of Stock') }}
                           </span>
                         </div>
                         <div class="flex items-center bg-surface px-2.5 py-1.5 rounded-xl border border-outline focus-within:border-primary/50">
@@ -1252,9 +1248,9 @@ const getAgentLabel = (assignedAgent) => {
 const getAgentIcon = (assignedAgent) => {
   if (!assignedAgent || assignedAgent === 'all') return 'hub'
   const found = (props.agents || []).find(a => a.id === assignedAgent)
-  if (found?.platform === 'telegram') return 'send'
-  if (found?.platform === 'whatsapp') return 'chat'
-  if (found?.platform === 'messenger') return 'forum'
+  if (found?.platform === 'telegram') return ''
+  if (found?.platform === 'whatsapp') return ''
+  if (found?.platform === 'messenger') return ''
   return 'smart_toy'
 }
 

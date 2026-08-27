@@ -1,8 +1,9 @@
 // server/api/agents/connect.post.ts
 import { encrypt } from '../../utils/encryption'
-import { decrypt } from '../../utils/encryption'
+import { requireDashboardRole } from '../../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
+    const dashboardUser = await requireDashboardRole(event, ['owner', 'admin', 'manager'])
     const body = await readBody(event)
     const { platform, token, knowledge, name } = body
 
@@ -10,39 +11,48 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'Metadata missing: platform and token are required' })
     }
 
+    if (process.env.NODE_ENV === 'production') {
+        if (platform === 'telegram' && !process.env.TELEGRAM_WEBHOOK_SECRET) {
+            throw createError({ statusCode: 500, statusMessage: 'TELEGRAM_WEBHOOK_SECRET must be configured before connecting Telegram.' })
+        }
+        if (['messenger', 'fb_comment', 'facebook', 'whatsapp', 'instagram', 'ig_comment'].includes(platform) && !(process.env.META_APP_SECRET || process.env.FB_APP_SECRET)) {
+            throw createError({ statusCode: 500, statusMessage: 'META_APP_SECRET must be configured before connecting Meta channels.' })
+        }
+    }
+
     try {
         const supabase = useSupabaseAdmin()
         
-        // Extract JWT token from Authorization header or cookie
-        const authHeader = getRequestHeader(event, 'authorization')
-        const tokenStr = authHeader?.startsWith('Bearer ') 
-            ? authHeader.substring(7) 
-            : (authHeader?.split(' ')[1] || getCookie(event, 'toolkit_user_auth'))
-
-        const { data: { user: supabaseUser } } = await supabase.auth.getUser(tokenStr)
-
-        if (!supabaseUser) {
-            throw createError({ statusCode: 401, statusMessage: 'Session expired. Please log in again.' })
-        }
-        const user_id = supabaseUser.id
+        const user_id = dashboardUser.id
 
         const encryptedToken = encrypt(token)
 
         let externalId = null
         let detectedName = name || ''
 
-        // Auto-detect External ID and Name for Meta Platforms (FB, Messenger, WhatsApp)
-        if (['messenger', 'fb_comment', 'facebook', 'whatsapp'].includes(platform)) {
+        // Auto-detect External ID and Name for Meta Platforms (FB, Messenger, WhatsApp, Instagram)
+        if (['messenger', 'fb_comment', 'facebook', 'whatsapp', 'instagram', 'ig_comment'].includes(platform)) {
             try {
-                // 1. Get the main account ID (Page ID or WABA ID)
-                const metaData: any = await $fetch(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${token}`).catch(() => null)
+                // 1. Get the main account ID (Page ID, WABA ID, or connected Instagram Account)
+                const metaData: any = await $fetch(`https://graph.facebook.com/v19.0/me?fields=id,name,instagram_business_account{id,username}&access_token=${token}`).catch(() => null)
                 if (metaData?.id) {
                     externalId = metaData.id
                     if (!detectedName && metaData.name) {
                         detectedName = metaData.name
                     }
+
+                    // 2. For Instagram, check connected Instagram Business Account
+                    if (platform === 'instagram' || platform === 'ig_comment') {
+                        if (metaData.instagram_business_account?.id) {
+                            externalId = metaData.instagram_business_account.id
+                            if (metaData.instagram_business_account.username) {
+                                detectedName = `@${metaData.instagram_business_account.username} (Instagram)`
+                            }
+                            console.log(`[AGENT CONNECT]: Auto-detected Instagram Business ID: ${externalId}`)
+                        }
+                    }
                     
-                    // 2. For WhatsApp, specifically fetch phone_number_id
+                    // 3. For WhatsApp, specifically fetch phone_number_id
                     if (platform === 'whatsapp') {
                         try {
                             const phones: any = await $fetch(`https://graph.facebook.com/v19.0/${externalId}/phone_numbers?access_token=${token}`).catch(() => null)
@@ -180,7 +190,10 @@ export default defineEventHandler(async (event) => {
             try {
                 await $fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
                     method: 'POST',
-                    body: { url: webhookUrl }
+                    body: {
+                        url: webhookUrl,
+                        ...(process.env.TELEGRAM_WEBHOOK_SECRET ? { secret_token: process.env.TELEGRAM_WEBHOOK_SECRET } : {})
+                    }
                 }).catch(() => null)
                 console.log(`[AGENT AUTO-SYNC]: Registered Telegram Webhook: ${webhookUrl}`)
             } catch (tgErr: any) {

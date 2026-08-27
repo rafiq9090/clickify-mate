@@ -19,10 +19,11 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
                 color: { type: 'string', description: 'Color requested by customer (e.g. White, Maroon, Red, Sky Blue, Black)' },
                 size: { type: 'string', description: 'Size requested (e.g. L, XL, XXL)' },
                 quantity: { type: 'number', description: 'Number of pieces (defaults to 1)' }
-            }
+            },
+            required: ['sku']
         },
         isSideEffect: false,
-        execute: async (args) => checkInventory(args)
+        execute: async (args, ctx) => checkInventory({ ...args, agentId: ctx?.agentId })
     },
 
     get_current_price: {
@@ -34,10 +35,11 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
                 sku: { type: 'string', description: 'Product SKU or name' },
                 quantity: { type: 'number', description: 'Quantity being ordered' },
                 couponCode: { type: 'string', description: 'Optional coupon code (e.g. SAVE10)' }
-            }
+            },
+            required: ['sku']
         },
         isSideEffect: false,
-        execute: async (args) => getCurrentPrice(args)
+        execute: async (args, ctx) => getCurrentPrice({ ...args, agentId: ctx?.agentId })
     },
 
     calculate_delivery_fee: {
@@ -49,7 +51,8 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
                 address: { type: 'string', description: 'Customer delivery address' },
                 district: { type: 'string', description: 'District or city (e.g. Dhaka, Chittagong, Sylhet, Cumilla)' },
                 orderTotal: { type: 'number', description: 'Total value of items' }
-            }
+            },
+            required: ['district']
         },
         isSideEffect: false,
         execute: async (args) => calculateDeliveryFee(args)
@@ -62,7 +65,8 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
             type: 'object',
             properties: {
                 query: { type: 'string', description: 'Search keywords (e.g. hoodie, tshirt, white, maroon)' }
-            }
+            },
+            required: ['query']
         },
         isSideEffect: false,
         execute: async (args, ctx) => searchProducts({ query: args.query, agentId: ctx?.agentId })
@@ -79,12 +83,12 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
             required: ['sku']
         },
         isSideEffect: false,
-        execute: async (args) => getProductVariants(args.sku)
+        execute: async (args, ctx) => getProductVariants(args.sku, ctx?.agentId)
     },
 
     verify_payment: {
         name: 'verify_payment',
-        description: 'Verify a customer bKash/Nagad/Rocket transaction ID for advance delivery charge or full payment.',
+        description: 'Validate the format of manual payment proof for human review. This never confirms payment; hosted checkout provider verification is required.',
         parameters: {
             type: 'object',
             properties: {
@@ -125,7 +129,7 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
             required: ['query']
         },
         isSideEffect: false,
-        execute: async (args) => resolveProductImagesTool(args)
+        execute: async (args, ctx) => resolveProductImagesTool({ ...args, agentId: ctx?.agentId })
     },
 
     get_customer_profile: {
@@ -138,12 +142,16 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
             }
         },
         isSideEffect: false,
-        execute: async (args, ctx) => getCustomerProfile({ customerId: args.customerId || ctx?.customerId || '', agentId: ctx?.agentId })
+        execute: async (args, ctx) => getCustomerProfile({
+            customerId: args.customerId || ctx?.customerId || '',
+            agentId: ctx?.agentId || '',
+            channel: ctx?.channel
+        })
     },
 
     create_order: {
         name: 'create_order',
-        description: 'Place a confirmed order in the system with stock deduction and courier consignment creation.',
+        description: 'Create an order. For bKash, Nagad, or Stripe, pass paymentProvider to create a pending order and secure hosted checkout URL. COD orders are confirmed immediately.',
         parameters: {
             type: 'object',
             properties: {
@@ -157,12 +165,35 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
                 unitPrice: { type: 'number', description: 'Unit selling price' },
                 deliveryFee: { type: 'number', description: 'Delivery fee' },
                 total: { type: 'number', description: 'Grand total amount' },
-                trxId: { type: 'string', description: 'Advance payment Transaction ID if outside Dhaka' }
+                paymentProvider: { type: 'string', description: 'Customer payment choice: bkash, nagad, stripe, or cod' }
             },
             required: ['customerName', 'phone', 'address', 'sku', 'total']
         },
         isSideEffect: true,
         execute: async (args, ctx) => {
+            const requiredText = ['customerName', 'phone', 'address', 'sku']
+            for (const field of requiredText) {
+                if (!String(args[field] || '').trim()) {
+                    throw new Error(`Cannot create order: ${field} is required.`)
+                }
+            }
+            if (!/^(?:\+?88)?01[3-9]\d{8}$/.test(String(args.phone).replace(/[\s-]/g, ''))) {
+                throw new Error('Cannot create order: a valid Bangladesh mobile number is required.')
+            }
+            const quantity = Number(args.quantity ?? 1)
+            const unitPrice = Number(args.unitPrice)
+            const deliveryFee = Number(args.deliveryFee)
+            const total = Number(args.total)
+            if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) {
+                throw new Error('Cannot create order: quantity must be between 1 and 50.')
+            }
+            if (![unitPrice, deliveryFee, total].every(value => Number.isFinite(value) && value >= 0)) {
+                throw new Error('Cannot create order: verified price, delivery fee, and total are required.')
+            }
+            const paymentProvider = String(args.paymentProvider || '').toLowerCase()
+            if (!['bkash', 'nagad', 'stripe', 'cod'].includes(paymentProvider)) {
+                throw new Error('Cannot create order: payment method must be bKash, Nagad, Stripe, or COD.')
+            }
             const draft = {
                 agentId: ctx?.agentId || '',
                 customerId: ctx?.customerId || '',
@@ -172,11 +203,11 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
                 sku: args.sku,
                 color: args.color,
                 size: args.size,
-                quantity: args.quantity || 1,
-                unitPrice: args.unitPrice || 1000,
-                deliveryFee: args.deliveryFee || 80,
-                total: args.total || 1080,
-                trxId: args.trxId,
+                quantity,
+                unitPrice,
+                deliveryFee,
+                total,
+                paymentMethod: paymentProvider,
                 platform: ctx?.channel,
                 checkoutToken: ctx?.session?.checkoutToken
             }

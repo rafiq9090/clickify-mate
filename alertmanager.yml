@@ -3,11 +3,9 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 12h
-  receiver: 'web.hook'
+  receiver: 'operator-required'
 receivers:
-- name: 'web.hook'
-  webhook_configs:
-  - url: 'http://localhost:5001/api/health'
+- name: 'operator-required'
 inhibit_rules:
   - source_match:
       severity: 'critical'

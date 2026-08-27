@@ -11,15 +11,22 @@ export interface CustomerMemoryRecord {
 
 const customerMemoryCache = new Map<string, CustomerMemoryRecord>()
 
-export function getCustomerMemory(customerId: string): CustomerMemoryRecord | undefined {
-    return customerMemoryCache.get(customerId)
+function memoryKey(agentId: string, channel: string, customerId: string): string {
+    return `${agentId}:${channel}:${customerId}`
+}
+
+export function getCustomerMemory(agentId: string, channel: string, customerId: string): CustomerMemoryRecord | undefined {
+    return customerMemoryCache.get(memoryKey(agentId, channel, customerId))
 }
 
 export function updateCustomerMemory(
+    agentId: string,
+    channel: string,
     customerId: string,
     updates: Partial<CustomerMemoryRecord>
 ): CustomerMemoryRecord {
-    const existing = customerMemoryCache.get(customerId) || {
+    const key = memoryKey(agentId, channel, customerId)
+    const existing = customerMemoryCache.get(key) || {
         customerId,
         totalOrders: 0,
         lastActive: new Date().toISOString()
@@ -31,6 +38,6 @@ export function updateCustomerMemory(
         lastActive: new Date().toISOString()
     }
 
-    customerMemoryCache.set(customerId, updated)
+    customerMemoryCache.set(key, updated)
     return updated
 }

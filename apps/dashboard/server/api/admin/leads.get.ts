@@ -1,4 +1,5 @@
 export default defineEventHandler(async (event) => {
+  requireAdminSession(event)
   const client = useSupabaseAdmin()
   
   try {

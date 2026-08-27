@@ -1,4 +1,4 @@
-import { getMockInventory, saveMockInventory } from '../../mock_shop'
+import { deductCatalogStock, listCatalogForAgent } from '../../catalog-store'
 
 export interface InventoryCheckResult {
     available: boolean
@@ -17,12 +17,13 @@ export interface InventoryCheckResult {
 }
 
 export async function checkInventory(args: {
+    agentId?: string
     sku?: string
     color?: string
     size?: string
     quantity?: number
 }): Promise<InventoryCheckResult> {
-    const catalog = getMockInventory()
+    const catalog = args.agentId ? await listCatalogForAgent(args.agentId) : []
     const requestedQty = Math.max(1, args.quantity || 1)
     const targetSku = (args.sku || '').toLowerCase().trim()
     const targetColor = (args.color || '').toLowerCase().trim()
@@ -31,9 +32,8 @@ export async function checkInventory(args: {
     // Find product by SKU or name
     const product = catalog.find((p: any) =>
         (p.sku && p.sku.toLowerCase() === targetSku) ||
-        (p.name && p.name.toLowerCase().includes(targetSku)) ||
-        (targetColor && p.name && p.name.toLowerCase().includes(targetColor))
-    ) || catalog[0]
+        (p.name && p.name.toLowerCase().includes(targetSku))
+    )
 
     if (!product) {
         return {
@@ -81,6 +81,22 @@ export async function checkInventory(args: {
                 }
             }
         }
+
+        // A requested color/size did not match any catalog variant. Never fall
+        // through to product-level stock, which would incorrectly approve it.
+        if (targetColor || targetSize) {
+            return {
+                available: false,
+                sku: product.sku,
+                productName: product.name,
+                color: args.color,
+                size: args.size,
+                requestedQuantity: requestedQty,
+                availableQuantity: 0,
+                alternativeVariants: availableVariants.filter(variant => variant.stock > 0),
+                message: `The requested variant was not found for ${product.name}.`
+            }
+        }
     }
 
     // Default product-level stock check
@@ -103,52 +119,12 @@ export async function checkInventory(args: {
 }
 
 export async function deductInventoryStock(args: {
+    agentId?: string
     sku: string
     color?: string
     size?: string
     quantity: number
+    referenceId?: string
 }): Promise<{ success: boolean; newStock: number; message: string }> {
-    const catalog = getMockInventory()
-    const targetSku = (args.sku || '').toLowerCase().trim()
-    const targetColor = (args.color || '').toLowerCase().trim()
-    const qtyToDeduct = Math.max(1, args.quantity || 1)
-
-    const product = catalog.find((p: any) =>
-        (p.sku && p.sku.toLowerCase() === targetSku) ||
-        (p.name && p.name.toLowerCase().includes(targetSku))
-    )
-
-    if (!product) {
-        return { success: false, newStock: 0, message: 'Product not found' }
-    }
-
-    let deducted = false
-    let currentStock = product.stock_quantity || 0
-
-    if (Array.isArray(product.images)) {
-        for (const img of product.images) {
-            const vColor = (img.color || '').toLowerCase().trim()
-            if (!targetColor || vColor.includes(targetColor) || targetColor.includes(vColor)) {
-                if (typeof img.quantity === 'number') {
-                    img.quantity = Math.max(0, img.quantity - qtyToDeduct)
-                    currentStock = img.quantity
-                    deducted = true
-                    break
-                }
-            }
-        }
-    }
-
-    if (!deducted) {
-        product.stock_quantity = Math.max(0, (product.stock_quantity || 10) - qtyToDeduct)
-        currentStock = product.stock_quantity
-    }
-
-    saveMockInventory(catalog)
-
-    return {
-        success: true,
-        newStock: currentStock,
-        message: `Successfully deducted ${qtyToDeduct} pcs from inventory.`
-    }
+    return deductCatalogStock(args)
 }

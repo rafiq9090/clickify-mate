@@ -5,6 +5,7 @@ const isScrolled = ref(false)
 const isSidebarOpen = ref(false)
 
 const route = useRoute()
+const isLanding = computed(() => route.path === '/')
 const handleHomeClick = (path, event) => {
   if (route.path === path || (path === '/' && route.path === '/')) {
     if (process.client) {
@@ -56,9 +57,10 @@ const { data: globalData } = useAsyncData('global-app-settings', () => $fetch('/
 const navigation = computed(() => {
   return [
     { label: 'Home', path: '/',  },
-    { label: 'Use Cases', path: '#use-cases', },
-    { label: 'Products', path: '#features', },
-    { label: 'Contact Us', path: '#cta', }
+    { label: 'How it works', path: '#live-demo', },
+    { label: 'Channels', path: '#channels', },
+    { label: 'Intelligence', path: '#features', },
+    { label: 'FAQ', path: '#faq', }
   ]
 })
 
@@ -294,23 +296,22 @@ const handleLogout = async () => {
      </aside>
 
     <nav 
-      :class="[isScrolled ? 'h-16 md:h-20 bg-background border-b border-outline' : 'h-20 md:h-24 bg-background shadow-lg border-b border-outline']"
+      :class="[
+        isScrolled ? 'h-16 md:h-20' : 'h-20 md:h-24',
+        isLanding ? 'landing-nav' : 'bg-background border-b border-outline'
+      ]"
       class="fixed top-0 w-full z-50 transition-all duration-300 flex items-center px-0"
     >
-      <div class="max-w-7xl mx-auto pl-4 pr-1.5 md:px-6 w-full flex justify-between items-center">
+      <div class="max-w-[1500px] mx-auto pl-4 pr-1.5 md:px-8 w-full flex justify-between items-center">
         <!-- Left Group -->
         <div class="flex items-center gap-2 md:gap-12 flex-1">
           <div class="flex items-center gap-1.5 md:gap-4 shrink-0">
             <NuxtLink to="/" class="flex items-center gap-2 group" @click="handleHomeClick('/', $event)">
-              <svg class="w-7 h-7 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
-              </svg>
-              <span class="text-xl font-black tracking-tight text-on-background">
-                <span class="text-primary">{{ logoParts.first }}</span>{{ logoParts.second }}
+              <span class="text-xl font-black tracking-tight landing-brand">
+                Clickify <b>Mate</b>
               </span>
             </NuxtLink>
           </div>
-          
           <div class="hidden lg:flex items-center space-x-8">
             <NuxtLink 
               v-for="item in navigation" 
@@ -328,7 +329,7 @@ const handleLogout = async () => {
         <!-- Right Side Actions -->
         <div class="flex items-center space-x-3 md:space-x-4">
           <!-- Dark/Light Theme Toggle -->
-          <ThemeToggle class="mr-1" />
+          <ThemeToggle v-if="!isLanding" class="mr-1" />
 
           <!-- Mobile Navigation Actions -->
           <template v-if="!user">
@@ -358,8 +359,8 @@ const handleLogout = async () => {
                Dashboard
             </NuxtLink>
           </template>
-          <NuxtLink v-else to="/login" class="hidden lg:flex items-center justify-center bg-[#2575FC] hover:bg-blue-600 text-white text-xs font-bold uppercase tracking-wider rounded-full h-10 px-6 transition-all duration-300 transform hover:-translate-y-0.5 shadow-sm whitespace-nowrap">
-            Get Started
+          <NuxtLink v-else to="/login" class="landing-nav-cta hidden lg:flex items-center justify-center text-white text-xs font-bold rounded-full h-11 px-6 transition-all duration-300 transform hover:-translate-y-0.5 whitespace-nowrap">
+            Build your agent
           </NuxtLink>
         </div>
       </div>
@@ -446,5 +447,18 @@ main {
   scrollbar-width: thin;
   scrollbar-color: rgba(217, 119, 6, 0.2) transparent;
 }
+
+.landing-nav {
+  border-bottom: 1px solid rgba(23, 52, 74, 0.08);
+  background: rgba(248, 251, 255, 0.78);
+  box-shadow: 0 10px 40px rgba(50, 76, 110, 0.06);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.landing-brand { color: #102639; }
+.landing-brand b { color: #4167ed; font-weight: 900; }
+.landing-nav-cta { background: #10263a; box-shadow: 0 10px 24px rgba(16, 38, 58, 0.18); }
+.landing-nav-cta:hover { background: #193b55; box-shadow: 0 14px 30px rgba(16, 38, 58, 0.24); }
 
 </style>

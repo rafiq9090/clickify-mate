@@ -1,10 +1,10 @@
-import { getMockInventory } from '../../mock_shop'
+import { listCatalogForAgent } from '../../catalog-store'
 
 export async function searchProducts(args: {
     query?: string
     agentId?: string
 }): Promise<any[]> {
-    const catalog = getMockInventory()
+    const catalog = args.agentId ? await listCatalogForAgent(args.agentId) : []
     const q = (args.query || '').toLowerCase().trim()
 
     let items = catalog
@@ -21,8 +21,8 @@ export async function searchProducts(args: {
     )
 }
 
-export async function getProductVariants(sku: string): Promise<any[]> {
-    const catalog = getMockInventory()
+export async function getProductVariants(sku: string, agentId?: string): Promise<any[]> {
+    const catalog = agentId ? await listCatalogForAgent(agentId) : []
     const product = catalog.find((p: any) => p.sku?.toLowerCase() === sku.toLowerCase() || p.name?.toLowerCase().includes(sku.toLowerCase()))
     if (!product || !Array.isArray(product.images)) return []
 
@@ -35,11 +35,12 @@ export async function getProductVariants(sku: string): Promise<any[]> {
 }
 
 export async function resolveProductImagesTool(args: {
+    agentId?: string
     query?: string
     sku?: string
     color?: string
 }): Promise<{ images: string[]; productMatched?: string; message?: string }> {
-    const catalog = getMockInventory()
+    const catalog = args.agentId ? await listCatalogForAgent(args.agentId) : []
     const query = (args.query || '').toLowerCase()
     const sku = (args.sku || '').toLowerCase()
     const color = (args.color || '').toLowerCase()

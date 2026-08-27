@@ -2,7 +2,7 @@
  * Canonical Domain Types for Clickify AI Agent 2.0 (Architecture V2)
  */
 
-export type AgentChannel = 'telegram' | 'whatsapp' | 'messenger' | 'facebook_comment'
+export type AgentChannel = 'telegram' | 'whatsapp' | 'messenger' | 'facebook_comment' | 'instagram' | 'instagram_comment'
 
 export interface IncomingAgentEvent {
     channel: AgentChannel
@@ -38,9 +38,16 @@ export type AgentIntent =
     | 'ORDER_TRACKING'
     | 'DELIVERY_QUERY'
     | 'PAYMENT_QUERY'
+    | 'PAYMENT_SELECTION'
+    | 'OPTION_SELECTION'
+    | 'AFFIRMATION'
+    | 'NEGATION'
     | 'CUSTOMER_CORRECTION'
     | 'COMPLAINT'
     | 'HUMAN_REQUEST'
+    | 'HUMAN_HANDOFF'
+    | 'SWITCH_BACK'
+    | 'OUT_OF_CATALOG'
     | 'UNKNOWN'
 
 export type AgentComplexity =
@@ -96,6 +103,7 @@ export interface AgentUnderstanding {
 
 export interface AgentContext {
     agentId: string
+    shopId?: string
     channel: AgentChannel
     customerId: string
     customerName?: string
@@ -115,8 +123,23 @@ export interface AgentContext {
         leadId?: string
         aiDisabled?: boolean
         checkoutToken?: string
+        lastPresentedOptions?: Record<string, string>
+        lastAskedField?: 'product' | 'color' | 'size' | 'quantity' | 'name' | 'phone' | 'address' | 'payment' | 'confirmation'
+        fallbackCount?: number
+        language?: string
+        activeSubAgent?: string
+        subAgentHistory?: string[]
     }
     selection: {
+        productId?: string
+        sku?: string
+        productName?: string
+        color?: string
+        size?: string
+        quantity?: number
+        price?: number
+    }
+    previousSelection?: {
         productId?: string
         sku?: string
         productName?: string
@@ -131,6 +154,7 @@ export interface AgentContext {
         address?: string
         district?: string
         sku?: string
+        productName?: string
         color?: string
         size?: string
         quantity?: number
@@ -138,6 +162,7 @@ export interface AgentContext {
         deliveryFee?: number
         total?: number
         trxId?: string
+        paymentMethod?: string
         isAdvanceRequired?: boolean
     }
     recentMessages: Array<{
@@ -211,4 +236,7 @@ export interface AgentResult {
     traceId?: string
     repaired?: boolean
     requiresHumanHandoff?: boolean
+    aiPaused?: boolean
+    activeSubAgent?: string
+    subAgentResults?: Record<string, any>
 }

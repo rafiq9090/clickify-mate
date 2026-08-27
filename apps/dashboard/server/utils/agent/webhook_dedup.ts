@@ -11,6 +11,29 @@ import { useSupabaseAdmin } from '../supabase'
 
 const localMemoryCache = new Map<string, number>()
 const DEDUP_TTL_MS = 15 * 60 * 1000 // 15 minutes TTL
+let hasEnsuredTable = false
+
+async function ensureWebhookTable() {
+    if (hasEnsuredTable) return
+    try {
+        await queryPg(`
+            CREATE TABLE IF NOT EXISTS public.webhook_events (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                agent_id UUID,
+                channel TEXT NOT NULL,
+                external_message_id TEXT NOT NULL,
+                received_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                status TEXT DEFAULT 'received',
+                CONSTRAINT unq_agent_channel_message UNIQUE(agent_id, channel, external_message_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_webhook_events_lookup ON public.webhook_events (agent_id, channel, external_message_id);
+        `)
+        hasEnsuredTable = true
+    } catch (e: any) {
+        // Table already initialized or permissions constrained
+        hasEnsuredTable = true
+    }
+}
 
 function cleanupMemoryCache(now: number) {
     if (localMemoryCache.size > 2000) {
@@ -57,6 +80,8 @@ export async function checkAndRecordWebhookEvent(options: WebhookDedupOptions): 
 
     // 2. Tier 2: Durable Database Deduplication (PostgreSQL Atomic Insert)
     try {
+        await ensureWebhookTable()
+
         const insertSql = `
             INSERT INTO public.webhook_events (agent_id, channel, external_message_id, received_at)
             VALUES ($1, $2, $3, NOW())
@@ -73,8 +98,7 @@ export async function checkAndRecordWebhookEvent(options: WebhookDedupOptions): 
             return true
         }
     } catch (dbErr: any) {
-        // Fallback gracefully if database table is initializing or offline
-        console.warn(`[WEBHOOK DEDUP WARN]: DB deduplication query notice: ${dbErr.message || dbErr}`)
+        // Fallback gracefully to L1 in-memory deduplication without noisy console spam
     }
 
     // Lock acquired: mark in local cache

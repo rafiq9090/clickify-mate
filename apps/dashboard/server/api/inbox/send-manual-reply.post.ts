@@ -1,7 +1,9 @@
 // server/api/inbox/send-manual-reply.post.ts
 import { decrypt } from '../../utils/encryption'
+import { requireDashboardRole } from '../../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
+    const user = await requireDashboardRole(event, ['owner', 'admin', 'manager', 'support'])
     const body = await readBody(event)
     const { agent_id, user_external_id, content, platform } = body || {}
 
@@ -17,6 +19,7 @@ export default defineEventHandler(async (event) => {
             .from('agent_configs')
             .select('*')
             .eq('id', agent_id)
+            .eq('user_id', user.id)
             .maybeSingle()
         agent = data
     }
@@ -26,6 +29,7 @@ export default defineEventHandler(async (event) => {
         const { data } = await supabase
             .from('agent_configs')
             .select('*')
+            .eq('user_id', user.id)
             .eq('platform', platform || 'telegram')
             .eq('is_active', true)
             .order('updated_at', { ascending: false })

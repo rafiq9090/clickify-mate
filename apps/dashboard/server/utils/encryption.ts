@@ -10,13 +10,15 @@ if (!KEY_HEX) {
 }
 
 // Key must be a 64-char hex string (32 bytes = 256 bits)
-const ENCRYPTION_KEY = KEY_HEX ? Buffer.from(KEY_HEX, 'hex') : Buffer.alloc(32)
+const ENCRYPTION_KEY = KEY_HEX && /^[0-9a-f]{64}$/i.test(KEY_HEX)
+  ? Buffer.from(KEY_HEX, 'hex')
+  : Buffer.alloc(32)
 
 const IV_LENGTH = 12   // 12 bytes is standard for GCM
 const AUTH_TAG_LENGTH = 16
 
 export const encrypt = (text: string): string => {
-  if (!KEY_HEX) throw new Error('Encryption failed: Key missing')
+  if (!KEY_HEX || !/^[0-9a-f]{64}$/i.test(KEY_HEX)) throw new Error('Encryption failed: valid 32-byte hex key missing')
   
   const iv = crypto.randomBytes(IV_LENGTH)
   const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv)
@@ -33,24 +35,7 @@ export const encrypt = (text: string): string => {
 }
 
 export const decrypt = async (payload: string): Promise<string> => {
-  if (!KEY_HEX) throw new Error('Decryption failed: Key missing')
-  
-  // Try delegating to the high-performance Rust microservice
-  try {
-    const response = await $fetch<{ success: boolean; decrypted: string; error: string }>('http://localhost:5004/decrypt', {
-      method: 'POST',
-      body: {
-        payload,
-        key_hex: KEY_HEX
-      },
-      timeout: 1000
-    })
-    if (response && response.success) {
-      return response.decrypted
-    }
-  } catch (err: any) {
-    // Graceful fallback to native crypto on any connection or execution failure
-  }
+  if (!KEY_HEX || !/^[0-9a-f]{64}$/i.test(KEY_HEX)) throw new Error('Decryption failed: valid 32-byte hex key missing')
 
   try {
     const parts = payload.split(':')

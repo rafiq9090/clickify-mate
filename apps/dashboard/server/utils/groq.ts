@@ -88,7 +88,7 @@ export async function fetchGroqCompletions(
                         total_tokens: totalTokens,
                         model: model,
                         feature: featureName
-                    }).then(({ error }) => {
+                    }).then(({ error }: { error?: any }) => {
                         if (error) {
                             console.error('[TOKEN LOGGING SAVE ERROR]:', error)
                         }

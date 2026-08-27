@@ -5,18 +5,26 @@
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-              <span class="material-symbols-outlined text-xl">shopping_cart</span>
-            </div>
+            
             <h2 class="text-xl font-bold tracking-tight text-on-surface">Customer Leads & Orders</h2>
           </div>
           <p class="text-xs text-on-surface-variant mt-1">
-            Real-time orders and inquiries automatically gathered by your AI agents across all channels.
+            Real-time orders and inquiries automatically gathered by your AI agents or added manually.
           </p>
         </div>
 
         <!-- Top Actions -->
         <div class="flex items-center gap-2.5 flex-wrap">
+          <!-- Add Manual Lead Button -->
+          <button 
+            @click="$emit('open-create-lead')"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary-accent shadow-xs transition-all cursor-pointer"
+            title="Create New Order / Lead Manually"
+          >
+            <span class="material-symbols-outlined text-base">add_circle</span>
+            Add Order / Lead
+          </button>
+
           <button 
             @click="$emit('refresh')"
             :disabled="loading"
@@ -35,11 +43,23 @@
             Export CSV
           </button>
 
+          <!-- Bulk Delete Button (When items are checked) -->
+          <button 
+            v-if="selectedLeads.length > 0"
+            @click="$emit('bulk-delete')"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 transition-all shadow-xs cursor-pointer animate-in fade-in"
+            title="Delete Selected Orders"
+          >
+            <span class="material-symbols-outlined text-base">delete_sweep</span>
+            Delete {{ selectedLeads.length }} Selected
+          </button>
+
+          <!-- Bulk Dispatch Courier Button -->
           <button 
             v-if="selectedLeads.length > 0"
             @click="$emit('bulk-send-to-steadfast')"
             :disabled="sendingToSteadfast"
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all shadow-sm disabled:opacity-50 cursor-pointer animate-in fade-in"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all shadow-sm disabled:opacity-50 cursor-pointer animate-in fade-in"
           >
             <span class="material-symbols-outlined text-base" :class="sendingToSteadfast ? 'animate-spin' : ''">local_shipping</span>
             Send {{ selectedLeads.length }} to Courier
@@ -89,7 +109,7 @@
         <!-- Platform Tabs Filter -->
         <div class="md:col-span-3 flex items-center bg-surface-hover/70 p-1 border border-outline rounded-xl overflow-x-auto">
           <button 
-            v-for="tab in ['all', 'whatsapp', 'telegram', 'facebook']" 
+            v-for="tab in ['all', 'whatsapp', 'telegram', 'facebook', 'direct']" 
             :key="tab"
             @click="$emit('update:activeTab', tab)"
             :class="activeTab === tab 
@@ -114,7 +134,7 @@
       </div>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse min-w-[700px]">
+        <table class="w-full text-left border-collapse min-w-[750px]">
           <thead>
             <tr class="bg-surface-hover/50 border-b border-outline text-xs font-semibold text-on-surface-variant">
               <th class="py-3 px-3 w-10 text-center"></th>
@@ -131,6 +151,7 @@
               <th class="py-3 px-4">Customer & Details</th>
               <th class="py-3 px-4">Order ID</th>
               <th class="py-3 px-4 text-right">Date & Time</th>
+              <th class="py-3 px-4 text-center w-24">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-outline/50 text-xs">
@@ -187,7 +208,11 @@
                         {{ lead.data?.status || 'Pending' }}
                       </span>
                     </div>
-                    <span class="text-xs text-on-surface-variant truncate max-w-xs">{{ lead.email }}</span>
+                    <div class="flex items-center gap-2 text-xs text-on-surface-variant">
+                      <span v-if="lead.data?.phone" class="font-medium text-primary">{{ lead.data.phone }}</span>
+                      <span v-if="lead.data?.phone && lead.email" class="text-on-surface-variant/40">•</span>
+                      <span class="truncate max-w-[200px]">{{ lead.email }}</span>
+                    </div>
                   </div>
                 </td>
 
@@ -208,17 +233,37 @@
                   <div>{{ new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</div>
                   <div class="text-[10px] text-on-surface-variant/60">{{ new Date(lead.created_at).toLocaleDateString() }}</div>
                 </td>
+
+                <!-- Inline Action Buttons (Edit & Delete One-by-One) -->
+                <td class="py-3.5 px-4 text-center" @click.stop>
+                  <div class="inline-flex items-center gap-1">
+                    <button 
+                      @click="$emit('open-edit', lead)" 
+                      class="p-1.5 rounded-lg hover:bg-primary/10 text-on-surface-variant hover:text-primary transition-colors cursor-pointer" 
+                      title="Edit this Lead"
+                    >
+                      <span class="material-symbols-outlined text-base">edit</span>
+                    </button>
+                    <button 
+                      @click="$emit('delete', lead.id)" 
+                      class="p-1.5 rounded-lg hover:bg-rose-500/10 text-on-surface-variant hover:text-rose-600 transition-colors cursor-pointer" 
+                      title="Delete this Lead"
+                    >
+                      <span class="material-symbols-outlined text-base">delete</span>
+                    </button>
+                  </div>
+                </td>
               </tr>
 
               <!-- Expanded Details Row -->
               <tr v-if="expandedLeads.includes(lead.id)" class="bg-surface-hover/20">
-                <td colspan="7" class="p-4 sm:p-6 bg-surface-hover/30 border-b border-outline">
+                <td colspan="8" class="p-4 sm:p-6 bg-surface-hover/30 border-b border-outline">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
                     <!-- Order Items Breakdown -->
                     <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline">
                       <div class="flex items-center gap-1.5 font-semibold text-on-surface">
                         <span class="material-symbols-outlined text-sm text-primary">receipt_long</span>
-                        <span>Order Items & Inquiry</span>
+                        <span>Order Items & Details</span>
                       </div>
                       <div v-if="lead.data?.order && lead.data.order.includes(':')" class="space-y-1 pt-1">
                         <div 
@@ -233,6 +278,11 @@
                       <p v-else class="text-on-surface font-medium pt-1">
                         {{ lead.data?.order || 'No specific order items listed' }}
                       </p>
+
+                      <div v-if="lead.data?.address" class="pt-2 border-t border-outline/30">
+                        <span class="text-[10px] text-on-surface-variant font-semibold uppercase tracking-wider block mb-0.5">Delivery Address</span>
+                        <p class="text-on-surface text-xs font-medium">{{ lead.data.address }}</p>
+                      </div>
                     </div>
 
                     <!-- Courier & Fulfillment -->
@@ -285,11 +335,11 @@
                           class="flex-1 py-1.5 px-3 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <span class="material-symbols-outlined text-sm">edit</span>
-                          Edit
+                          Edit Details
                         </button>
                         <button 
                           @click.stop="$emit('delete', lead.id)" 
-                          class="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          class="py-1.5 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-500/20 font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <span class="material-symbols-outlined text-sm">delete</span>
                           Delete
@@ -378,12 +428,15 @@ const emit = defineEmits([
   'update:endDate',
   'update:activeTab',
   'update:selectedLeads',
+  'open-create-lead',
   'open-edit',
   'delete',
+  'bulk-delete',
   'send-to-steadfast',
   'bulk-send-to-steadfast',
   'export-csv',
-  'copy-text'
+  'copy-text',
+  'refresh'
 ])
 
 const expandedLeads = ref([])
@@ -425,7 +478,7 @@ const getPlatformBadgeClass = (platform) => {
   if (platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
   if (platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
   if (platform === 'facebook' || platform === 'messenger' || platform === 'fb_comment') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-  return 'bg-primary/10 text-primary border-primary/20'
+  return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
 }
 
 const getStatusBadgeClass = (status) => {

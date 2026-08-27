@@ -9,6 +9,8 @@ export const useAgents = (supabase: any, showToast: Function) => {
         if (platform === 'messenger') return 'Messenger'
         if (platform === 'whatsapp') return 'WhatsApp'
         if (platform === 'telegram') return 'Telegram'
+        if (platform === 'instagram') return 'Instagram DM'
+        if (platform === 'ig_comment') return 'Instagram comment'
         return platform
     }
 
@@ -52,17 +54,32 @@ export const useAgents = (supabase: any, showToast: Function) => {
     }
 
     const updateKnowledge = async (agent: any) => {
+        if (!agent?.id) return
         try {
-            const { error } = await supabase.from('agent_configs').update({
-                knowledge: agent.knowledge,
-                product_images: agent.product_images.filter((img: any) => img && img.url && img.url.trim() !== ''),
-                agent_behavior: agent.agent_behavior
-            }).eq('id', agent.id)
-            if (error) throw error
-            agent.isDirty = false
-            showToast('Knowledge Base & Product Gallery Synchronized', 'success')
+            const rawImages = Array.isArray(agent.product_images)
+                ? agent.product_images
+                    .map((img: any) => typeof img === 'string' ? img.trim() : (img?.url || '').trim())
+                    .filter((url: string) => url.length > 0)
+                : []
+
+            const res: any = await $fetch('/api/agents/update', {
+                method: 'POST',
+                body: {
+                    id: agent.id,
+                    knowledge: agent.knowledge || '',
+                    product_images: rawImages,
+                    agent_behavior: agent.agent_behavior || {}
+                }
+            })
+            if (res?.success) {
+                agent.isDirty = false
+                showToast('Knowledge Base & Product Gallery Synchronized', 'success')
+            } else {
+                throw new Error(res?.message || 'Sync failed')
+            }
         } catch (e: any) {
-            showToast('Sync Failed: ' + e.message, 'error')
+            const msg = e?.data?.statusMessage || e?.data?.message || e?.message || 'Sync Failed'
+            showToast('Sync Failed: ' + msg, 'error')
         }
     }
 
@@ -87,10 +104,8 @@ export const useAgents = (supabase: any, showToast: Function) => {
         }
         connectingAgent.value = true
         try {
-            const { data: { session } } = await supabase.auth.getSession()
             const res: any = await $fetch('/api/agents/connect', {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${session?.access_token}` },
                 body: { platform: connectPlatform.value, token: connectToken.value, knowledge: connectKnowledge.value }
             })
             if (res.success) {

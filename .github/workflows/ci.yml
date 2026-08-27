@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: clickify_mate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgrespassword
+    steps:
+      - uses: actions/checkout@v4
+      - run: psql -h 127.0.0.1 -U postgres -d clickify_mate -v ON_ERROR_STOP=1 -f scripts/ci_supabase_compat.sql
+      - run: psql -h 127.0.0.1 -U postgres -d clickify_mate -v ON_ERROR_STOP=1 -f database.sql
+      - run: psql -h 127.0.0.1 -U postgres -d clickify_mate -v ON_ERROR_STOP=1 -f supabase/migrations/20260820082635_add_hosted_payment_flow.sql
+      - run: psql -h 127.0.0.1 -U postgres -d clickify_mate -v ON_ERROR_STOP=1 -f supabase/migrations/20260823061937_production_foundations.sql
+      - run: psql -h 127.0.0.1 -U postgres -d clickify_mate -v ON_ERROR_STOP=1 -f scripts/test_payment_schema.sql
+      - run: psql -h 127.0.0.1 -U postgres -d clickify_mate -v ON_ERROR_STOP=1 -f scripts/test_production_foundations.sql
+
+  services:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/orchestrator/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pip install -r services/agent_ai/requirements.txt
+      - run: python -m pytest services/agent_ai/test_features.py services/agent_ai/test_grpc_client.py services/agent_ai/test_orchestrator_grpc.py
+      - run: go test ./...
+        working-directory: services/orchestrator
+      - run: cargo test
+        working-directory: services/image_verifier
+      - run: cargo test
+        working-directory: services/webhook_rust

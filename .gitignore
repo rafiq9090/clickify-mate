@@ -34,8 +34,12 @@ desktop.ini
 testsprite_tests/
 scripts/create-testsprite_tests
 
+# Supabase CLI local metadata
+supabase/.temp/
+
 # Python cache
 **/__pycache__/
 **/*.pyc
 
-
+# Temporary scratch
+apps/dashboard/scratch/

@@ -45,15 +45,22 @@
 
           <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
             <button 
-              v-for="tab in ['all', 'telegram', 'whatsapp', 'facebook']" 
-              :key="tab"
-              @click="activePlatform = tab"
-              :class="activePlatform === tab 
+              v-for="tab in [
+                { id: 'all', label: 'All' },
+                { id: 'telegram', label: 'Telegram' },
+                { id: 'whatsapp', label: 'WhatsApp' },
+                { id: 'facebook', label: 'Facebook' },
+                { id: 'instagram', label: 'Instagram' },
+                { id: 'fb_comment', label: 'FB Comment' }
+              ]" 
+              :key="tab.id"
+              @click="activePlatform = tab.id"
+              :class="activePlatform === tab.id 
                 ? 'bg-primary text-white font-semibold' 
                 : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-hover'"
-              class="px-2.5 py-1 rounded-lg text-[11px] capitalize transition-colors whitespace-nowrap cursor-pointer"
+              class="px-2.5 py-1 rounded-lg text-[11px] transition-colors whitespace-nowrap cursor-pointer"
             >
-              {{ tab }}
+              {{ tab.label }}
             </button>
           </div>
         </div>
@@ -67,7 +74,7 @@
             class="p-3.5 hover:bg-surface-hover/70 transition-colors cursor-pointer flex items-start gap-3"
             :class="{ 'bg-primary/10 border-l-3 border-l-primary': selectedThread?.user_external_id === thread.user_external_id }"
           >
-            <!-- Customer Avatar with Platform Sub-Badge -->
+            <!-- Customer Avatar -->
             <div class="relative shrink-0">
               <div 
                 class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs border border-outline/70 bg-surface shadow-xs"
@@ -81,12 +88,6 @@
                   @error="thread.customer_avatar = ''"
                 />
                 <span v-else>{{ getCustomerInitials(thread.customer_name, thread.user_external_id) }}</span>
-              </div>
-              <div 
-                class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] shadow-xs border border-surface"
-                :class="getPlatformBadgeClass(thread.platform)"
-              >
-                <span class="material-symbols-outlined text-[10px]">{{ getPlatformIcon(thread.platform) }}</span>
               </div>
             </div>
 
@@ -140,12 +141,6 @@
                     @error="selectedThread.customer_avatar = ''"
                   />
                   <span v-else>{{ getCustomerInitials(selectedThread.customer_name, selectedThread.user_external_id) }}</span>
-                </div>
-                <div 
-                  class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] shadow-xs border border-surface"
-                  :class="getPlatformBadgeClass(selectedThread.platform)"
-                >
-                  <span class="material-symbols-outlined text-[10px]">{{ getPlatformIcon(selectedThread.platform) }}</span>
                 </div>
               </div>
 
@@ -281,9 +276,62 @@
                     </div>
                   </div>
 
+                  <!-- Moderated / Auto-Deleted Bad Comment Callout Banner -->
+                  <div 
+                    v-if="isModeratedBadComment(msg.content)" 
+                    class="mb-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs space-y-1"
+                  >
+                    <div class="flex items-center gap-1.5 font-bold">
+                      <span class="material-symbols-outlined text-sm text-rose-500">shield</span>
+                      <span>Auto-Deleted Bad Comment</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-600 dark:text-rose-300 uppercase font-mono">Removed</span>
+                    </div>
+                    <p class="text-[11px] opacity-90">
+                      Reason: <span class="font-semibold">{{ getModerationReason(msg.content) }}</span>
+                    </p>
+                  </div>
+
                   <p v-if="cleanDisplayMessage(msg.content)">
                     {{ cleanDisplayMessage(msg.content) }}
                   </p>
+
+                  <!-- Video Attachment Player & AI Multi-Modal Breakdown -->
+                  <div 
+                    v-if="isVideoMessage(msg.content)" 
+                    class="mt-2.5 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs space-y-2 max-w-sm"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-1.5 font-semibold text-purple-600 dark:text-purple-400">
+                        <span class="material-symbols-outlined text-sm">videocam</span>
+                        <span>Customer Video</span>
+                      </div>
+                      <a 
+                        v-if="getVideoUrl(msg.content)" 
+                        :href="getVideoUrl(msg.content)" 
+                        target="_blank" 
+                        class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        <span>Watch Video</span>
+                        <span class="material-symbols-outlined text-xs">open_in_new</span>
+                      </a>
+                    </div>
+
+                    <!-- Inline playable video if URL is present -->
+                    <video 
+                      v-if="getVideoUrl(msg.content)" 
+                      :src="getVideoUrl(msg.content)" 
+                      controls 
+                      class="w-full max-h-48 rounded-lg bg-black/40 border border-outline object-contain"
+                    ></video>
+
+                    <!-- AI Multi-Modal Video Analysis breakdown -->
+                    <div v-if="getVideoVisualContent(msg.content)" class="text-[11px] text-on-surface-variant leading-relaxed">
+                      <span class="font-semibold text-on-surface">🎥 Visual:</span> {{ getVideoVisualContent(msg.content) }}
+                    </div>
+                    <div v-if="getVideoAudioTranscript(msg.content)" class="text-[11px] text-on-surface-variant leading-relaxed">
+                      <span class="font-semibold text-on-surface">🎙️ Voice:</span> "{{ getVideoAudioTranscript(msg.content) }}"
+                    </div>
+                  </div>
 
                   <!-- Render Attached Product Images Gallery in Bubble -->
                   <div 
@@ -494,8 +542,61 @@ const getRepliedMessage = (msg) => {
   return null
 }
 
+const isVideoMessage = (content) => {
+  if (!content) return false
+  return content.includes('[User sent video:') || content.includes('[Video Visual Content:') || content.includes('[VIDEO_URL:') || content.includes('[Video Attachment]')
+}
+
+const getVideoUrl = (content) => {
+  if (!content) return null
+  const match = content.match(/\[VIDEO_URL:([^\]]+)\]/i)
+  if (match) {
+    const rawUrl = match[1].trim()
+    if (rawUrl.startsWith('https://api.telegram.org/') || rawUrl.includes('graph.facebook.com') || rawUrl.includes('s3.')) {
+      return `/api/media/stream?url=${encodeURIComponent(rawUrl)}`
+    }
+    return rawUrl
+  }
+  return null
+}
+
+const getVideoVisualContent = (content) => {
+  if (!content) return null
+  const match = content.match(/\[(?:User sent video:\s*|Video Visual Content:\s*)([^\]|]+)/i)
+  return match ? match[1].trim() : null
+}
+
+const getVideoAudioTranscript = (content) => {
+  if (!content) return null
+  const match = content.match(/(?:Customer Spoken Voice|Audio Transcript|Audio speech|Audio):\s*"([^"]+)"/i)
+  return match ? match[1].trim() : null
+}
+
+const isModeratedBadComment = (content) => {
+  return typeof content === 'string' && /\[(?:AUTO-)?DELETED BAD COMMENT/i.test(content)
+}
+
+const getModerationReason = (content) => {
+  if (typeof content !== 'string') return 'Inappropriate Content'
+  const match = content.match(/\[(?:AUTO-)?DELETED BAD COMMENT:\s*([^\]]+)\]/i)
+  return match ? match[1].trim() : 'Abuse / Scam / Policy Violation'
+}
+
 const cleanDisplayMessage = (msg) => {
   if (!msg) return ''
+  if (isModeratedBadComment(msg)) {
+    return msg.replace(/🚨?\s*\[(?:AUTO-)?DELETED BAD COMMENT:[^\]]+\]\s*/gi, '').replace(/^"|"$/g, '').trim()
+  }
+  if (isVideoMessage(msg)) {
+    // If it's pure video metadata, don't show duplicate raw bracket text
+    const captionText = msg
+      .replace(/\[(?:User sent video|Video Visual Content)[^\]]*\]/gi, '')
+      .replace(/\[(?:Audio Transcript|Audio)[^\]]*\]/gi, '')
+      .replace(/\[VIDEO_URL:[^\]]*\]/gi, '')
+      .trim()
+    return captionText
+  }
+
   return msg
     .replace(/^\[In reply to [^\]]+\]\s*/gi, '')
     .replace(/\[IMAGE:?[^\]]*?\]/gi, '')
@@ -503,6 +604,7 @@ const cleanDisplayMessage = (msg) => {
     .replace(/\[ROUTE:?[^\]]*?\]/gi, '')
     .replace(/\[SEND_IMAGES:?[^\]]*?\]/gi, '')
     .replace(/\[ORDER_DATA:?[^\]]*?\]/gi, '')
+    .replace(/\[VIDEO_URL:[^\]]*\]/gi, '')
     .trim()
 }
 
@@ -557,9 +659,15 @@ const handleClearThread = async (thread) => {
 }
 
 const toggleAiForThread = async (thread) => {
-  if (!thread) return
+  if (!thread || togglingAi.value) return
   togglingAi.value = true
   const newStatus = !thread.ai_disabled
+
+  // Optimistic update for instant button and banner change
+  thread.ai_disabled = newStatus
+  if (selectedThread.value && selectedThread.value.user_external_id === thread.user_external_id) {
+    selectedThread.value.ai_disabled = newStatus
+  }
 
   try {
     const res = await $fetch('/api/inbox/toggle-ai', {
@@ -567,20 +675,24 @@ const toggleAiForThread = async (thread) => {
       body: {
         user_external_id: thread.user_external_id,
         platform: thread.platform,
-        agent_id: thread.agent_id,
+        agent_id: thread.agent_id || props.agents?.[0]?.id,
         ai_disabled: newStatus
       }
     })
 
-    thread.ai_disabled = newStatus
     emit('show-toast', {
       message: newStatus 
-        ? 'AI Auto-Pilot paused. You can now chat manually.' 
-        : 'AI Auto-Pilot resumed! Bot will auto-reply.',
+        ? '⏸️ AI Auto-Pilot paused! You can now reply manually.' 
+        : '▶️ AI Auto-Pilot resumed! AI will reply automatically.',
       type: newStatus ? 'warning' : 'success'
     })
   } catch (err) {
     console.error('Toggle AI error:', err)
+    // Revert on error
+    thread.ai_disabled = !newStatus
+    if (selectedThread.value && selectedThread.value.user_external_id === thread.user_external_id) {
+      selectedThread.value.ai_disabled = !newStatus
+    }
     emit('show-toast', {
       message: 'Failed to update AI state: ' + (err.data?.statusMessage || err.message),
       type: 'error'
@@ -636,8 +748,16 @@ const fetchChatHistory = async (isBackground = false) => {
     const aiStatusMap = {}
     if (leadsRes.data) {
       leadsRes.data.forEach(lead => {
-        const userExtId = lead.data?.customer || (lead.email ? lead.email.split('@')[0] : '')
-        if (userExtId && lead.data?.ai_disabled !== undefined) {
+        let userExtId = ''
+        if (lead.email && lead.email.includes('@')) {
+          userExtId = lead.email.split('@')[0].trim()
+        } else if (lead.data?.user_external_id) {
+          userExtId = lead.data.user_external_id.toString().trim()
+        } else if (lead.data?.customer && /^\d+$/.test(lead.data.customer.toString())) {
+          userExtId = lead.data.customer.toString().trim()
+        }
+
+        if (userExtId && lead.data?.ai_disabled !== undefined && aiStatusMap[userExtId] === undefined) {
           aiStatusMap[userExtId] = Boolean(lead.data.ai_disabled)
         }
       })

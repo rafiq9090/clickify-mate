@@ -1,5 +1,4 @@
 export default defineNuxtRouteMiddleware(async (to, from) => {
-  const adminAuth = useCookie('toolkit_admin_auth')
   const supabase = useSupabase() as any
 
   // Helper to handle i18n paths (e.g., /bn/tools/ai-reply -> /tools/ai-reply)
@@ -17,7 +16,8 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
 
   // 1. Admin Protection
   if (cleanPath.startsWith('/admin') && cleanPath !== '/admin/login') {
-    if (!adminAuth.value) {
+    const session: any = await $fetch('/api/auth/session').catch(() => null)
+    if (!session?.admin) {
       return navigateTo('/admin/login')
     }
   }
@@ -34,8 +34,9 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   }
 
   // 3. Prevent accessing login pages if already authenticated
-  if (cleanPath === '/admin/login' && adminAuth.value) {
-    return navigateTo('/admin')
+  if (cleanPath === '/admin/login') {
+    const session: any = await $fetch('/api/auth/session').catch(() => null)
+    if (session?.admin) return navigateTo('/admin')
   }
 
   if (cleanPath === '/login') {

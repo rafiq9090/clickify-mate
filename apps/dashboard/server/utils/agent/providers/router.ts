@@ -19,10 +19,18 @@ export function chooseModelRoute(input: {
     requiresDeepReasoning?: boolean
 }): ModelRoute {
     const hasNvidia = Boolean(process.env.NVIDIA_API_KEY && process.env.NVIDIA_API_KEY.startsWith('nvapi-'))
-    const fastProvider = (process.env.AGENT_FAST_PROVIDER as 'groq' | 'nvidia') || 'groq'
-    const fastModel = process.env.AGENT_FAST_MODEL || 'qwen/qwen3.6-27b'
-    const reasoningProvider = (process.env.AGENT_REASONING_PROVIDER as 'groq' | 'nvidia') || (hasNvidia ? 'nvidia' : 'groq')
-    const reasoningModel = process.env.AGENT_REASONING_MODEL || (reasoningProvider === 'nvidia' ? 'meta/llama-3.3-70b-instruct' : 'qwen/qwen3.6-27b')
+    const configuredPrimary = process.env.AGENT_PRIMARY_PROVIDER || process.env.AGENT_FAST_PROVIDER
+    const fastProvider: 'groq' | 'nvidia' = configuredPrimary === 'groq'
+        ? 'groq'
+        : (hasNvidia ? 'nvidia' : 'groq')
+    const fastModel = process.env.AGENT_FAST_MODEL || (fastProvider === 'nvidia'
+        ? 'meta/llama-3.1-8b-instruct'
+        : 'openai/gpt-oss-20b')
+    const configuredReasoning = (process.env.AGENT_REASONING_PROVIDER as 'groq' | 'nvidia') || (hasNvidia ? 'nvidia' : 'groq')
+    const reasoningProvider: 'groq' | 'nvidia' = configuredReasoning === 'nvidia' && hasNvidia ? 'nvidia' : 'groq'
+    const reasoningModel = process.env.AGENT_REASONING_MODEL || (reasoningProvider === 'nvidia' ? 'meta/llama-3.1-8b-instruct' : 'openai/gpt-oss-20b')
+    const selectedFastProvider = fastProvider === 'nvidia' && hasNvidia ? nvidiaProvider : groqProvider
+    const selectedFastProviderName: 'groq' | 'nvidia' = fastProvider === 'nvidia' && hasNvidia ? 'nvidia' : 'groq'
 
     switch (input.complexity) {
         case 'DETERMINISTIC':
@@ -34,17 +42,17 @@ export function chooseModelRoute(input: {
 
         case 'SIMPLE':
             return {
-                provider: groqProvider,
-                providerName: 'groq',
+                provider: selectedFastProvider,
+                providerName: selectedFastProviderName,
                 model: fastModel,
                 mode: 'FAST'
             }
 
         case 'MEDIUM':
             return {
-                provider: groqProvider,
-                providerName: 'groq',
-                model: 'qwen/qwen3.6-27b',
+                provider: selectedFastProvider,
+                providerName: selectedFastProviderName,
+                model: fastModel,
                 mode: 'AGENT'
             }
 

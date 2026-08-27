@@ -1,37 +1,27 @@
 import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
 import { queryPg } from '../../utils/db'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-token-key-change-in-prod-9988'
+import { clearDashboardSession, requireDashboardUser } from '../../utils/auth-session'
+import { assertStrongPassword } from '../../utils/password-policy'
 
 export default defineEventHandler(async (event) => {
+  const user = await requireDashboardUser(event)
   const body = await readBody(event)
-  const { password } = body
-  
-  if (!password) {
-    throw createError({ statusCode: 400, statusMessage: 'Password is required.' })
+  const currentPassword = String(body?.currentPassword || body?.current_password || '')
+  const newPassword = assertStrongPassword(body?.password)
+  if (!currentPassword) throw createError({ statusCode: 400, statusMessage: 'Current password is required.' })
+
+  const result = await queryPg('SELECT password_hash FROM public.users WHERE id = $1', [user.id])
+  if (!result.rows[0] || !bcrypt.compareSync(currentPassword, result.rows[0].password_hash)) {
+    throw createError({ statusCode: 401, statusMessage: 'Current password is incorrect.' })
   }
 
-  // Retrieve JWT token from headers or cookie
-  const authHeader = getRequestHeader(event, 'authorization')
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : getCookie(event, 'toolkit_user_auth')
-
-  if (!token) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized. Log in first.' })
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    
-    // Hash new password
-    const salt = bcrypt.genSaltSync(10)
-    const hash = bcrypt.hashSync(password, salt)
-
-    await queryPg('UPDATE public.users SET password_hash = $1 WHERE id = $2', [hash, decoded.id])
-
-    return { success: true }
-  } catch (err: any) {
-    console.error('[UPDATE PASSWORD ERROR]:', err)
-    throw createError({ statusCode: 401, statusMessage: 'Invalid or expired session.' })
-  }
+  const passwordHash = bcrypt.hashSync(newPassword, 12)
+  await queryPg(
+    `UPDATE public.users
+        SET password_hash = $1, session_version = session_version + 1, updated_at = now()
+      WHERE id = $2`,
+    [passwordHash, user.id]
+  )
+  clearDashboardSession(event)
+  return { success: true, message: 'Password updated. Sign in again on this device.' }
 })

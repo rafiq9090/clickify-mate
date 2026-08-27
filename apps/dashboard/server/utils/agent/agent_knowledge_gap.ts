@@ -130,10 +130,10 @@ export async function recordKnowledgeGap(gap: {
                     created_at: new Date().toISOString(),
                     last_asked_at: new Date().toISOString()
                 })
-
-            console.log(`[KNOWLEDGE CLUSTER]: Quietly detected new topic "${topic}" for Agent ${gap.agentId} (Frequency: 1)`)
         }
     } catch (err: any) {
-        console.warn(`[KNOWLEDGE GAP WARN]: ${err.message}`)
+        if (err?.message) {
+            console.warn(`[KNOWLEDGE GAP WARN]: ${err.message}`)
+        }
     }
 }

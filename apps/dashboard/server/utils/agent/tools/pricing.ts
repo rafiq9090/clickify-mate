@@ -1,4 +1,4 @@
-import { getMockInventory } from '../../mock_shop'
+import { listCatalogForAgent } from '../../catalog-store'
 
 export interface PriceCalculationResult {
     sku: string
@@ -17,21 +17,29 @@ export interface PriceCalculationResult {
 }
 
 export async function getCurrentPrice(args: {
+    agentId?: string
     sku?: string
     quantity?: number
     couponCode?: string
 }): Promise<PriceCalculationResult> {
-    const catalog = getMockInventory()
+    const catalog = args.agentId ? await listCatalogForAgent(args.agentId) : []
     const targetSku = (args.sku || '').toLowerCase().trim()
     const quantity = Math.max(1, args.quantity || 1)
 
     const product = catalog.find((p: any) =>
         (p.sku && p.sku.toLowerCase() === targetSku) ||
         (p.name && p.name.toLowerCase().includes(targetSku))
-    ) || catalog[0]
+    )
 
-    const unitRegularPrice = product?.regular_price || product?.price || 1200
-    const unitOfferPrice = product?.price || 1000
+    if (!product) {
+        throw new Error(`Product "${args.sku || 'unknown'}" was not found in this agent's catalog.`)
+    }
+
+    const unitRegularPrice = Number(product.regular_price ?? product.price)
+    const unitOfferPrice = Number(product.price)
+    if (!Number.isFinite(unitOfferPrice) || unitOfferPrice < 0) {
+        throw new Error(`Product "${product.name || product.sku}" does not have a valid price.`)
+    }
     const rawSubtotal = unitOfferPrice * quantity
 
     let discountPercent = 0
@@ -69,12 +77,12 @@ export async function getCurrentPrice(args: {
     const finalItemTotal = rawSubtotal - discountAmount
 
     const explanation = discountAmount > 0
-        ? `${product?.name || 'Product'} (${quantity} pcs): ৳${unitOfferPrice} x ${quantity} = ৳${rawSubtotal}. Applied ${appliedOffer || 'discount'} (-৳${discountAmount}). Final Total: ৳${finalItemTotal} BDT.${couponNote ? ` Note: ${couponNote}` : ''}`
-        : `${product?.name || 'Product'} (${quantity} pcs): ৳${unitOfferPrice} x ${quantity} = ৳${finalItemTotal} BDT.`
+        ? `${product.name || 'Product'} (${quantity} pcs): ৳${unitOfferPrice} x ${quantity} = ৳${rawSubtotal}. Applied ${appliedOffer || 'discount'} (-৳${discountAmount}). Final Total: ৳${finalItemTotal} BDT.${couponNote ? ` Note: ${couponNote}` : ''}`
+        : `${product.name || 'Product'} (${quantity} pcs): ৳${unitOfferPrice} x ${quantity} = ৳${finalItemTotal} BDT.`
 
     return {
-        sku: product?.sku || 'unknown',
-        productName: product?.name || 'Item',
+        sku: product.sku || args.sku || 'unknown',
+        productName: product.name || 'Item',
         unitRegularPrice,
         unitPrice: unitOfferPrice,
         quantity,

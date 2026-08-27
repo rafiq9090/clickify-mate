@@ -2,6 +2,7 @@ import type { AgentContext, AgentUnderstanding, AgentResult } from './agent_type
 import { checkInventory } from './tools/inventory'
 import { getCurrentPrice } from './tools/pricing'
 import { saveFsmState } from './agent_fsm'
+import { buildProgressReply, collectedDetailsForSave, getMissingOrderField } from './agent_dialogue'
 
 export async function runConversationRepair(
     context: AgentContext,
@@ -23,7 +24,7 @@ export async function runConversationRepair(
     let clarificationReply = ''
 
     if (errorType === 'WRONG_PRICE') {
-        const priceData = await getCurrentPrice({ sku: targetSku, quantity: context.selection.quantity || 1 })
+        const priceData = await getCurrentPrice({ agentId: context.agentId, sku: targetSku, quantity: context.selection.quantity || 1 })
         const unitPriceStr = priceData.unitPrice.toString()
 
         // Structured check: did system price already equal customer's expected price?
@@ -39,7 +40,7 @@ export async function runConversationRepair(
             clarificationReply = `দুঃখিত, তথ্যে একটু বিভ্রান্তি হয়েছিল। আমাদের ${priceData.productName}-এর বর্তমান অফার প্রাইস ৳${priceData.unitPrice}। আপনি কি এটি অর্ডার করতে চান?`
         }
     } else if (errorType === 'WRONG_STOCK' || errorType === 'WRONG_VARIANT') {
-        const stockData = await checkInventory({ sku: targetSku, color: targetColor, size: targetSize })
+        const stockData = await checkInventory({ agentId: context.agentId, sku: targetSku, color: targetColor, size: targetSize })
 
         // Structured check: was customer's desired color/variant ALREADY in the active selection?
         const alreadyMatched = (currentSelectedColor && currentSelectedColor === claimColor) ||
@@ -57,15 +58,24 @@ export async function runConversationRepair(
             clarificationReply = `জি বুঝতে পেরেছি। আপনি ${targetColor || ''} চেয়েছেন, তবে এই মুহূর্তে ${targetColor || ''} স্টকে সীমিত। অন্য কোনো কালার দেখতে চান কি?`
         }
     } else {
-        clarificationReply = `জি বুঝতে পেরেছি। আপনার তথ্যটি আপডেট করে নেওয়া হয়েছে। অর্ডারটি কীভাবে সম্পন্ন করতে সাহায্য করতে পারি?`
+        const lower = (understanding.rawSummary || '').toLowerCase()
+        const missing = getMissingOrderField(context)
+        if (context.orderDraft?.address && /(thikana|ঠিকানা|address)/i.test(lower)) {
+            clarificationReply = `আপনি ঠিক বলেছেন—আপনার ঠিকানা “${context.orderDraft.address}” আগে থেকেই সংরক্ষিত আছে। ${missing ? buildProgressReply(context, missing) : 'অর্ডারের প্রয়োজনীয় তথ্য সম্পূর্ণ আছে।'}`
+        } else if (context.orderDraft?.phone && /(phone|mobile|number|ফোন|মোবাইল|নম্বর)/i.test(lower)) {
+            clarificationReply = `আপনি ঠিক বলেছেন—আপনার মোবাইল নম্বর আগে থেকেই সংরক্ষিত আছে। ${missing ? buildProgressReply(context, missing) : 'অর্ডারের প্রয়োজনীয় তথ্য সম্পূর্ণ আছে।'}`
+        } else {
+            clarificationReply = `দুঃখিত, আগের উত্তরটি আপনার কথার সাথে মিলেনি। ${missing ? buildProgressReply(context, missing) : 'আপনি কোন তথ্যটি ঠিক করতে চান, সংক্ষেপে বলুন।'}`
+        }
     }
 
     // Restore previous valid state so flow does not restart
-    const restoredState = context.session.previousValidState || 'VARIANT_SELECTION'
+    const restoredState = context.session.state === 'REPAIR'
+        ? (context.session.previousValidState || 'VARIANT_SELECTION')
+        : context.session.state
     await saveFsmState(context.agentId, context.customerId, restoredState, restoredState, {
-        ...(understanding.entities.color ? { color: understanding.entities.color } : {}),
-        ...(understanding.entities.size ? { size: understanding.entities.size } : {})
-    })
+        ...collectedDetailsForSave(context, understanding.entities)
+    }, context.channel)
 
     return {
         text: clarificationReply,

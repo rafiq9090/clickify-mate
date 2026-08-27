@@ -1,3 +1,5 @@
+import { useSupabaseAdmin } from '../../supabase'
+
 export interface CustomerProfileResult {
     id: string
     name?: string
@@ -9,9 +11,13 @@ export interface CustomerProfileResult {
 
 export async function getCustomerProfile(args: {
     customerId: string
-    agentId?: string
+    agentId: string
+    channel?: string
     phone?: string
 }): Promise<CustomerProfileResult> {
+    if (!args.agentId) {
+        throw new Error('Agent context is required to load a customer profile safely.')
+    }
     const supabase = useSupabaseAdmin()
     let name = ''
     let phone = args.phone || ''
@@ -20,9 +26,14 @@ export async function getCustomerProfile(args: {
     let lastOrder: any = null
 
     if (supabase && supabase.from) {
-        let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
+        const channel = args.channel || 'telegram'
+        let query = supabase
+            .from('leads')
+            .select('*')
+            .eq('data->>agent_id', args.agentId)
+            .order('created_at', { ascending: false })
         if (args.customerId) {
-            const emailKey = `${args.customerId}@telegram.org`
+            const emailKey = `${args.customerId}@${channel}.org`
             query = query.eq('email', emailKey)
         }
 

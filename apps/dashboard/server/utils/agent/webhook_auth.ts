@@ -20,8 +20,9 @@ export function verifyMetaSignature(
     const secret = typeof rawSecret === 'string' ? rawSecret : undefined
 
     if (!secret) {
-        // In local development/sandbox mode when app secret isn't set, permit with notice
-        return { isValid: true, reason: 'META_APP_SECRET not configured (Permissive Sandbox Mode)' }
+        return process.env.NODE_ENV === 'production'
+            ? { isValid: false, reason: 'META_APP_SECRET is required in production' }
+            : { isValid: true, reason: 'META_APP_SECRET not configured (development only)' }
     }
 
     const signatureHeader = getHeader(event, 'x-hub-signature-256') || getHeader(event, 'X-Hub-Signature-256')
@@ -65,7 +66,9 @@ export function verifyTelegramSecret(
     const secret = typeof rawSecret === 'string' ? rawSecret : undefined
 
     if (!secret) {
-        return { isValid: true, reason: 'TELEGRAM_WEBHOOK_SECRET not configured (Permissive Mode)' }
+        return process.env.NODE_ENV === 'production'
+            ? { isValid: false, reason: 'TELEGRAM_WEBHOOK_SECRET is required in production' }
+            : { isValid: true, reason: 'TELEGRAM_WEBHOOK_SECRET not configured (development only)' }
     }
 
     const incomingToken = getHeader(event, 'x-telegram-bot-api-secret-token') || getHeader(event, 'X-Telegram-Bot-Api-Secret-Token')

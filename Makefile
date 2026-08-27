@@ -36,4 +36,3 @@ observability-down:
 
 observability-logs:
 	docker compose logs -f loki promtail prometheus alertmanager grafana
-

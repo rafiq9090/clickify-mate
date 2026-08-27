@@ -1,11 +1,13 @@
 import type { IncomingAgentEvent, AgentContext, ConversationState } from './agent_types'
-import { getMockInventory } from '../mock_shop'
+import { listCatalogForAgent, shopIdForAgent } from '../catalog-store'
+import { useSupabaseAdmin } from '../supabase'
 
 export async function buildAgentContext(
     event: IncomingAgentEvent,
     agent: any
 ): Promise<AgentContext> {
     const supabase = useSupabaseAdmin()
+    const shopId = await shopIdForAgent(agent.id)
 
     // 1. Fetch latest lead state if exists
     let currentState: ConversationState = 'SALES_INQUIRING'
@@ -18,17 +20,17 @@ export async function buildAgentContext(
 
     if (supabase && supabase.from) {
         const emailKey = `${event.customerId}@${event.channel || 'telegram'}.org`
-        const { data: lead } = await supabase
+        const { data: leads } = await supabase
             .from('leads')
             .select('*')
             .eq('email', emailKey)
+            .eq('data->>agent_id', agent.id)
             .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
 
-        if (lead) {
+        if (Array.isArray(leads) && leads.length > 0) {
+            const lead = leads[0]
             leadId = lead.id
-            aiDisabled = lead.data?.ai_disabled === true
+            aiDisabled = leads.some(l => l.data?.ai_disabled === true)
             currentState = (lead.data?.current_state as ConversationState) || 'SALES_INQUIRING'
             previousValidState = (lead.data?.previous_valid_state as ConversationState) || currentState
             collectedDetails = lead.data?.collected_details || {}
@@ -37,7 +39,7 @@ export async function buildAgentContext(
         }
     }
 
-    // 2. Fetch last 8 recent messages for working memory
+    // 2. Fetch last 25 recent messages for rich conversational memory
     const recentMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string; created_at?: string }> = []
     if (supabase && supabase.from) {
         const { data: history } = await supabase
@@ -46,11 +48,16 @@ export async function buildAgentContext(
             .eq('agent_id', agent.id)
             .eq('user_external_id', event.customerId)
             .order('created_at', { ascending: false })
-            .limit(8)
+            .limit(25)
 
         if (Array.isArray(history)) {
-            // Reverse so oldest of recent is first
-            for (const h of history.reverse()) {
+            // Sort ascending chronologically
+            const sortedHistory = [...history].sort((a: any, b: any) => {
+                const timeA = new Date(a.created_at || 0).getTime()
+                const timeB = new Date(b.created_at || 0).getTime()
+                return timeA - timeB
+            })
+            for (const h of sortedHistory) {
                 if (h.role === 'user' || h.role === 'assistant') {
                     recentMessages.push({
                         role: h.role,
@@ -59,21 +66,32 @@ export async function buildAgentContext(
                     })
                 }
             }
+
+            // Messenger/WhatsApp persist the incoming message before invoking the
+            // agent, while Telegram/Instagram persist it afterward. Remove only an
+            // exact latest copy so every channel presents the current turn once.
+            const latest = recentMessages[recentMessages.length - 1]
+            if (latest?.role === 'user' &&
+                latest.content.trim() === String(event.text || '').trim()) {
+                recentMessages.pop()
+            }
         }
     }
 
     // 3. Catalog context
-    const catalog = getMockInventory()
+    const catalog = await listCatalogForAgent(agent.id)
     const assignedProducts = catalog.filter((p: any) =>
         !p.assigned_agent || p.assigned_agent === 'all' || p.assigned_agent === agent.id
     )
 
     return {
         agentId: agent.id,
+        shopId: shopId || undefined,
         channel: event.channel,
         customerId: event.customerId,
         customerName: event.customerName,
         customerAvatar: event.customerAvatar,
+        aiDisabled,
         customer: {
             id: event.customerId,
             name: event.customerName,
@@ -85,7 +103,10 @@ export async function buildAgentContext(
             previousValidState,
             leadId,
             aiDisabled,
-            checkoutToken: collectedDetails.checkout_token || ('chk_' + Math.random().toString(36).slice(2, 9))
+            checkoutToken: collectedDetails.checkout_token || ('chk_' + Math.random().toString(36).slice(2, 9)),
+            lastPresentedOptions: collectedDetails.last_presented_options || {},
+            lastAskedField: collectedDetails.last_asked_field,
+            fallbackCount: Number(collectedDetails.fallback_count || 0)
         },
         selection: {
             sku: collectedDetails.sku || collectedDetails.product,
@@ -95,27 +116,30 @@ export async function buildAgentContext(
             quantity: collectedDetails.quantity ? Number(collectedDetails.quantity) : 1,
             price: collectedDetails.price ? Number(collectedDetails.price) : undefined
         },
+        previousSelection: collectedDetails.previous_selection || undefined,
         orderDraft: {
             name: collectedDetails.name || event.customerName,
             phone: collectedDetails.phone || customerPhone,
             address: collectedDetails.address || customerAddress,
             district: collectedDetails.district,
             sku: collectedDetails.sku || collectedDetails.product,
+            productName: collectedDetails.productName,
             color: collectedDetails.color,
             size: collectedDetails.size,
             quantity: collectedDetails.quantity ? Number(collectedDetails.quantity) : 1,
             unitPrice: collectedDetails.unitPrice || collectedDetails.price,
             deliveryFee: collectedDetails.delivery_fee,
             total: collectedDetails.total,
-            trxId: collectedDetails.trxId || collectedDetails.PaymentTransactionId
+            trxId: collectedDetails.trxId || collectedDetails.PaymentTransactionId,
+            paymentMethod: collectedDetails.paymentMethod || collectedDetails.payment_method
         },
         recentMessages,
         agentConfig: {
             name: agent.name,
-            businessName: agent.business_name || agent.name,
-            tone: agent.tone || 'Friendly and professional in Bengali & Banglish',
-            knowledge: agent.prompt || '',
-            orderForm: agent.order_form || '',
+            businessName: agent.agent_behavior?.business_name || (/^(?:mess|faceb|fb|telegr|tg|whats|wa|insta|ig|direct|agent|bot)/i.test(String(agent.name || '').trim()) ? '' : agent.name) || '',
+            tone: agent.agent_behavior?.tone || agent.agent_behavior?.personality || 'Friendly and professional in Bengali & Banglish',
+            knowledge: agent.knowledge || '',
+            orderForm: agent.agent_behavior?.order_form || '',
             catalog: assignedProducts
         }
     }

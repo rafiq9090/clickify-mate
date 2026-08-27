@@ -1,6 +1,7 @@
 import { useSupabaseAdmin } from '../../utils/supabase'
 
 export default defineEventHandler(async (event) => {
+    requireAdminSession(event)
     const supabase = useSupabaseAdmin()
     if (!supabase || !supabase.from) {
         return { success: false, data: [] }

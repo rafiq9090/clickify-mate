@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sha2::{Digest, Sha256};
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -34,8 +35,14 @@ impl ImageVerifier for ImageVerifierService {
             }));
         }
 
+        // Refuse oversized input before base64 decoding to prevent memory exhaustion.
+        const MAX_BASE64_BYTES: usize = 20 * 1024 * 1024;
+        if req.image_base64.len() > MAX_BASE64_BYTES {
+            return Err(Status::resource_exhausted("Image payload exceeds the 15 MB decoded limit"));
+        }
+
         // 1. Decode base64 image data
-        let image_bytes = match base64::decode(&req.image_base64) {
+        let image_bytes = match STANDARD.decode(&req.image_base64) {
             Ok(bytes) => bytes,
             Err(e) => {
                 return Ok(Response::new(VerifyResponse {
@@ -57,21 +64,16 @@ impl ImageVerifier for ImageVerifierService {
 
         println!("[VERIFIER] Cryptographic fingerprint calculated: {}", hash_sig);
 
-        // 3. Extract transaction details (Mocking OCR detection logic)
-        let transaction_id = format!("TXN{}", hash_sig[0..10].to_uppercase());
-        let amount_detected = req.expected_amount;
-
-        println!(
-            "[VERIFIER] Success. Extracted TxID: {}, Amount: ৳{}",
-            transaction_id, amount_detected
-        );
-
+        // Screenshot content is not authoritative payment evidence. A cryptographic
+        // fingerprint can prevent exact-file replay, but it cannot prove that the
+        // provider transaction exists, belongs to this merchant, or has the right
+        // amount. Hosted checkout callbacks must be verified through the provider API.
         Ok(Response::new(VerifyResponse {
-            is_valid: true,
-            transaction_id,
-            amount_detected,
+            is_valid: false,
+            transaction_id: "".to_string(),
+            amount_detected: 0.0,
             hash_signature: hash_sig,
-            error_message: "".to_string(),
+            error_message: "Screenshot proof requires human review; use hosted checkout provider verification.".to_string(),
         }))
     }
 }

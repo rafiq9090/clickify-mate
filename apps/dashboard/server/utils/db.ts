@@ -1,9 +1,15 @@
 import pg from 'pg'
 import { MongoClient } from 'mongodb'
 
-// Read database URLs from environment or use local Docker defaults
-const POSTGRES_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgrespassword@localhost:5432/clickify_mate'
-const MONGODB_URL = process.env.MONGODB_URL || 'mongodb://admin:adminpassword@localhost:27017/clickify_mate?authSource=admin'
+function databaseUrl(name: 'DATABASE_URL' | 'MONGODB_URL', developmentFallback: string) {
+  const configured = process.env[name]
+  if (configured) return configured
+  if (process.env.NODE_ENV === 'production') throw new Error(`${name} is required in production.`)
+  return developmentFallback
+}
+
+const POSTGRES_URL = databaseUrl('DATABASE_URL', 'postgresql://postgres@localhost:5432/clickify_mate')
+const MONGODB_URL = databaseUrl('MONGODB_URL', 'mongodb://localhost:27017/clickify_mate')
 
 // Extend global namespace to cache pools in development HMR
 declare global {
@@ -27,6 +33,23 @@ export async function queryPg(text: string, params?: any[]) {
   const res = await pool.query(text, params)
   const duration = Date.now() - start
   return res
+}
+
+export async function withPgTransaction<T>(
+  callback: (client: pg.PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await callback(client)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 // Initialize MongoDB Client

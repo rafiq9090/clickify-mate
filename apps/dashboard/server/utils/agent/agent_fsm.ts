@@ -1,4 +1,4 @@
-import type { ConversationState, AgentContext } from './agent_types'
+import type { AgentChannel, ConversationState } from './agent_types'
 import { useSupabaseAdmin } from '../supabase'
 
 export function computeNextState(
@@ -25,9 +25,14 @@ export function computeNextState(
         }
     }
 
-    // 2. Complaint / Support
-    if (event.isComplaint) {
+    // 2. Complaint / Support / Human Handoff
+    if (event.isComplaint || event.intent === 'HUMAN_HANDOFF' || event.intent === 'HUMAN_REQUEST') {
         return { nextState: 'SUPPORT', previousValidState: currentState }
+    }
+
+    // 2.1 Switch Back to Previous Product Selection
+    if (event.intent === 'SWITCH_BACK') {
+        return { nextState: 'VARIANT_SELECTION', previousValidState: currentState }
     }
 
     // 3. Greeting: Greetings are conversational interrupts, NEVER overwrite business state!
@@ -35,21 +40,21 @@ export function computeNextState(
         return { nextState: currentState, previousValidState: currentState }
     }
 
-    // 4. Temporary Product / Stock / Delivery / Image Inquiries (Interruptible Inquiries)
+    // 4. Product / Stock / Delivery / Image Inquiries (Pure Discovery & Consultation)
+    // Never force customer into checkout collection when they are simply inquiring!
     if (
         event.intent === 'PRODUCT_DISCOVERY' ||
         event.intent === 'PRICE_QUERY' ||
         event.intent === 'STOCK_QUERY' ||
         event.intent === 'DELIVERY_QUERY' ||
-        event.intent === 'IMAGE_REQUEST'
+        event.intent === 'IMAGE_REQUEST' ||
+        event.intent === 'OUT_OF_CATALOG'
     ) {
         if (currentState === 'ORDER_CONFIRMED' || currentState === 'COMPLETED') {
-            // Keep business state intact while answering inquiry
             return { nextState: currentState, previousValidState: currentState }
         }
-        // If in middle of checkout, preserve the checkout state in previousValidState
         return {
-            nextState: currentState === 'SALES_INQUIRING' ? 'PRODUCT_DISCOVERY' : currentState,
+            nextState: 'PRODUCT_DISCOVERY',
             previousValidState: currentState
         }
     }
@@ -91,17 +96,19 @@ export async function saveFsmState(
     customerId: string,
     state: ConversationState,
     previousValidState?: ConversationState,
-    collectedDetails?: Record<string, any>
+    collectedDetails?: Record<string, any>,
+    channel: AgentChannel = 'telegram'
 ): Promise<void> {
     const supabase = useSupabaseAdmin()
     if (!supabase || !supabase.from) return
 
     try {
-        const emailKey = `${customerId}@telegram.org`
+        const emailKey = `${customerId}@${channel}.org`
         const { data: existing } = await supabase
             .from('leads')
             .select('id, data')
             .eq('email', emailKey)
+            .eq('data->>agent_id', agentId)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
@@ -110,6 +117,7 @@ export async function saveFsmState(
             ...(existing?.data || {}),
             customer: customerId,
             agent_id: agentId,
+            platform: channel,
             current_state: state,
             previous_valid_state: previousValidState || existing?.data?.previous_valid_state || state,
             collected_details: {

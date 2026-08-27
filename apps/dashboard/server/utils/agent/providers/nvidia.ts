@@ -4,7 +4,7 @@ import { getApiKey } from '../../settings'
 
 export class NvidiaModelProvider implements AgentModelProvider {
     name = 'nvidia'
-    private defaultModel = 'meta/llama-3.3-70b-instruct'
+    private defaultModel = 'meta/llama-3.1-8b-instruct'
 
     private async getNvidiaKey(): Promise<string> {
         const envKey = process.env.NVIDIA_API_KEY
@@ -36,7 +36,7 @@ export class NvidiaModelProvider implements AgentModelProvider {
                     'Content-Type': 'application/json'
                 },
                 body,
-                timeout: 7000
+                timeout: 15000
             })
 
             const choice = res.choices?.[0]
@@ -105,7 +105,7 @@ export class NvidiaModelProvider implements AgentModelProvider {
                     'Content-Type': 'application/json'
                 },
                 body,
-                timeout: 7000
+                timeout: 15000
             })
 
             const choice = res.choices?.[0]

@@ -1,22 +1,25 @@
 // server/utils/backblaze.ts
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 
-const B2_KEY_ID = process.env.B2_KEY_ID || '00582640740723d0000000002'
-const B2_APPLICATION_KEY = process.env.B2_APPLICATION_KEY || 'K005JA/ABftkByPHc3Ee8vOJJQQtZ/o'
-const B2_BUCKET_NAME = process.env.B2_BUCKET_NAME || 'agent-chat-store'
+const B2_BUCKET_NAME = process.env.B2_BUCKET_NAME || ''
 const B2_REGION = process.env.B2_REGION || 'us-east-005'
 const B2_ENDPOINT = process.env.B2_ENDPOINT || `https://s3.${B2_REGION}.backblazeb2.com`
 
 let s3Client: S3Client | null = null
 
 export const getB2Client = () => {
+  const keyId = process.env.B2_KEY_ID
+  const applicationKey = process.env.B2_APPLICATION_KEY
+  if (!keyId || !applicationKey || !B2_BUCKET_NAME) {
+    throw new Error('Backblaze B2 storage is not configured.')
+  }
   if (!s3Client) {
     s3Client = new S3Client({
       endpoint: process.env.B2_ENDPOINT || B2_ENDPOINT,
       region: process.env.B2_REGION || B2_REGION,
       credentials: {
-        accessKeyId: process.env.B2_KEY_ID || B2_KEY_ID,
-        secretAccessKey: process.env.B2_APPLICATION_KEY || B2_APPLICATION_KEY
+        accessKeyId: keyId,
+        secretAccessKey: applicationKey
       }
     })
   }
@@ -47,6 +50,7 @@ export async function uploadToBackblaze(
   const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
   const key = `${folder}/${Date.now()}_${sanitizedName}`
   const bucket = process.env.B2_BUCKET_NAME || B2_BUCKET_NAME
+  if (!bucket) throw new Error('Backblaze B2 bucket is not configured.')
   const region = process.env.B2_REGION || B2_REGION
 
   const command = new PutObjectCommand({
@@ -79,6 +83,7 @@ export async function uploadToBackblaze(
 export async function getFileFromBackblaze(key: string) {
   const client = getB2Client()
   const bucket = process.env.B2_BUCKET_NAME || B2_BUCKET_NAME
+  if (!bucket) throw new Error('Backblaze B2 bucket is not configured.')
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: key

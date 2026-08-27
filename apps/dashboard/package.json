@@ -7,6 +7,8 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "typecheck": "nuxi typecheck",
+    "test": "node --require ./scripts/node-userinfo-polyfill.cjs --import tsx --test server/utils/payments/payment-providers.test.ts server/utils/security/security.test.ts server/utils/agent/rag/rag.test.ts server/utils/agent/agent_dialogue.test.ts server/utils/agent/providers/router.test.ts server/api/agents/instagram.test.ts server/utils/agent/subagents/subagents.test.ts",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
@@ -20,8 +22,9 @@
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "mongodb": "^7.3.0",
-    "nuxt": "^4.4.2",
+    "nuxt": "^4.5.2",
     "pg": "^8.22.0",
+    "rolldown": "~1.2.1",
     "vue": "^3.5.30",
     "vue-router": "^5.0.4",
     "vue3-emoji-picker": "^1.1.8",
@@ -32,6 +35,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.5.0",
     "@types/pg": "^8.20.0",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "vue-tsc": "^3.3.11"
   }
 }
