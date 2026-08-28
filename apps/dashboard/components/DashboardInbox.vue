@@ -38,9 +38,17 @@
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-base">search</span>
             <input 
               v-model="searchQuery" 
-              placeholder="Search customer name or ID..." 
-              class="w-full h-9 pl-8 pr-3 bg-surface-hover border border-outline rounded-xl text-xs text-on-surface outline-none focus:border-primary/50 transition-colors placeholder:text-on-surface-variant/50"
+              placeholder="Search customer name, phone, message or ID..." 
+              class="w-full h-9 pl-8 pr-8 bg-surface-hover border border-outline rounded-xl text-xs text-on-surface outline-none focus:border-primary/50 transition-colors placeholder:text-on-surface-variant/50"
             />
+            <button 
+              v-if="searchQuery"
+              @click="searchQuery = ''"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant/50 hover:text-on-surface p-0.5 rounded cursor-pointer transition-colors"
+              title="Clear search"
+            >
+              <span class="material-symbols-outlined text-xs">close</span>
+            </button>
           </div>
 
           <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
@@ -847,13 +855,19 @@ const selectThread = (thread) => {
 
 const filteredThreads = computed(() => {
   return threads.value.filter(t => {
-    const q = searchQuery.value.toLowerCase()
-    const matchSearch = q 
-      ? t.user_external_id.toLowerCase().includes(q) || 
-        (t.customer_name && t.customer_name.toLowerCase().includes(q)) || 
-        t.last_message.toLowerCase().includes(q)
-      : true
-    const matchPlatform = activePlatform.value === 'all' || t.platform.toLowerCase() === activePlatform.value.toLowerCase()
+    const q = (searchQuery.value || '').trim().toLowerCase()
+    const matchSearch = !q || (
+      (t.user_external_id || '').toLowerCase().includes(q) ||
+      (t.customer_name && t.customer_name.toLowerCase().includes(q)) ||
+      (t.last_message && t.last_message.toLowerCase().includes(q)) ||
+      (t.messages && t.messages.some(m => (m.content || '').toLowerCase().includes(q)))
+    )
+    const platformNorm = (t.platform || '').toLowerCase()
+    const activeNorm = activePlatform.value.toLowerCase()
+    const matchPlatform = activeNorm === 'all' || 
+      platformNorm === activeNorm ||
+      (activeNorm === 'facebook' && (platformNorm === 'messenger' || platformNorm === 'facebook')) ||
+      (activeNorm === 'instagram' && (platformNorm === 'instagram' || platformNorm === 'ig_comment'))
     return matchSearch && matchPlatform
   })
 })

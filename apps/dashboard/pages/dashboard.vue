@@ -377,19 +377,8 @@
           :key="'integrations'"
           :integrations="integrations"
           :savingIntegrations="savingIntegrations"
-          :mockInventory="mockInventory"
-          :loadingInventory="loadingInventory"
-          :savingInventory="savingInventory"
-          :apiKeys="apiKeys"
-          :generatingApiKey="generatingApiKey"
           @update:integration-field="({ field, value }) => integrations[field] = value"
           @save-integrations="saveIntegrations"
-          @generate-api-key="generateNewApiKey"
-          @delete-api-key="deleteApiKey"
-          @save-inventory="saveInventory"
-          @reset-inventory="resetToDefaultInventory"
-          @add-product="addProduct"
-          @remove-product="removeProduct"
           @copy-text="copyText"
           @switch-tab="val => currentMenu = val"
         />
@@ -1923,59 +1912,20 @@ const saveIntegrations = async () => {
         ...agent.agent_behavior,
         ...integrations
       }
-      await supabase.from('agent_configs').update({ agent_behavior: updatedBehavior }).eq('id', agent.id)
+      await $fetch('/api/agents/update', {
+        method: 'POST',
+        body: {
+          agentId: agent.id,
+          agentBehavior: updatedBehavior
+        }
+      })
       agent.agent_behavior = updatedBehavior
     }
-    showToast('Integration credentials saved', 'success')
+    showToast('Integration & Courier credentials saved successfully', 'success')
   } catch (e) {
-    showToast('Save failed: ' + e.message, 'error')
+    showToast('Save failed: ' + (e.data?.statusMessage || e.message), 'error')
   } finally {
     savingIntegrations.value = false
-  }
-}
-
-const fetchApiKeys = async () => {
-  try {
-    const { data } = await supabase.from('user_api_keys').select('*').order('created_at', { ascending: false })
-    apiKeys.value = data || []
-  } catch (e) {
-    console.error('Failed to fetch API keys:', e)
-  }
-}
-
-const generateNewApiKey = async () => {
-  generatingApiKey.value = true
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const randomKey = 'ck_' + Array.from(crypto.getRandomValues(new Uint8Array(20)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-
-    const { error } = await supabase.from('user_api_keys').insert({
-      user_id: user.id,
-      key_value: randomKey,
-      name: `API Key - ${new Date().toLocaleDateString()}`
-    })
-
-    if (error) throw error
-    showToast('New Developer API Key generated', 'success')
-    await fetchApiKeys()
-  } catch (e) {
-    showToast('Failed to generate key: ' + e.message, 'error')
-  } finally {
-    generatingApiKey.value = false
-  }
-}
-
-const deleteApiKey = async (id) => {
-  try {
-    await supabase.from('user_api_keys').delete().eq('id', id)
-    showToast('API Key revoked', 'info')
-    await fetchApiKeys()
-  } catch (e) {
-    showToast('Failed to delete key: ' + e.message, 'error')
   }
 }
 

@@ -84,7 +84,26 @@ export async function buildAgentContext(
         !p.assigned_agent || p.assigned_agent === 'all' || p.assigned_agent === agent.id
     )
 
-    return {
+        // Match product from Facebook / Instagram post context if customer has not selected one yet
+        let resolvedSku = collectedDetails.sku || collectedDetails.product
+        let resolvedProductName = collectedDetails.productName
+        let resolvedPrice = collectedDetails.price ? Number(collectedDetails.price) : undefined
+
+        if (!resolvedSku && event.postContext?.postCaption && assignedProducts.length > 0) {
+            const captionLower = event.postContext.postCaption.toLowerCase()
+            const matched = assignedProducts.find((p: any) => {
+                const nameLower = (p.name || '').toLowerCase()
+                const skuLower = (p.sku || '').toLowerCase()
+                return (nameLower && captionLower.includes(nameLower)) || (skuLower && captionLower.includes(skuLower))
+            })
+            if (matched) {
+                resolvedSku = matched.sku || matched.name
+                resolvedProductName = matched.name
+                resolvedPrice = matched.price
+            }
+        }
+
+        return {
         agentId: agent.id,
         shopId: shopId || undefined,
         channel: event.channel,
@@ -109,12 +128,12 @@ export async function buildAgentContext(
             fallbackCount: Number(collectedDetails.fallback_count || 0)
         },
         selection: {
-            sku: collectedDetails.sku || collectedDetails.product,
-            productName: collectedDetails.productName,
+            sku: resolvedSku,
+            productName: resolvedProductName,
             color: collectedDetails.color,
             size: collectedDetails.size,
             quantity: collectedDetails.quantity ? Number(collectedDetails.quantity) : 1,
-            price: collectedDetails.price ? Number(collectedDetails.price) : undefined
+            price: resolvedPrice
         },
         previousSelection: collectedDetails.previous_selection || undefined,
         orderDraft: {
@@ -122,12 +141,12 @@ export async function buildAgentContext(
             phone: collectedDetails.phone || customerPhone,
             address: collectedDetails.address || customerAddress,
             district: collectedDetails.district,
-            sku: collectedDetails.sku || collectedDetails.product,
-            productName: collectedDetails.productName,
+            sku: resolvedSku,
+            productName: resolvedProductName,
             color: collectedDetails.color,
             size: collectedDetails.size,
             quantity: collectedDetails.quantity ? Number(collectedDetails.quantity) : 1,
-            unitPrice: collectedDetails.unitPrice || collectedDetails.price,
+            unitPrice: resolvedPrice || collectedDetails.unitPrice,
             deliveryFee: collectedDetails.delivery_fee,
             total: collectedDetails.total,
             trxId: collectedDetails.trxId || collectedDetails.PaymentTransactionId,

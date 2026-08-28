@@ -292,20 +292,68 @@
           <!-- Tab Content: Behavior & Settings -->
           <div v-show="agent.activeCardTab === 'behavior'" class="mb-4 space-y-3.5">
             <!-- Facebook specific options -->
-            <div v-if="agent.platform === 'fb_comment'" class="space-y-2 text-xs">
-              <span class="font-semibold text-on-surface block pb-1 border-b border-outline/40">Comment Automations</span>
-              <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
-                <input type="checkbox" v-model="agent.agent_behavior.fb_private_reply_prices" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
-                <span>Auto-DM prices to comments</span>
-              </label>
-              <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
-                <input type="checkbox" v-model="agent.agent_behavior.fb_public_reply_enabled" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
-                <span>Enable public replies on comments</span>
-              </label>
-              <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
-                <input type="checkbox" v-model="agent.agent_behavior.fb_delete_negatives" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
-                <span>Auto-delete spam/negative comments</span>
-              </label>
+            <div v-if="agent.platform === 'fb_comment'" class="space-y-2.5 text-xs">
+              <span class="font-semibold text-on-surface block pb-1 border-b border-outline/40">Comment Automations &amp; Post Targeting</span>
+              
+              <!-- Post Scope Selector -->
+              <div class="space-y-1.5 pt-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-on-surface-variant font-medium">Post Targeting Scope</span>
+                  <select 
+                    v-model="agent.agent_behavior.fb_comment_scope" 
+                    @change="agent.isDirty = true"
+                    class="bg-surface-hover border border-outline rounded-lg px-2 py-1 text-[11px] text-on-surface outline-none cursor-pointer"
+                  >
+                    <option value="all_posts">All Page Posts (Auto-Detect)</option>
+                    <option value="specific_posts">Specific Post IDs Only</option>
+                    <option value="tagged_posts">Tagged Posts (Hashtag)</option>
+                  </select>
+                </div>
+
+                <!-- Specific Post IDs Input -->
+                <div v-if="agent.agent_behavior.fb_comment_scope === 'specific_posts'" class="pt-1">
+                  <input 
+                    type="text" 
+                    v-model="agent.agent_behavior.fb_target_post_ids" 
+                    @input="agent.isDirty = true"
+                    placeholder="Enter Post IDs (e.g. 10293848_4958392)"
+                    class="w-full bg-surface-hover border border-outline rounded-lg px-2.5 py-1.5 text-[11px] text-on-surface outline-none focus:border-primary/50"
+                  />
+                  <p class="text-[10px] text-on-surface-variant/70 mt-0.5">Separate multiple Post IDs with commas.</p>
+                </div>
+
+                <!-- Hashtag Trigger Input -->
+                <div v-if="agent.agent_behavior.fb_comment_scope === 'tagged_posts'" class="pt-1">
+                  <input 
+                    type="text" 
+                    v-model="agent.agent_behavior.fb_trigger_tag" 
+                    @input="agent.isDirty = true"
+                    placeholder="e.g. #order or #clickify"
+                    class="w-full bg-surface-hover border border-outline rounded-lg px-2.5 py-1.5 text-[11px] text-on-surface outline-none focus:border-primary/50"
+                  />
+                  <p class="text-[10px] text-on-surface-variant/70 mt-0.5">Bot will only reply to posts containing this tag in caption.</p>
+                </div>
+              </div>
+
+              <!-- Checkboxes -->
+              <div class="space-y-2 pt-1 border-t border-outline/30">
+                <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
+                  <input type="checkbox" v-model="agent.agent_behavior.fb_private_reply_prices" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
+                  <span>Auto-DM prices &amp; product photos to comments</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
+                  <input type="checkbox" v-model="agent.agent_behavior.fb_public_reply_enabled" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
+                  <span>Enable public replies on comments</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
+                  <input type="checkbox" v-model="agent.agent_behavior.fb_delete_negatives" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
+                  <span>Auto-delete spam/negative comments</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer text-on-surface-variant hover:text-on-surface">
+                  <input type="checkbox" v-model="agent.agent_behavior.fb_ignore_non_sales" @change="agent.isDirty = true" class="w-4 h-4 rounded text-primary border-outline focus:ring-primary/20" />
+                  <span>Ignore non-sales posts (e.g. holiday greetings)</span>
+                </label>
+              </div>
             </div>
 
             <!-- General Options -->

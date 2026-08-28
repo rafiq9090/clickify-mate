@@ -22,6 +22,11 @@ export interface IncomingAgentEvent {
         text?: string
         author?: string
     }
+    postContext?: {
+        postId?: string
+        postCaption?: string
+        matchedProduct?: string
+    }
     timestamp: number
     rawPayload?: any
 }

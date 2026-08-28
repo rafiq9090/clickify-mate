@@ -10,6 +10,24 @@ import { analyzeImage } from '../../utils/agent/vision'
 import { analyzeVideoMessage } from '../../utils/agent/video_processor'
 import { analyzeCommentToxicity } from '../../utils/agent/comment_moderator'
 
+const postCaptionCache = new Map<string, { message: string; timestamp: number }>()
+
+async function fetchFacebookPostCaption(postId: string, pageAccessToken: string): Promise<string> {
+    if (!postId || !pageAccessToken) return ''
+    const cached = postCaptionCache.get(postId)
+    if (cached && Date.now() - cached.timestamp < 1000 * 60 * 30) {
+        return cached.message
+    }
+    try {
+        const res: any = await $fetch(`https://graph.facebook.com/v19.0/${postId}?fields=message&access_token=${pageAccessToken}`)
+        const message = res?.message || ''
+        postCaptionCache.set(postId, { message, timestamp: Date.now() })
+        return message
+    } catch {
+        return ''
+    }
+}
+
 interface DownloadedMedia {
     buffer: Buffer
     contentType: string
@@ -418,7 +436,39 @@ export default defineEventHandler(async (event) => {
 
                 if (!senderId || senderId === pageId || !commentText) continue
 
-                // 🛡️ 1. Real-Time Bad / Toxic / Scam / Spam Comment Moderation
+                // 📖 Fetch & Cache Post Caption for Context Understanding
+                const postId = commentValue.post_id || commentValue.parent_id || ''
+                const postCaption = commentValue.post?.message || (await fetchFacebookPostCaption(postId, pageAccessToken))
+
+                // 🎯 1. Specific Post Targeting Scope Filters
+                const commentScope = agent.agent_behavior?.fb_comment_scope || 'all_posts'
+                if (commentScope === 'specific_posts') {
+                    const rawTargetIds = agent.agent_behavior?.fb_target_post_ids || ''
+                    const targetIds = Array.isArray(rawTargetIds)
+                        ? rawTargetIds
+                        : String(rawTargetIds).split(',').map((s: string) => s.trim()).filter(Boolean)
+                    if (targetIds.length > 0 && !targetIds.some((id: string) => postId.includes(id))) {
+                        console.log(`[FB POST SCOPE]: Skipping comment on Post ${postId} (not in specified target post IDs)`)
+                        continue
+                    }
+                } else if (commentScope === 'tagged_posts') {
+                    const triggerTag = (agent.agent_behavior?.fb_trigger_tag || '').trim().toLowerCase()
+                    if (triggerTag && !postCaption.toLowerCase().includes(triggerTag)) {
+                        console.log(`[FB POST SCOPE]: Skipping comment on Post ${postId} (missing tag "${triggerTag}")`)
+                        continue
+                    }
+                }
+
+                // 🛑 2. Ignore Non-Sales Posts Filter
+                if (agent.agent_behavior?.fb_ignore_non_sales) {
+                    const nonSalesPatterns = /(?:eid mubarak|শুভ নববর্ষ|happy new year|announcement|বিজ্ঞপ্তি|অফিস বন্ধ|holiday|winner announcement|contest winner)/i
+                    if (nonSalesPatterns.test(postCaption)) {
+                        console.log(`[FB POST SCOPE]: Skipping non-sales post: "${postCaption.slice(0, 45)}..."`)
+                        continue
+                    }
+                }
+
+                // 🛡️ 3. Real-Time Bad / Toxic / Scam / Spam Comment Moderation
                 const toxicity = analyzeCommentToxicity(commentText)
                 const shouldAutoDelete = toxicity.isBad && agent.agent_behavior?.fb_delete_negatives !== false
 
@@ -490,6 +540,11 @@ export default defineEventHandler(async (event) => {
                 let aiReply = ''
                 let sentPrivateSuccess = false
 
+                const postContext = postCaption ? { postId, postCaption } : undefined
+                const enrichedCommentText = postCaption 
+                    ? `[Customer commented on Post: "${postCaption.slice(0, 150)}"] ${commentText}`
+                    : commentText
+
                 if (containsPrivateInquiry) {
                     // Dispatch directly to Agent Engine for private response context
                     const privateEvent: IncomingAgentEvent = {
@@ -497,8 +552,10 @@ export default defineEventHandler(async (event) => {
                         eventId: `fb-comment-priv-${commentId}`,
                         customerId: senderId,
                         customerName: senderName,
+                        customerAvatar: senderAvatar,
                         messageId: commentId,
-                        text: commentText,
+                        text: enrichedCommentText,
+                        postContext,
                         timestamp: Date.now(),
                         rawPayload: commentValue
                     }
@@ -529,8 +586,10 @@ export default defineEventHandler(async (event) => {
                         eventId: `fb-comment-${commentId}`,
                         customerId: senderId,
                         customerName: senderName,
+                        customerAvatar: senderAvatar,
                         messageId: commentId,
-                        text: commentText,
+                        text: enrichedCommentText,
+                        postContext,
                         timestamp: Date.now(),
                         rawPayload: commentValue
                     }
