@@ -12,20 +12,20 @@
         </p>
       </div>
 
-      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+      <div class="flex items-center gap-2">
         <button 
           @click="$emit('switch-tab', 'catalog')"
-          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
         >
-          <span>Product Catalog</span>
+          <span>Open Product Catalog</span>
         </button>
 
         <button 
           @click="$emit('open-connect-modal')" 
-          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-all shadow-sm hover:shadow-md active:scale-98 cursor-pointer"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-all shadow-sm hover:shadow-md active:scale-98 cursor-pointer"
         >
           <span class="material-symbols-outlined text-base">add</span>
-          <span>Connect Agent</span>
+          Connect New Agent
         </button>
       </div>
     </div>
@@ -77,10 +77,10 @@
                 type="button"
                 @click="$emit('toggle-agent-status', agent)"
                 class="px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
-                :class="agent.is_active ? ' text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'"
+                :class="agent.is_active ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'"
                 :title="agent.is_active ? 'Click to Pause this Agent' : 'Click to Start / Resume this Agent'"
               >
-                <span>{{ agent.is_active ? 'Active' : 'Paused' }}</span>
+                <span>{{ agent.is_active ? 'Active (Click to Pause)' : 'Paused (Click to Start)' }}</span>
               </button>
             </div>
           </div>

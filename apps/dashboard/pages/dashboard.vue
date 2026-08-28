@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-shell h-[100dvh] min-h-0 w-full max-w-full flex flex-col md:flex-row bg-background text-on-background overflow-hidden">
+  <div class="dashboard-shell h-[100dvh] min-h-0 w-full max-w-full flex bg-background text-on-background overflow-hidden">
     <Transition name="drawer-fade">
       <button
         v-if="mobileMenuOpen"
@@ -131,6 +131,7 @@
             <div class="min-w-0">
               <p class="text-xs font-semibold text-on-surface truncate" :title="userEmail">{{ userEmail || 'Account' }}</p>
               <span class="text-[10px] text-emerald-500 font-medium flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                 Standard Plan
               </span>
             </div>
@@ -149,7 +150,7 @@
     </aside>
 
     <!-- Main Content Container -->
-    <main class="w-full min-w-0 flex-1 flex flex-col min-h-0 overflow-y-auto overscroll-contain">
+    <main class="w-full md:w-auto flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overscroll-contain">
       <!-- Top Header Bar -->
       <header class="h-14 sm:h-16 px-3 sm:px-6 bg-surface/85 backdrop-blur-xl border-b border-outline flex items-center justify-between sticky top-0 z-30 shrink-0">
         <div class="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -2168,6 +2169,13 @@ useHead({
 
 .mobile-close .material-symbols-outlined {
   font-size: 1.15rem;
+}
+
+@media (min-width: 768px) {
+  .hamburger-button,
+  .mobile-close {
+    display: none !important;
+  }
 }
 
 @media (max-width: 767px) {

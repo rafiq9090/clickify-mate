@@ -1,5 +1,5 @@
 <template>
-  <section class="w-full min-w-0 max-w-full space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+  <section class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <!-- Header -->
     <div class="pb-2 border-b border-outline/40">
       <div class="flex items-center gap-2.5">
@@ -11,21 +11,17 @@
       </p>
     </div>
 
-    <div class="space-y-4 sm:space-y-5 w-full min-w-0">
+    <div class="space-y-5">
       <!-- 1. Steadfast Courier Integration Card -->
-      <div class="bg-surface border border-outline rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 w-full min-w-0">
-        <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 border-b border-outline/40 pb-3">
-          <div class="flex items-center gap-3 min-w-0">
+      <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-outline/40 pb-3">
+          <div class="flex items-center gap-3">
            
-            <div class="min-w-0">
+            <div>
               <h3 class="text-sm font-bold text-on-surface">Steadfast Courier Logistics</h3>
-              <p class="text-xs text-on-surface-variant line-clamp-2 sm:line-clamp-none">Automate parcel booking and tracking code generation directly from customer orders.</p>
+              <p class="text-xs text-on-surface-variant">Automate parcel booking and tracking code generation directly from customer orders.</p>
             </div>
           </div>
-
-          <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
-            Courier Partner
-          </span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -54,8 +50,8 @@
       </div>
 
       <!-- 2. Payment Accounts moved to the dedicated secure workspace -->
-      <div class="bg-surface border border-outline rounded-2xl p-4 sm:p-6 shadow-sm w-full min-w-0">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-3">
             
             <div>
@@ -66,7 +62,7 @@
 
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 w-full sm:w-auto"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700"
             @click="$emit('switch-tab', 'payment-gateways')"
           >
             Manage gateways
@@ -76,7 +72,7 @@
       </div>
 
       <!-- 3. External Store Sync (Shopify / WooCommerce) -->
-      <div class="bg-surface border border-outline rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 w-full min-w-0">
+      <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
         <div class="flex items-center gap-3 border-b border-outline/40 pb-3">
           
           <div>
