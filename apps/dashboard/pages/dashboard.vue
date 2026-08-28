@@ -4,7 +4,7 @@
       <button
         v-if="mobileMenuOpen"
         type="button"
-        class="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[2px] md:hidden"
+        class="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[2px] lg:hidden"
         aria-label="Close navigation menu"
         @click="closeMobileMenu"
       ></button>
@@ -13,12 +13,12 @@
     <!-- Left Sidebar -->
     <aside
       id="dashboard-navigation"
-      class="dashboard-sidebar fixed inset-y-0 left-0 z-50 w-[min(18rem,86vw)] bg-surface border-r border-outline shrink-0 flex flex-col justify-between shadow-2xl md:static md:w-[17rem] md:translate-x-0 md:shadow-none transition-[transform,background-color] duration-300 ease-out"
+      class="dashboard-sidebar fixed inset-y-0 left-0 z-50 w-[min(18rem,86vw)] bg-surface border-r border-outline shrink-0 flex flex-col justify-between shadow-2xl lg:static lg:w-64 lg:translate-x-0 lg:shadow-none transition-[transform,background-color] duration-300 ease-out"
       :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="flex min-h-0 flex-1 flex-col">
         <!-- Logo / Brand Header -->
-        <div class="min-h-16 px-4 md:px-5 border-b border-outline flex items-center justify-between shrink-0">
+        <div class="min-h-16 px-4 lg:px-5 border-b border-outline flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm shadow-primary/30">
               <span class="material-symbols-outlined text-xl">auto_awesome</span>
@@ -31,7 +31,7 @@
 
           <button
             type="button"
-            class="mobile-close md:hidden"
+            class="mobile-close lg:hidden"
             aria-label="Close navigation menu"
             @click="closeMobileMenu"
           >
@@ -40,9 +40,9 @@
         </div>
 
         <!-- Navigation Menu -->
-        <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 md:p-4 flex flex-col gap-1.5 scrollbar-none">
+        <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 lg:p-4 flex flex-col gap-1.5 scrollbar-none">
           <!-- Group 1: Live Operations -->
-          <div class="hidden md:block px-3 py-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
+          <div class="hidden lg:block px-3 py-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
             Conversations
           </div>
           
@@ -62,7 +62,7 @@
           </button>
 
           <!-- Group 2: Commerce & Catalog -->
-          <div class="hidden md:block px-3 pt-3 pb-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
+          <div class="hidden lg:block px-3 pt-3 pb-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
             Commerce &amp; Stock
           </div>
 
@@ -102,7 +102,7 @@
           </button>
 
           <!-- Group 3: Settings & Integrations -->
-          <div class="hidden md:block px-3 pt-3 pb-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
+          <div class="hidden lg:block px-3 pt-3 pb-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
             Configuration
           </div>
 
@@ -122,7 +122,7 @@
       </div>
 
       <!-- Footer User Card - Desktop -->
-      <div class="shrink-0 p-3 md:p-4 border-t border-outline space-y-3 bg-surface/95">
+      <div class="shrink-0 p-3 lg:p-4 border-t border-outline space-y-3 bg-surface/95">
         <div class="flex items-center justify-between px-1">
           <div class="flex items-center gap-2.5 min-w-0">
             <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
@@ -130,8 +130,7 @@
             </div>
             <div class="min-w-0">
               <p class="text-xs font-semibold text-on-surface truncate" :title="userEmail">{{ userEmail || 'Account' }}</p>
-              <span class="text-[10px] text-emerald-500 font-medium flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span class="text-[10px] text-primary/70 font-medium flex items-center gap-1">
                 Standard Plan
               </span>
             </div>
@@ -150,13 +149,13 @@
     </aside>
 
     <!-- Main Content Container -->
-    <main class="w-full md:w-auto flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overscroll-contain">
+    <main class="w-full lg:w-auto flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overscroll-contain">
       <!-- Top Header Bar -->
       <header class="h-14 sm:h-16 px-3 sm:px-6 bg-surface/85 backdrop-blur-xl border-b border-outline flex items-center justify-between sticky top-0 z-30 shrink-0">
         <div class="flex min-w-0 items-center gap-2 sm:gap-3">
           <button
             type="button"
-            class="hamburger-button md:hidden"
+            class="hamburger-button lg:hidden"
             :class="{ open: mobileMenuOpen }"
             :aria-expanded="mobileMenuOpen"
             aria-controls="dashboard-navigation"
@@ -926,7 +925,7 @@ const handleDashboardKeydown = (event) => {
 }
 
 const handleDashboardResize = () => {
-  if (window.innerWidth >= 768) closeMobileMenu()
+  if (window.innerWidth >= 1024) closeMobileMenu()
 }
 
 const currentMenuTitle = computed(() => {
@@ -2171,14 +2170,14 @@ useHead({
   font-size: 1.15rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .hamburger-button,
   .mobile-close {
     display: none !important;
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .dashboard-shell,
   .dashboard-content {
     width: 100%;

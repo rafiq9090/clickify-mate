@@ -15,8 +15,7 @@
       <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
         <!-- Smart Batch Auto-Linker Button -->
         <label class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-secondary/10 hover:bg-secondary text-secondary hover:text-white border border-secondary/20 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer">
-          <span class="material-symbols-outlined text-base">auto_fix_high</span>
-          <span class="truncate">🪄 Batch Images</span>
+          <span class="truncate">Batch Images</span>
           <input type="file" multiple accept="image/*" class="hidden" @change="handleBatchUpload" />
         </label>
 

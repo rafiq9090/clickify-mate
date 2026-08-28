@@ -19,7 +19,7 @@
           :disabled="loading"
           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
         >
-          <span class="material-symbols-outlined text-base" :class="loading ? 'animate-spin' : ''">sync</span>
+          <span class="material-symbols-outlined text-base" :class="loading ? 'animate-spin' : ''">replay</span>
           <span>{{ loading ? 'Refreshing...' : 'Refresh Inbox' }}</span>
         </button>
       </div>
@@ -125,7 +125,6 @@
           </div>
 
           <div v-if="filteredThreads.length === 0" class="p-8 text-center text-xs text-on-surface-variant">
-            <span class="material-symbols-outlined text-3xl opacity-40 mb-2 block">chat_bubble_outline</span>
             No conversations found
           </div>
         </div>
@@ -422,7 +421,6 @@
 
         <!-- No Thread Selected -->
         <div v-else class="flex-1 flex flex-col items-center justify-center p-8 text-center text-on-surface-variant space-y-2">
-          <span class="material-symbols-outlined text-5xl text-on-surface-variant/20">chat</span>
           <h4 class="text-sm font-semibold text-on-surface">No Conversation Selected</h4>
           <p class="text-xs max-w-xs">Select a conversation from the left to view full message history and manage AI reply.</p>
         </div>
@@ -835,16 +833,20 @@ const fetchChatHistory = async (isBackground = false) => {
       const threadList = Object.values(threadMap).sort((a, b) => new Date(b.last_active) - new Date(a.last_active))
       threads.value = threadList
 
+      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+
       if (!selectedThread.value && threadList.length > 0) {
-        selectedThread.value = threadList[0]
-        scrollToBottom()
+        if (isDesktop && !isBackground) {
+          selectedThread.value = threadList[0]
+          scrollToBottom()
+        }
       } else if (selectedThread.value) {
         // Refresh selected thread object
         const updatedSelected = threadList.find(t => t.user_external_id === selectedThread.value.user_external_id)
         if (updatedSelected) {
-          const prevMsgCount = selectedThread.value.messages.length
+          const prevMsgCount = selectedThread.value.messages?.length || 0
           selectedThread.value = updatedSelected
-          if (updatedSelected.messages.length > prevMsgCount) {
+          if (updatedSelected.messages?.length > prevMsgCount) {
             scrollToBottom(true)
           }
         }
