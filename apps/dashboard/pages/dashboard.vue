@@ -1,10 +1,24 @@
 <template>
-  <div class="min-h-screen flex flex-col md:flex-row bg-background text-on-background">
+  <div class="dashboard-shell h-[100dvh] min-h-0 w-full max-w-full flex flex-col md:flex-row bg-background text-on-background overflow-hidden">
+    <Transition name="drawer-fade">
+      <button
+        v-if="mobileMenuOpen"
+        type="button"
+        class="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[2px] md:hidden"
+        aria-label="Close navigation menu"
+        @click="closeMobileMenu"
+      ></button>
+    </Transition>
+
     <!-- Left Sidebar -->
-    <aside class="w-full md:w-68 bg-surface border-b md:border-b-0 md:border-r border-outline shrink-0 flex flex-col justify-between z-20 transition-colors">
-      <div class="flex flex-col">
+    <aside
+      id="dashboard-navigation"
+      class="dashboard-sidebar fixed inset-y-0 left-0 z-50 w-[min(18rem,86vw)] bg-surface border-r border-outline shrink-0 flex flex-col justify-between shadow-2xl md:static md:w-[17rem] md:translate-x-0 md:shadow-none transition-[transform,background-color] duration-300 ease-out"
+      :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'"
+    >
+      <div class="flex min-h-0 flex-1 flex-col">
         <!-- Logo / Brand Header -->
-        <div class="p-5 md:p-6 border-b border-outline flex items-center justify-between">
+        <div class="min-h-16 px-4 md:px-5 border-b border-outline flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm shadow-primary/30">
               <span class="material-symbols-outlined text-xl">auto_awesome</span>
@@ -15,20 +29,18 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-2 md:hidden">
-            <ThemeToggle />
-            <button 
-              @click="handleLogout" 
-              class="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
-              title="Logout"
-            >
-              <span class="material-symbols-outlined text-lg">logout</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            class="mobile-close md:hidden"
+            aria-label="Close navigation menu"
+            @click="closeMobileMenu"
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
         </div>
 
         <!-- Navigation Menu -->
-        <nav class="p-3 md:p-4 flex md:flex-col overflow-x-auto md:overflow-x-visible gap-1.5 scrollbar-none">
+        <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 md:p-4 flex flex-col gap-1.5 scrollbar-none">
           <!-- Group 1: Live Operations -->
           <div class="hidden md:block px-3 py-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
             Conversations
@@ -37,8 +49,8 @@
           <button 
             v-for="item in menuItems.slice(0, 2)" 
             :key="item.id" 
-            @click="currentMenu = item.id"
-            class="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap shrink-0 w-auto md:w-full cursor-pointer"
+            @click="selectMenu(item.id)"
+            class="flex min-h-11 w-full items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer"
             :class="currentMenu === item.id 
               ? 'bg-primary text-white shadow-xs font-semibold' 
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-hover font-medium'"
@@ -57,8 +69,8 @@
           <button 
             v-for="item in menuItems.slice(2, 5)" 
             :key="item.id" 
-            @click="currentMenu = item.id"
-            class="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap shrink-0 w-auto md:w-full cursor-pointer"
+            @click="selectMenu(item.id)"
+            class="flex min-h-11 w-full items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer"
             :class="currentMenu === item.id 
               ? 'bg-primary text-white shadow-xs font-semibold' 
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-hover font-medium'"
@@ -97,8 +109,8 @@
           <button 
             v-for="item in menuItems.slice(5)" 
             :key="item.id" 
-            @click="currentMenu = item.id"
-            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap shrink-0 w-auto md:w-full cursor-pointer"
+            @click="selectMenu(item.id)"
+            class="flex min-h-11 w-full items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer"
             :class="currentMenu === item.id 
               ? 'bg-primary text-white shadow-xs font-semibold' 
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-hover font-medium'"
@@ -110,7 +122,7 @@
       </div>
 
       <!-- Footer User Card - Desktop -->
-      <div class="hidden md:block p-4 border-t border-outline space-y-3">
+      <div class="shrink-0 p-3 md:p-4 border-t border-outline space-y-3 bg-surface/95">
         <div class="flex items-center justify-between px-1">
           <div class="flex items-center gap-2.5 min-w-0">
             <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
@@ -119,7 +131,6 @@
             <div class="min-w-0">
               <p class="text-xs font-semibold text-on-surface truncate" :title="userEmail">{{ userEmail || 'Account' }}</p>
               <span class="text-[10px] text-emerald-500 font-medium flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                 Standard Plan
               </span>
             </div>
@@ -138,12 +149,23 @@
     </aside>
 
     <!-- Main Content Container -->
-    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <main class="w-full min-w-0 flex-1 flex flex-col min-h-0 overflow-y-auto overscroll-contain">
       <!-- Top Header Bar -->
-      <header class="h-14 sm:h-16 px-3.5 sm:px-6 bg-surface/80 backdrop-blur-md border-b border-outline flex items-center justify-between sticky top-0 z-40">
-        <div class="flex items-center gap-2 sm:gap-3">
-          <span class="text-xs text-on-surface-variant">Dashboard</span>
-          <span class="text-xs text-on-surface-variant/40">/</span>
+      <header class="h-14 sm:h-16 px-3 sm:px-6 bg-surface/85 backdrop-blur-xl border-b border-outline flex items-center justify-between sticky top-0 z-30 shrink-0">
+        <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            class="hamburger-button md:hidden"
+            :class="{ open: mobileMenuOpen }"
+            :aria-expanded="mobileMenuOpen"
+            aria-controls="dashboard-navigation"
+            aria-label="Open navigation menu"
+            @click="toggleMobileMenu"
+          >
+            <span></span><span></span><span></span>
+          </button>
+          <span class="hidden sm:inline text-xs text-on-surface-variant">Dashboard</span>
+          <span class="hidden sm:inline text-xs text-on-surface-variant/40">/</span>
           <span class="text-xs font-semibold text-on-surface capitalize">{{ currentMenuTitle }}</span>
         </div>
 
@@ -269,7 +291,7 @@
       </header>
 
       <!-- Subview Content Area -->
-      <div class="p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6 md:space-y-8 flex-1 min-w-0">
+      <div class="dashboard-content p-2.5 sm:p-5 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-3 sm:space-y-6 md:space-y-8 flex-1 min-w-0">
         <!-- 1. Live Chat Inbox (Default) -->
         <DashboardInbox
           v-if="currentMenu === 'inbox'"
@@ -870,6 +892,7 @@ const selectedLeads = ref([])
 const sendingToSteadfast = ref(false)
 
 const currentMenu = ref('inbox')
+const mobileMenuOpen = ref(false)
 const menuItems = [
   { id: 'inbox', label: 'Live Inbox', icon: 'forum' },
   { id: 'agents', label: 'AI Agents', icon: 'smart_toy' },
@@ -880,6 +903,30 @@ const menuItems = [
   { id: 'integrations', label: 'Settings & Courier', icon: 'settings' },
   { id: 'webhooks', label: 'Webhook Tools', icon: 'hub' }
 ]
+
+const closeMobileMenu = () => {
+  mobileMenuOpen.value = false
+}
+
+const toggleMobileMenu = () => {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+const selectMenu = (menuId) => {
+  currentMenu.value = menuId
+  closeMobileMenu()
+}
+
+const handleDashboardKeydown = (event) => {
+  if (event.key === 'Escape') {
+    closeMobileMenu()
+    showNotifications.value = false
+  }
+}
+
+const handleDashboardResize = () => {
+  if (window.innerWidth >= 768) closeMobileMenu()
+}
 
 const currentMenuTitle = computed(() => {
   const match = menuItems.find(i => i.id === currentMenu.value)
@@ -896,6 +943,11 @@ watch(currentMenu, (newTab) => {
   } else if (newTab === 'catalog') {
     fetchInventory()
   }
+})
+
+watch(mobileMenuOpen, (isOpen) => {
+  if (typeof document === 'undefined') return
+  document.documentElement.style.overflow = isOpen ? 'hidden' : ''
 })
 
 const loading = ref(true)
@@ -1982,6 +2034,9 @@ const handleLogout = async () => {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleDashboardKeydown)
+  window.addEventListener('resize', handleDashboardResize, { passive: true })
+
   try {
     loadNotificationPreferences()
     const { data: { user } } = await supabase.auth.getUser()
@@ -2012,6 +2067,10 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleDashboardKeydown)
+  window.removeEventListener('resize', handleDashboardResize)
+  document.documentElement.style.overflow = ''
+
   if (realtimeSyncInterval) {
     clearInterval(realtimeSyncInterval)
     realtimeSyncInterval = null
@@ -2032,5 +2091,112 @@ useHead({
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.drawer-fade-enter-active,
+.drawer-fade-leave-active {
+  transition: opacity 0.24s ease;
+}
+
+.drawer-fade-enter-from,
+.drawer-fade-leave-to {
+  opacity: 0;
+}
+
+.hamburger-button,
+.mobile-close {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--outline) 82%, transparent);
+  border-radius: 0.9rem;
+  color: var(--on-surface);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface) 94%, white), var(--surface-hover));
+  box-shadow: 0 7px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255,255,255,.55);
+  transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
+
+.hamburger-button:hover,
+.mobile-close:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 42%, var(--outline));
+  box-shadow: 0 9px 24px rgba(37,117,252,.14);
+}
+
+.hamburger-button:active,
+.mobile-close:active {
+  transform: scale(.94);
+}
+
+.hamburger-button {
+  position: relative;
+  flex-direction: column;
+  gap: .255rem;
+}
+
+.hamburger-button > span {
+  width: 1.12rem;
+  height: 1.5px;
+  display: block;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: center;
+  transition: transform .28s cubic-bezier(.2,.8,.2,1), opacity .18s ease, width .22s ease;
+}
+
+.hamburger-button > span:nth-child(2) {
+  width: .78rem;
+  margin-left: -.34rem;
+  color: var(--color-primary);
+}
+
+.hamburger-button.open > span:nth-child(1) {
+  transform: translateY(.315rem) rotate(45deg);
+}
+
+.hamburger-button.open > span:nth-child(2) {
+  width: 0;
+  opacity: 0;
+}
+
+.hamburger-button.open > span:nth-child(3) {
+  transform: translateY(-.315rem) rotate(-45deg);
+}
+
+.mobile-close .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+@media (max-width: 767px) {
+  .dashboard-shell,
+  .dashboard-content {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .dashboard-content {
+    overflow-x: clip;
+  }
+
+  .dashboard-content > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dashboard-sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-sidebar,
+  .drawer-fade-enter-active,
+  .drawer-fade-leave-active,
+  .hamburger-button > span {
+    transition-duration: .01ms !important;
+  }
 }
 </style>

@@ -26,8 +26,19 @@ onMounted(() => {
 
 <style>
 .app-container {
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+html,
+body,
+#__nuxt {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  overflow-x: hidden;
 }
 </style>

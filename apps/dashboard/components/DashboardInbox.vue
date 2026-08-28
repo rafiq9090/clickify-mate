@@ -4,9 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline/40">
       <div>
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            <span class="material-symbols-outlined text-xl">forum</span>
-          </div>
+        
           <h2 class="text-xl font-bold tracking-tight text-on-surface">Live Customer Inbox</h2>
         </div>
         <p class="text-xs text-on-surface-variant mt-1">
@@ -28,7 +26,7 @@
     </div>
 
     <!-- Main Inbox Split View with Fixed Height & Independent Column Scrolling -->
-    <div class="bg-surface border border-outline rounded-2xl overflow-hidden shadow-sm flex flex-col md:grid md:grid-cols-12 h-[calc(100vh-140px)] md:h-[640px] md:max-h-[calc(100vh-210px)] min-h-[480px]">
+    <div class="bg-surface border border-outline rounded-xl sm:rounded-2xl overflow-hidden shadow-sm flex flex-col md:grid md:grid-cols-12 h-[calc(100dvh-4.75rem)] min-h-0 md:h-[640px] md:max-h-[calc(100vh-210px)] md:min-h-[480px]">
       
       <!-- Left Column: Conversations List (Scrollable) -->
       <div 
@@ -198,10 +196,10 @@
                   : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20'"
                 :title="selectedThread.ai_disabled ? 'Start AI Auto-Pilot for this customer' : 'Pause AI Auto-Pilot to take over manually'"
               >
-                <span class="material-symbols-outlined text-sm">
+                <!-- <span class="material-symbols-outlined text-sm">
                   {{ selectedThread.ai_disabled ? 'play_arrow' : 'pause' }}
-                </span>
-                <span>{{ selectedThread.ai_disabled ? 'Start AI' : 'Stop AI' }}</span>
+                </span> -->
+                <span>{{ selectedThread.ai_disabled ? 'Start AI Reply' : 'Stop AI Reply' }}</span>
               </button>
 
               <span class="text-[10px] sm:text-[11px] font-semibold text-on-surface-variant bg-surface-hover px-2 py-1 rounded-lg border border-outline uppercase">
@@ -705,8 +703,8 @@ const toggleAiForThread = async (thread) => {
 
     emit('show-toast', {
       message: newStatus 
-        ? '⏸️ AI Auto-Pilot paused! You can now reply manually.' 
-        : '▶️ AI Auto-Pilot resumed! AI will reply automatically.',
+        ? 'AI Auto-Pilot paused! You can now reply manually.' 
+        : 'AI Auto-Pilot resumed! AI will reply automatically.',
       type: newStatus ? 'warning' : 'success'
     })
   } catch (err) {

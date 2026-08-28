@@ -77,10 +77,10 @@
                 type="button"
                 @click="$emit('toggle-agent-status', agent)"
                 class="px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
-                :class="agent.is_active ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'"
+                :class="agent.is_active ? ' text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'"
                 :title="agent.is_active ? 'Click to Pause this Agent' : 'Click to Start / Resume this Agent'"
               >
-                <span>{{ agent.is_active ? 'Active (Click to Pause)' : 'Paused (Click to Start)' }}</span>
+                <span>{{ agent.is_active ? 'Active' : 'Paused' }}</span>
               </button>
             </div>
           </div>
