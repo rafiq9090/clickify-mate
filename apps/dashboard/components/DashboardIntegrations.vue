@@ -85,7 +85,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
           <div class="space-y-1">
             <label class="font-medium text-on-surface-variant">Inventory Source</label>
             <select 
@@ -100,22 +100,37 @@
           </div>
 
           <div class="space-y-1" v-if="integrations.shop_type !== 'mock'">
-            <label class="font-medium text-on-surface-variant">Store Domain URL</label>
+            <label class="font-medium text-on-surface-variant">
+              {{ integrations.shop_type === 'shopify' ? 'Shopify Domain (*.myshopify.com)' : 'WordPress / WooCommerce URL' }}
+            </label>
             <input 
               :value="integrations.shop_api_url"
               @input="$emit('update:integration-field', { field: 'shop_api_url', value: $event.target.value })"
-              placeholder="https://mystore.myshopify.com" 
+              :placeholder="integrations.shop_type === 'shopify' ? 'mystore.myshopify.com' : 'https://mywordpress.com'" 
               class="w-full bg-surface-hover border border-outline rounded-xl px-3.5 py-2.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors" 
             />
           </div>
 
           <div class="space-y-1" v-if="integrations.shop_type !== 'mock'">
-            <label class="font-medium text-on-surface-variant">Store API Key / Access Token</label>
+            <label class="font-medium text-on-surface-variant">
+              {{ integrations.shop_type === 'shopify' ? 'Admin API Access Token (shpat_...)' : 'Consumer Key (ck_...)' }}
+            </label>
             <input 
               :value="integrations.shop_api_key"
               @input="$emit('update:integration-field', { field: 'shop_api_key', value: $event.target.value })"
               type="password" 
-              placeholder="API Access Token" 
+              :placeholder="integrations.shop_type === 'shopify' ? 'shpat_xxxx...' : 'ck_xxxx...'" 
+              class="w-full bg-surface-hover border border-outline rounded-xl px-3.5 py-2.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors" 
+            />
+          </div>
+
+          <div class="space-y-1" v-if="integrations.shop_type === 'woocommerce'">
+            <label class="font-medium text-on-surface-variant">Consumer Secret (cs_...)</label>
+            <input 
+              :value="integrations.shop_api_secret"
+              @input="$emit('update:integration-field', { field: 'shop_api_secret', value: $event.target.value })"
+              type="password" 
+              placeholder="cs_xxxx..." 
               class="w-full bg-surface-hover border border-outline rounded-xl px-3.5 py-2.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors" 
             />
           </div>

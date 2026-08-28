@@ -28,10 +28,13 @@
     </div>
 
     <!-- Main Inbox Split View with Fixed Height & Independent Column Scrolling -->
-    <div class="bg-surface border border-outline rounded-2xl overflow-hidden shadow-sm grid grid-cols-1 md:grid-cols-12 h-[640px] max-h-[calc(100vh-210px)] min-h-[500px]">
+    <div class="bg-surface border border-outline rounded-2xl overflow-hidden shadow-sm flex flex-col md:grid md:grid-cols-12 h-[calc(100vh-140px)] md:h-[640px] md:max-h-[calc(100vh-210px)] min-h-[480px]">
       
       <!-- Left Column: Conversations List (Scrollable) -->
-      <div class="md:col-span-5 lg:col-span-4 border-r border-outline flex flex-col h-full bg-surface-hover/30 min-h-0">
+      <div 
+        :class="selectedThread ? 'hidden md:flex' : 'flex'" 
+        class="md:col-span-5 lg:col-span-4 border-r border-outline flex-col h-full bg-surface-hover/30 min-h-0 w-full"
+      >
         <!-- Search & Filter -->
         <div class="p-3.5 border-b border-outline space-y-2.5 bg-surface shrink-0">
           <div class="relative">
@@ -123,22 +126,34 @@
             </div>
           </div>
 
-          <div v-if="filteredThreads.length === 0" class="py-16 text-center text-xs text-on-surface-variant space-y-1">
-            <span class="material-symbols-outlined text-3xl text-on-surface-variant/30">chat_bubble_outline</span>
-            <p>No active conversations found</p>
+          <div v-if="filteredThreads.length === 0" class="p-8 text-center text-xs text-on-surface-variant">
+            <span class="material-symbols-outlined text-3xl opacity-40 mb-2 block">chat_bubble_outline</span>
+            No conversations found
           </div>
         </div>
       </div>
 
       <!-- Right Column: Active Chat View (Pinned Header + Scrollable Messages + Pinned Input Bar) -->
-      <div class="md:col-span-7 lg:col-span-8 flex flex-col h-full bg-surface min-h-0 relative">
+      <div 
+        :class="selectedThread ? 'flex' : 'hidden md:flex'" 
+        class="md:col-span-7 lg:col-span-8 flex-col h-full bg-surface min-h-0 relative w-full"
+      >
         <template v-if="selectedThread">
           <!-- Chat Header (Pinned) -->
-          <div class="p-3.5 px-5 border-b border-outline flex items-center justify-between bg-surface shrink-0 z-10">
-            <div class="flex items-center gap-3">
+          <div class="p-3 sm:p-3.5 px-3 sm:px-5 border-b border-outline flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 bg-surface shrink-0 z-10">
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+              <!-- Back button for mobile screens -->
+              <button 
+                @click="selectedThread = null"
+                class="md:hidden p-1 -ml-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-hover transition-colors cursor-pointer shrink-0"
+                title="Back to conversations"
+              >
+                <span class="material-symbols-outlined text-xl">arrow_back</span>
+              </button>
+
               <div class="relative shrink-0">
                 <div 
-                  class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs border border-outline bg-surface shadow-xs"
+                  class="w-8 sm:w-10 h-8 sm:h-10 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs border border-outline bg-surface shadow-xs"
                   :class="!selectedThread.customer_avatar ? getPlatformBadgeClass(selectedThread.platform) : ''"
                 >
                   <img 
@@ -152,32 +167,32 @@
                 </div>
               </div>
 
-              <div>
-                <h3 class="text-xs font-bold text-on-surface flex items-center gap-2">
-                  {{ selectedThread.customer_name || formatCustomerName(selectedThread.user_external_id, selectedThread.platform) }}
-                  <span class="text-[10px] font-normal text-on-surface-variant font-mono">({{ selectedThread.user_external_id }})</span>
+              <div class="min-w-0">
+                <h3 class="text-xs font-bold text-on-surface flex items-center gap-1.5 truncate">
+                  <span class="truncate">{{ selectedThread.customer_name || formatCustomerName(selectedThread.user_external_id, selectedThread.platform) }}</span>
+                  <span class="text-[10px] font-normal text-on-surface-variant font-mono hidden sm:inline">({{ selectedThread.user_external_id }})</span>
                 </h3>
                 <div class="flex items-center gap-2 mt-0.5">
                   <span 
-                    class="text-[11px] flex items-center gap-1 font-medium"
+                    class="text-[10px] sm:text-[11px] flex items-center gap-1 font-medium truncate"
                     :class="selectedThread.ai_disabled ? 'text-amber-500' : 'text-emerald-500'"
                   >
                     <span 
-                      class="w-1.5 h-1.5 rounded-full"
+                      class="w-1.5 h-1.5 rounded-full shrink-0"
                       :class="selectedThread.ai_disabled ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'"
                     ></span>
-                    {{ selectedThread.ai_disabled ? 'AI Auto-Pilot Paused (Manual Mode)' : 'AI Auto-Pilot Active' }}
+                    {{ selectedThread.ai_disabled ? 'Manual Mode' : 'AI Active' }}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <!-- AI Auto-Pilot Stop / Start Toggle -->
               <button 
                 @click="toggleAiForThread(selectedThread)"
                 :disabled="togglingAi"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs"
+                class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer shadow-2xs"
                 :class="selectedThread.ai_disabled 
                   ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' 
                   : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20'"
@@ -186,10 +201,10 @@
                 <span class="material-symbols-outlined text-sm">
                   {{ selectedThread.ai_disabled ? 'play_arrow' : 'pause' }}
                 </span>
-                <span>{{ selectedThread.ai_disabled ? 'Start AI Reply' : 'Stop AI Reply' }}</span>
+                <span>{{ selectedThread.ai_disabled ? 'Start AI' : 'Stop AI' }}</span>
               </button>
 
-              <span class="text-[11px] font-semibold text-on-surface-variant bg-surface-hover px-2.5 py-1 rounded-lg border border-outline uppercase">
+              <span class="text-[10px] sm:text-[11px] font-semibold text-on-surface-variant bg-surface-hover px-2 py-1 rounded-lg border border-outline uppercase">
                 {{ selectedThread.platform }}
               </span>
 

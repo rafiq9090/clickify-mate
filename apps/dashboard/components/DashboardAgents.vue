@@ -12,20 +12,20 @@
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
         <button 
           @click="$emit('switch-tab', 'catalog')"
-          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
+          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
         >
-          <span>Open Product Catalog</span>
+          <span>Product Catalog</span>
         </button>
 
         <button 
           @click="$emit('open-connect-modal')" 
-          class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-all shadow-sm hover:shadow-md active:scale-98 cursor-pointer"
+          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-all shadow-sm hover:shadow-md active:scale-98 cursor-pointer"
         >
           <span class="material-symbols-outlined text-base">add</span>
-          Connect New Agent
+          <span>Connect Agent</span>
         </button>
       </div>
     </div>

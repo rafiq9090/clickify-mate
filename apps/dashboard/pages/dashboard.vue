@@ -140,14 +140,14 @@
     <!-- Main Content Container -->
     <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
       <!-- Top Header Bar -->
-      <header class="h-16 px-6 bg-surface/80 backdrop-blur-md border-b border-outline flex items-center justify-between sticky top-0 z-40">
-        <div class="flex items-center gap-3">
+      <header class="h-14 sm:h-16 px-3.5 sm:px-6 bg-surface/80 backdrop-blur-md border-b border-outline flex items-center justify-between sticky top-0 z-40">
+        <div class="flex items-center gap-2 sm:gap-3">
           <span class="text-xs text-on-surface-variant">Dashboard</span>
           <span class="text-xs text-on-surface-variant/40">/</span>
           <span class="text-xs font-semibold text-on-surface capitalize">{{ currentMenuTitle }}</span>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
           <!-- Notification Bell & Flyout Dropdown -->
           <div class="relative">
             <button 
@@ -171,7 +171,7 @@
             <Transition name="fade">
               <div 
                 v-if="showNotifications" 
-                class="absolute right-0 top-12 w-80 sm:w-96 bg-surface border border-outline rounded-2xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-150 text-on-surface"
+                class="absolute right-0 top-12 w-[85vw] sm:w-96 max-w-sm bg-surface border border-outline rounded-2xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-150 text-on-surface"
               >
                 <!-- Top Header -->
                 <div class="p-3.5 bg-surface-hover/70 border-b border-outline flex items-center justify-between">
@@ -202,7 +202,7 @@
                 </div>
 
                 <!-- Filter tabs -->
-                <div class="px-3 pt-2 pb-1.5 bg-surface border-b border-outline/50 flex items-center gap-1">
+                <div class="px-3 pt-2 pb-1.5 bg-surface border-b border-outline/50 flex items-center gap-1 overflow-x-auto no-scrollbar">
                   <button 
                     v-for="filter in [
                       { id: 'all', label: 'All Alerts' },
@@ -212,7 +212,7 @@
                     ]"
                     :key="filter.id"
                     @click="notificationFilter = filter.id"
-                    class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                    class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
                     :class="notificationFilter === filter.id ? 'bg-primary text-white shadow-2xs' : 'text-on-surface-variant hover:bg-surface-hover hover:text-on-surface'"
                   >
                     {{ filter.label }}
@@ -249,26 +249,27 @@
                   <!-- Empty state -->
                   <div v-if="filteredNotifications.length === 0" class="py-8 text-center text-xs text-on-surface-variant space-y-1">
                     <span class="material-symbols-outlined text-2xl text-on-surface-variant/40">notifications_off</span>
-                    <p>No recent alerts.</p>
+                    <p>No notifications yet</p>
                   </div>
                 </div>
               </div>
             </Transition>
           </div>
 
-          <!-- Quick Connect Action Button -->
+          <!-- Quick Connect Agent Button -->
           <button 
             @click="openConnectModal" 
-            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent shadow-xs transition-all cursor-pointer"
+            class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent shadow-xs transition-all cursor-pointer"
           >
             <span class="material-symbols-outlined text-base">add</span>
-            <span>Connect Agent</span>
+            <span class="hidden sm:inline">Connect Agent</span>
+            <span class="sm:hidden">Connect</span>
           </button>
         </div>
       </header>
 
       <!-- Subview Content Area -->
-      <div class="p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8 flex-1">
+      <div class="p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6 md:space-y-8 flex-1 min-w-0">
         <!-- 1. Live Chat Inbox (Default) -->
         <DashboardInbox
           v-if="currentMenu === 'inbox'"
@@ -409,7 +410,7 @@
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showConnectModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+          <div class="bg-surface border border-outline rounded-3xl p-5 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200 in-scroll">
             <div class="flex items-center justify-between border-b border-outline/40 pb-3">
               <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
@@ -567,7 +568,7 @@
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showCreateLeadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+          <div class="bg-surface border border-outline rounded-3xl p-5 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 in-scroll">
             <div class="flex items-center justify-between border-b border-outline/40 pb-3">
               <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-xl text-primary">add_shopping_cart</span>
@@ -656,7 +657,7 @@
                 <label class="font-medium text-on-surface-variant">Delivery Address</label>
                 <input 
                   v-model="newLeadForm.address" 
-                  placeholder="e.g. House 12, Road 4, Dhanmondi, Dhaka"
+                  placeholder="e.g. House 12, Road 5, Dhanmondi, Dhaka"
                   class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
                 />
               </div>
@@ -665,7 +666,7 @@
                 <label class="font-medium text-on-surface-variant">Payment Transaction ID (Optional)</label>
                 <input 
                   v-model="newLeadForm.payment_transaction_id" 
-                  placeholder="e.g. BK987654321"
+                  placeholder="e.g. 9J47KLP0"
                   class="w-full bg-surface-hover border border-outline rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors"
                 />
               </div>
@@ -695,7 +696,7 @@
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+          <div class="bg-surface border border-outline rounded-3xl p-5 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 in-scroll">
             <div class="flex items-center justify-between border-b border-outline/40 pb-3">
               <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-xl text-primary">edit_note</span>
