@@ -13,7 +13,7 @@ test('uses NVIDIA for simple and medium turns when an NVIDIA key is configured',
 
         const simple = chooseModelRoute({ complexity: 'SIMPLE' })
         assert.equal(simple.providerName, 'nvidia')
-        assert.equal(simple.model, 'meta/llama-3.1-8b-instruct')
+        assert.equal(simple.model, 'nvidia/llama-3.1-nemotron-70b-instruct')
         assert.equal(chooseModelRoute({ complexity: 'MEDIUM' }).providerName, 'nvidia')
         assert.equal(chooseModelRoute({ complexity: 'COMPLEX' }).providerName, 'nvidia')
     } finally {

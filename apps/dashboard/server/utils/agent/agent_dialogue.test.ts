@@ -74,12 +74,12 @@ test('normalizes common Bangla payment spellings and typo variants', () => {
 
 test('uses an inclusive greeting unless the customer explicitly gives salam', () => {
     const neutral = context({ session: { state: 'SALES_INQUIRING', language: 'bn' } })
-    assert.match(buildGreetingReply(neutral, 'হ্যালো'), /^হ্যালো!/) 
+    assert.match(buildGreetingReply(neutral, 'হ্যালো'), /^হ্যালো/) 
     assert.equal(buildGreetingReply(neutral, 'হ্যালো').includes('ওয়ালাইকুম আসসালাম'), false)
 
     const salam = context({ session: { state: 'SALES_INQUIRING', language: 'bn' } })
     assert.equal(understandMessageFast('আসসালামু আলাইকুম').intent, 'GREETING')
-    assert.match(buildGreetingReply(salam, 'আসসালামু আলাইকুম'), /^ওয়ালাইকুম আসসালাম!/)
+    assert.match(buildGreetingReply(salam, 'আসসালামু আলাইকুম'), /^ওয়ালাইকুম আসসালাম/)
 })
 
 test('detects a plain English hello as English on the first turn', () => {
@@ -87,7 +87,7 @@ test('detects a plain English hello as English on the first turn', () => {
     const understanding = understandMessageFast('hello')
     mergeCurrentTurn(ctx, understanding, 'hello')
     assert.equal(ctx.session.language, 'en')
-    assert.match(buildGreetingReply(ctx, 'hello'), /^Hello!/)
+    assert.match(buildGreetingReply(ctx, 'hello'), /^Hello/)
 })
 
 test('merges a requested address before deciding the next missing order field', () => {

@@ -671,7 +671,7 @@ export function formatReplyForChannel(text: string, event: IncomingAgentEvent, a
         const allow = new Set(allowedUrls.filter(Boolean))
         output = output.replace(/https?:\/\/[^\s)]+/gi, url => {
             const cleanUrl = url.replace(/[.,]+$/, '')
-            return allow.has(cleanUrl) ? url : cleanUrl
+            return allow.has(cleanUrl) ? url : ''
         })
     }
 
