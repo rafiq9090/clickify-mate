@@ -4,8 +4,8 @@ import { getApiKeyList } from '../../settings'
 
 export class GroqModelProvider implements AgentModelProvider {
     name = 'groq'
-    private defaultModel = 'openai/gpt-oss-20b'
-    private fallbackModels = ['openai/gpt-oss-20b', 'qwen/qwen3.6-27b', 'openai/gpt-oss-120b']
+    private defaultModel = 'openai/gpt-oss-120b'
+    private fallbackModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b', 'groq/compound']
 
     async generate(options: GenerateOptions): Promise<ModelResult> {
         const keys = await getApiKeyList('groq_api_key', 'groqApiKey')
@@ -19,11 +19,12 @@ export class GroqModelProvider implements AgentModelProvider {
 
         let lastErr: any = null
         for (const currentModel of modelsToTry) {
+            const maxTokens = Math.min(Math.max(options.maxTokens ?? 1024, 256), 6144)
             const body: any = {
                 model: currentModel,
                 messages: options.messages,
                 temperature: options.temperature ?? 0.2,
-                max_tokens: options.maxTokens ?? 1024
+                max_tokens: maxTokens
             }
             if (options.responseFormat) {
                 body.response_format = options.responseFormat
@@ -38,7 +39,7 @@ export class GroqModelProvider implements AgentModelProvider {
                             'Content-Type': 'application/json'
                         },
                         body,
-                        timeout: 15000
+                        timeout: 60000
                     })
 
                     const choice = res.choices?.[0]
@@ -55,15 +56,37 @@ export class GroqModelProvider implements AgentModelProvider {
                     }
                 } catch (err: any) {
                     lastErr = err
+                    const msg = err?.data?.error?.message || err?.message || ''
                     if (err?.status === 429) {
-                        // Rate limited on this model/key, continue to next
                         continue
+                    }
+                    if (err?.status === 400 && msg.includes('json_object')) {
+                        // Retry without strict json_object response format
+                        delete body.response_format
+                        try {
+                            const res2 = await $fetch<any>('https://api.groq.com/openai/v1/chat/completions', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${keys[i]}`, 'Content-Type': 'application/json' },
+                                body,
+                                timeout: 15000
+                            })
+                            const choice2 = res2.choices?.[0]
+                            return {
+                                text: choice2?.message?.content || '',
+                                finishReason: choice2?.finish_reason,
+                                promptTokens: res2.usage?.prompt_tokens || 0,
+                                completionTokens: res2.usage?.completion_tokens || 0,
+                                totalTokens: res2.usage?.total_tokens || 0,
+                                model: currentModel,
+                                provider: 'groq'
+                            }
+                        } catch { /* continue */ }
                     }
                 }
             }
         }
 
-        throw new Error(`Groq API Error: ${lastErr?.message || 'Failed after trying all models and keys'}`)
+        throw new Error(`Groq API Error: ${lastErr?.data?.error?.message || lastErr?.message || 'Failed'}`)
     }
 
     async generateStructured<T>(options: GenerateOptions & { schema?: any }): Promise<{ data: T; usage: { totalTokens: number } }> {

@@ -14,14 +14,14 @@
         </div>
 
         <!-- Top Actions -->
-        <div class="flex items-center gap-2.5 flex-wrap">
+        <div class="hidden sm:flex items-center gap-2.5 flex-wrap">
           <button 
-            @click="$emit('refresh')"
+            @click="$emit('refresh')" 
             :disabled="loading"
             class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer disabled:opacity-50"
             title="Refresh Paid Orders"
           >
-            <span class="material-symbols-outlined text-base text-emerald-500" :class="loading ? 'animate-spin' : ''">refresh</span>
+            <span class="material-symbols-outlined text-base text-primary" :class="loading ? 'animate-spin' : ''">refresh</span>
             Refresh
           </button>
         </div>
@@ -37,7 +37,7 @@
             @input="$emit('update:searchQuery', $event.target.value)"
             type="text" 
             placeholder="Search by customer, phone, TxID, or Order ID..."
-            class="w-full h-10 pl-9 pr-8 bg-surface border border-outline rounded-xl text-xs text-on-surface outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-on-surface-variant/50"
+            class="w-full h-10 pl-9 pr-8 bg-surface border border-outline rounded-xl text-xs text-on-surface outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-on-surface-variant/50"
           >
           <button 
             v-if="searchQuery" 
@@ -73,7 +73,7 @@
             :key="tab"
             @click="$emit('update:activeTab', tab)"
             :class="activeTab === tab 
-              ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold' 
+              ? 'bg-surface text-primary shadow-xs font-semibold' 
               : 'text-on-surface-variant hover:text-on-surface font-medium'"
             class="flex-1 py-1.5 px-2.5 rounded-lg text-xs capitalize text-center transition-all truncate cursor-pointer"
           >
@@ -88,7 +88,7 @@
       <!-- Loading Overlay -->
       <div v-if="loading" class="absolute inset-0 z-20 bg-surface/70 backdrop-blur-xs flex items-center justify-center animate-in fade-in">
         <div class="flex flex-col items-center gap-3">
-          <div class="w-8 h-8 border-3 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+          <div class="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin"></div>
           <span class="text-xs font-medium text-on-surface-variant">Loading paid orders...</span>
         </div>
       </div>
@@ -111,12 +111,12 @@
               <tr 
                 @click="toggleOrderExpand(order.id)"
                 class="hover:bg-surface-hover/40 transition-colors cursor-pointer group"
-                :class="{ 'bg-emerald-500/5': expandedOrders.includes(order.id) }"
+                :class="{ 'bg-primary/5': expandedOrders.includes(order.id) }"
               >
                 <!-- Caret Toggle -->
                 <td class="py-3.5 px-3 text-center">
                   <span 
-                    class="material-symbols-outlined text-base text-on-surface-variant/50 group-hover:text-emerald-500 transition-transform inline-block"
+                    class="material-symbols-outlined text-base text-on-surface-variant/50 group-hover:text-primary transition-transform inline-block"
                     :class="{ 'rotate-180': expandedOrders.includes(order.id) }"
                   >
                     expand_more
@@ -143,7 +143,7 @@
                   <div class="flex flex-col gap-0.5">
                     <div class="flex items-center gap-2">
                       <span class="font-semibold text-on-surface capitalize">{{ order.data?.customer || 'Customer' }}</span>
-                      <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                      <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
                         Paid
                       </span>
                     </div>
@@ -155,7 +155,7 @@
                 <td class="py-3.5 px-4" @click.stop>
                   <button 
                     @click="$emit('copy-text', order.data?.payment_transaction_id)" 
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-mono font-semibold transition-colors cursor-pointer group/tx"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-hover hover:bg-primary/10 border border-outline text-primary text-xs font-mono font-semibold transition-colors cursor-pointer group/tx"
                     title="Click to copy Transaction ID"
                   >
                     <span>{{ order.data?.payment_transaction_id || 'N/A' }}</span>
@@ -187,43 +187,44 @@
                 <td colspan="7" class="p-4 sm:p-6 bg-surface-hover/30 border-b border-outline">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
                     <!-- Order Items Breakdown -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline">
-                      <div class="flex items-center gap-1.5 font-semibold text-on-surface">
-                        <span class="material-symbols-outlined text-sm text-emerald-500">receipt</span>
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0">
+                      <div class="font-semibold text-on-surface">
                         <span>Payment & Items</span>
                       </div>
                       <div v-if="order.data?.order && order.data.order.includes(':')" class="space-y-1 pt-1">
                         <div 
                           v-for="(part, i) in order.data.order.split('|')" 
                           :key="i"
-                          class="flex items-center justify-between py-1 border-b border-outline/40 last:border-0"
+                          class="flex items-center justify-between py-1 border-b border-outline/40 last:border-0 gap-2"
                         >
-                          <span class="text-on-surface-variant">{{ part.split(':')[0]?.trim() }}</span>
-                          <span class="font-semibold" :class="part.toLowerCase().includes('total') ? 'text-emerald-500 font-bold' : 'text-on-surface'">
+                          <span class="text-on-surface-variant truncate">{{ part.split(':')[0]?.trim() }}</span>
+                          <span class="font-semibold text-primary font-bold shrink-0" v-if="part.toLowerCase().includes('total')">
+                            {{ part.split(':')[1]?.trim() }}
+                          </span>
+                          <span class="font-semibold text-on-surface shrink-0" v-else>
                             {{ part.split(':')[1]?.trim() }}
                           </span>
                         </div>
                       </div>
-                      <p v-else class="text-on-surface font-medium pt-1">
+                      <p v-else class="text-on-surface font-medium pt-1 break-words">
                         {{ order.data?.order || 'No items listed' }}
                       </p>
                     </div>
 
                     <!-- Courier Status -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline">
-                      <div class="flex items-center gap-1.5 font-semibold text-on-surface">
-                        <span class="material-symbols-outlined text-sm text-orange-500">local_shipping</span>
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0">
+                      <div class="font-semibold text-on-surface">
                         <span>Courier Status</span>
                       </div>
 
                       <div v-if="order.data?.tracking_code" class="space-y-1.5 pt-1">
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between gap-2">
                           <span class="text-on-surface-variant">Tracking:</span>
-                          <span class="font-mono font-semibold text-orange-500 select-all">{{ order.data.tracking_code }}</span>
+                          <span class="font-mono font-semibold text-primary select-all truncate">{{ order.data.tracking_code }}</span>
                         </div>
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between gap-2">
                           <span class="text-on-surface-variant">Status:</span>
-                          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-hover text-on-surface border border-outline">
                             {{ order.data.delivery_status || 'Delivered to Courier' }}
                           </span>
                         </div>
@@ -233,22 +234,20 @@
                         <button 
                           @click.stop="$emit('send-to-steadfast', order.id)" 
                           :disabled="sendingToSteadfast"
-                          class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white border border-orange-500/20 rounded-lg text-xs font-semibold transition-colors cursor-pointer w-max"
+                          class="inline-flex items-center justify-center px-3.5 py-2 bg-primary text-white hover:bg-primary-accent rounded-xl text-xs font-semibold transition-colors cursor-pointer w-max shadow-xs disabled:opacity-50"
                         >
-                          <span class="material-symbols-outlined text-sm">local_shipping</span>
                           Dispatch via Steadfast
                         </button>
                       </div>
                     </div>
 
                     <!-- Actions -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline flex flex-col justify-between">
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0 flex flex-col justify-between">
                       <div>
-                        <div class="flex items-center gap-1.5 font-semibold text-on-surface mb-2">
-                          <span class="material-symbols-outlined text-sm text-secondary">tune</span>
+                        <div class="font-semibold text-on-surface mb-1">
                           <span>Order Actions</span>
                         </div>
-                        <p class="text-[11px] text-on-surface-variant">
+                        <p class="text-[11px] text-on-surface-variant leading-relaxed">
                           Update verified payment status or view captured customer notes.
                         </p>
                       </div>
@@ -256,16 +255,14 @@
                       <div class="flex items-center gap-2 pt-2">
                         <button 
                           @click.stop="$emit('open-edit', order)" 
-                          class="flex-1 py-1.5 px-3 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          class="flex-1 py-2 px-3 rounded-xl bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-semibold transition-colors flex items-center justify-center cursor-pointer"
                         >
-                          <span class="material-symbols-outlined text-sm">edit</span>
-                          Edit
+                          Edit Details
                         </button>
                         <button 
                           @click.stop="$emit('delete', order.id)" 
-                          class="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          class="py-2 px-3.5 rounded-xl bg-surface-hover hover:bg-primary/10 text-on-surface hover:text-primary border border-outline font-semibold transition-colors flex items-center justify-center cursor-pointer"
                         >
-                          <span class="material-symbols-outlined text-sm">delete</span>
                           Delete
                         </button>
                       </div>
@@ -307,7 +304,7 @@
             :key="p"
             @click="$emit('update:currentPage', p)"
             :class="currentPage === p 
-              ? 'bg-emerald-500 text-white border-emerald-500 font-semibold' 
+              ? 'bg-primary text-white border-primary font-semibold' 
               : 'border-outline text-on-surface hover:bg-surface-hover font-medium'"
             class="w-7 h-7 rounded-lg border text-xs flex items-center justify-center transition-colors cursor-pointer"
           >
@@ -376,9 +373,6 @@ const formatPlatformName = (platform) => {
 }
 
 const getPlatformBadgeClass = (platform) => {
-  if (platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-  if (platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
-  if (platform === 'facebook' || platform === 'messenger' || platform === 'fb_comment') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-  return 'bg-primary/10 text-primary border-primary/20'
+  return 'bg-surface-hover text-on-surface border-outline/70'
 }
 </script>

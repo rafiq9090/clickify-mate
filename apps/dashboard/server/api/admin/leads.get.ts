@@ -1,20 +1,26 @@
+import { defineEventHandler } from 'h3'
+import { requireAdminSession } from '../../utils/auth-session'
+import { getContactInquiriesFromFirestore } from '../../utils/firebase'
+
 export default defineEventHandler(async (event) => {
   requireAdminSession(event)
-  const client = useSupabaseAdmin()
-  
+
   try {
-     const { data: messages, error } = await client
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50)
-     
-     if (error) {
-         return { success: false, error: error?.message || error, messages: [] }
-     }
-     
-     return { success: true, messages: messages || [] }
-  } catch (err) {
-     return { success: false, error: (err as Error).message, messages: [] }
+    const rawMessages = await getContactInquiriesFromFirestore()
+
+    const messages = (rawMessages || []).map((r: any) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name || r.customer || 'Anonymous',
+      message: r.message || r.raw_message || '-',
+      platform: r.platform || 'Direct',
+      volume: r.volume || '',
+      created_at: r.created_at || r.submitted_at || new Date().toISOString()
+    }))
+
+    return { success: true, messages }
+  } catch (err: any) {
+    console.error('[LEADS_GET_EXCEPTION]:', err)
+    return { success: false, error: err.message, messages: [] }
   }
 })

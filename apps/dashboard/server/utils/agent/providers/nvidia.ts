@@ -4,7 +4,15 @@ import { getApiKey } from '../../settings'
 
 export class NvidiaModelProvider implements AgentModelProvider {
     name = 'nvidia'
-    private defaultModel = 'meta/llama-3.1-8b-instruct'
+    private defaultModel = 'nvidia/llama-3.1-nemotron-70b-instruct'
+    private fallbackModels = [
+        'nvidia/llama-3.1-nemotron-70b-instruct',
+        'meta/llama-3.1-70b-instruct',
+        'meta/llama-3.1-405b-instruct',
+        'mistralai/mixtral-8x22b-instruct-v0.1',
+        'meta/llama3-70b-instruct',
+        'meta/llama-3.3-70b-instruct'
+    ]
 
     private async getNvidiaKey(): Promise<string> {
         const envKey = process.env.NVIDIA_API_KEY
@@ -16,44 +24,54 @@ export class NvidiaModelProvider implements AgentModelProvider {
 
     async generate(options: GenerateOptions): Promise<ModelResult> {
         const apiKey = await this.getNvidiaKey()
-        const model = options.model || this.defaultModel
+        const modelsToTry = options.model
+            ? [options.model, ...this.fallbackModels.filter(m => m !== options.model)]
+            : this.fallbackModels
 
-        const body: any = {
-            model,
-            messages: options.messages,
-            temperature: options.temperature ?? 0.2,
-            max_tokens: options.maxTokens ?? 1024
-        }
-        if (options.responseFormat) {
-            body.response_format = options.responseFormat
-        }
+        let lastErr: any = null
 
-        try {
-            const res = await $fetch<any>('https://integrate.api.nvidia.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body,
-                timeout: 15000
-            })
-
-            const choice = res.choices?.[0]
-            const usage = res.usage || {}
-
-            return {
-                text: choice?.message?.content || '',
-                finishReason: choice?.finish_reason,
-                promptTokens: usage.prompt_tokens || 0,
-                completionTokens: usage.completion_tokens || 0,
-                totalTokens: usage.total_tokens || 0,
-                model,
-                provider: 'nvidia'
+        for (const currentModel of modelsToTry) {
+            const body: any = {
+                model: currentModel,
+                messages: options.messages,
+                temperature: options.temperature ?? 0.2,
+                max_tokens: options.maxTokens ?? 1024
             }
-        } catch (err: any) {
-            throw new Error(`NVIDIA NIM API Error: ${err.message}`)
+            if (options.responseFormat) {
+                body.response_format = options.responseFormat
+            }
+
+            try {
+                const res = await $fetch<any>('https://integrate.api.nvidia.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body,
+                    timeout: 15000
+                })
+
+                const choice = res.choices?.[0]
+                const usage = res.usage || {}
+
+                return {
+                    text: choice?.message?.content || '',
+                    finishReason: choice?.finish_reason,
+                    promptTokens: usage.prompt_tokens || 0,
+                    completionTokens: usage.completion_tokens || 0,
+                    totalTokens: usage.total_tokens || 0,
+                    model: currentModel,
+                    provider: 'nvidia'
+                }
+            } catch (err: any) {
+                lastErr = err
+                // Continue trying remaining models in the list
+                continue
+            }
         }
+
+        throw new Error(`NVIDIA NIM API Error: ${lastErr?.data?.error?.message || lastErr?.message || 'All models failed'}`)
     }
 
     async generateStructured<T>(options: GenerateOptions & { schema?: any }): Promise<{ data: T; usage: { totalTokens: number } }> {

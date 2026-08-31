@@ -9,20 +9,10 @@
           Connect your shop's own bKash, Nagad, and Stripe merchant accounts. Each account is private to the signed-in shop owner.
         </p>
       </div>
-
-      <button
-        type="button"
-        class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-outline bg-surface px-3.5 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        :disabled="loading"
-        @click="loadGateways"
-      >
-        <span class="material-symbols-outlined text-base" :class="loading ? 'animate-spin' : ''">refresh</span>
-        Refresh
-      </button>
     </div>
 
 
-    <div v-if="loadError" class="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4 text-xs text-rose-600 dark:text-rose-400">
+    <div v-if="loadError" class="rounded-2xl border border-outline bg-surface-hover p-4 text-xs text-on-surface">
       {{ loadError }}
     </div>
 
@@ -39,7 +29,22 @@
       >
         <div class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-outline bg-surface-hover/45 p-3.5 sm:gap-3 sm:p-5">
           <div class="contents">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black text-white shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl" :class="provider.logoClass">
+            <!-- Original Provider Logos -->
+            <div v-if="provider.id === 'bkash'" class="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-outline/80 shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl shrink-0 p-1.5 overflow-hidden">
+              <img src="/images/gateways/bkash.png" alt="bKash" class="w-full h-full object-contain" />
+            </div>
+
+            <div v-else-if="provider.id === 'nagad'" class="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-outline/80 shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl shrink-0 p-1 overflow-hidden">
+              <img src="/images/gateways/nagad.png" alt="Nagad" class="w-full h-full object-contain" />
+            </div>
+
+            <div v-else-if="provider.id === 'stripe'" class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#635BFF] text-white shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl shrink-0 p-2.5">
+              <svg viewBox="0 0 24 24" class="w-full h-full fill-white" xmlns="http://www.w3.org/2000/svg">
+                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697.5 12.522.5 6.85.5 2.896 3.446 2.896 8.604c0 6.04 8.307 5.093 8.307 7.706 0 .984-.874 1.398-2.172 1.398-2.474 0-5.35-1.192-7.25-2.225l-.89 5.568c2.093 1.096 5.088 1.699 8.232 1.699 5.82 0 10.088-2.868 10.088-8.212 0-6.273-8.235-5.289-8.235-7.69z"/>
+              </svg>
+            </div>
+
+            <div v-else class="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black text-white shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl shrink-0" :class="provider.logoClass">
               {{ provider.shortName }}
             </div>
             <div class="min-w-0">
@@ -51,7 +56,7 @@
           <span
             class="whitespace-nowrap rounded-full border px-2 py-1 text-[9px] font-bold sm:px-2.5 sm:text-[10px]"
             :class="drafts[provider.id].configured
-              ? (drafts[provider.id].isActive ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400')
+              ? (drafts[provider.id].isActive ? 'border-primary/25 bg-primary/10 text-primary' : 'border-outline bg-surface-hover text-on-surface-variant')
               : 'border-outline bg-surface text-on-surface-variant'"
           >
             {{ drafts[provider.id].configured ? (drafts[provider.id].isActive ? 'Active' : 'Inactive') : 'Not configured' }}
@@ -120,7 +125,7 @@
               <span class="material-symbols-outlined text-base text-on-surface-variant/60">key</span>
             </div>
 
-            <div v-if="provider.id === 'stripe'" class="mb-3 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-[10px] leading-relaxed text-on-surface-variant">
+            <div v-if="provider.id === 'stripe'" class="mb-3 rounded-xl border border-outline bg-surface-hover/60 px-3 py-2 text-[10px] leading-relaxed text-on-surface-variant">
               Register <strong class="break-all text-on-surface">/api/payments/webhook/stripe</strong> as a Stripe webhook endpoint and subscribe to Checkout Session completed, async succeeded/failed, and expired events.
             </div>
 
@@ -128,7 +133,7 @@
               <label v-for="field in provider.credentialFields" :key="field.key" class="space-y-1.5 text-xs">
                 <span class="flex items-center justify-between gap-2 font-semibold text-on-surface-variant">
                   {{ field.label }}
-                  <span v-if="drafts[provider.id].configuredCredentials[field.key]" class="text-[9px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Saved</span>
+                  <span v-if="drafts[provider.id].configuredCredentials[field.key]" class="text-[9px] font-bold uppercase tracking-wide text-primary">Saved</span>
                 </span>
                 <textarea
                   v-if="field.multiline"
@@ -162,7 +167,7 @@
             <button
               v-if="drafts[provider.id].configured"
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-500 transition-colors hover:bg-rose-500/10 disabled:opacity-50"
+              class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
               :disabled="savingProvider === provider.id || deletingProvider === provider.id"
               @click="removeGateway(provider.id)"
             >

@@ -36,33 +36,30 @@
     </div>
 
     <!-- Agents Grid -->
-    <div v-else-if="agents.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div v-else-if="agents.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
       <div 
         v-for="agent in agents" 
         :key="agent.id" 
-        class="bg-surface border border-outline/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group hover:border-primary/40 relative"
+        class="bg-surface border border-outline/80 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group hover:border-primary/40 relative min-w-0"
       >
         <!-- Top Agent Header -->
-        <div>
-          <div class="flex items-start justify-between gap-3 mb-4">
-            <div class="flex items-center gap-3">
+        <div class="min-w-0">
+          <div class="flex items-start justify-between gap-2.5 mb-3">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
               <div 
-                class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
-                :class="getPlatformIconClass(agent.platform)"
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 bg-surface-hover border border-outline shadow-2xs"
               >
-                <PlatformIcon :platform="agent.platform" custom-class="w-6 h-6" />
+                <PlatformIcon :platform="agent.platform" custom-class="w-5 h-5" />
               </div>
-              <div class="min-w-0">
-                <h3 class="text-sm font-bold text-on-surface truncate capitalize flex items-center gap-1.5" :title="agent.name || formatPlatformName(agent.platform)">
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-bold text-on-surface truncate capitalize leading-tight" :title="agent.name || (formatPlatformName(agent.platform) + ' Agent')">
                   {{ agent.name || (formatPlatformName(agent.platform) + ' Agent') }}
                 </h3>
-                <div class="flex items-center gap-2 mt-0.5">
-                  <span class="text-[11px] text-on-surface-variant font-mono">
-                    ID: ...{{ agent.id.slice(-6) }}
-                  </span>
+                <div class="flex items-center gap-1 mt-0.5 text-on-surface-variant font-mono text-[11px]">
+                  <span class="truncate">ID: ...{{ agent.id.slice(-6) }}</span>
                   <button 
                     @click="$emit('copy-text', agent.id, 'Agent ID')" 
-                    class="text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer"
+                    class="p-0.5 hover:text-primary transition-colors cursor-pointer shrink-0 inline-flex items-center"
                     title="Copy full Agent ID"
                   >
                     <span class="material-symbols-outlined text-[13px]">content_copy</span>
@@ -72,37 +69,38 @@
             </div>
 
             <!-- Platform Badge & Toggle -->
-            <div class="flex flex-col items-end gap-1.5 shrink-0">
-              <button 
-                type="button"
-                @click="$emit('toggle-agent-status', agent)"
-                class="px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
-                :class="agent.is_active ? ' text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'"
-                :title="agent.is_active ? 'Click to Pause this Agent' : 'Click to Start / Resume this Agent'"
-              >
-                <span>{{ agent.is_active ? 'Active' : 'Paused' }}</span>
-              </button>
+            <button 
+              type="button"
+              @click="$emit('toggle-agent-status', agent)"
+              class="px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border transition-all cursor-pointer shadow-2xs shrink-0 hover:scale-105 active:scale-95"
+              :class="agent.is_active ? 'bg-primary/10 text-primary border-primary/25' : 'bg-surface-hover text-on-surface-variant border-outline'"
+              :title="agent.is_active ? 'Click to Pause this Agent' : 'Click to Start / Resume this Agent'"
+            >
+              <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="agent.is_active ? 'bg-primary animate-pulse' : 'bg-on-surface-variant/40'"></span>
+              <span>{{ agent.is_active ? 'Active' : 'Paused' }}</span>
+            </button>
+          </div>
+
+          <!-- Channel Specific Row -->
+          <div class="mb-3 flex items-center justify-between text-xs text-on-surface-variant gap-2 bg-surface-hover/50 px-2.5 py-1.5 rounded-xl border border-outline/40 min-w-0">
+            <span class="font-medium text-on-surface-variant whitespace-nowrap text-[11px] shrink-0">Channel</span>
+            <div class="flex items-center gap-1 min-w-0 truncate text-right">
+              <span class="capitalize font-bold text-primary text-[11px] truncate">
+                {{ formatPlatformName(agent.platform) }}
+              </span>
+              <span v-if="agent.external_id" class="text-[10px] font-mono text-on-surface-variant/70 truncate" :title="agent.external_id">
+                ({{ agent.external_id }})
+              </span>
             </div>
           </div>
 
-          <!-- Channel Specific Badge -->
-          <div class="mb-4 flex items-center gap-1.5 text-xs text-on-surface-variant">
-            <span class="font-medium text-on-surface">Target Channel:</span>
-            <span class="capitalize font-semibold text-primary">
-              {{ formatPlatformName(agent.platform) }}
-            </span>
-            <span v-if="agent.external_id" class="text-[11px] font-mono text-on-surface-variant/70">
-              ({{ agent.external_id }})
-            </span>
-          </div>
-
           <!-- Internal Card Tabs -->
-          <div class="flex items-center gap-1 p-1 bg-surface-hover/50 rounded-xl mb-4 border border-outline/40">
+          <div class="flex items-center gap-1 p-1 bg-surface-hover/70 rounded-xl mb-3.5 border border-outline/50">
             <button 
               type="button"
               @click="agent.activeCardTab = 'knowledge'" 
               class="flex-1 py-1.5 text-xs rounded-lg font-medium transition-all cursor-pointer"
-              :class="(!agent.activeCardTab || agent.activeCardTab === 'knowledge') ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-on-surface-variant hover:text-on-surface'"
+              :class="(!agent.activeCardTab || agent.activeCardTab === 'knowledge') ? 'bg-surface text-primary shadow-xs font-bold' : 'text-on-surface-variant hover:text-on-surface'"
             >
               Knowledge
             </button>
@@ -110,7 +108,7 @@
               type="button"
               @click="agent.activeCardTab = 'catalog'" 
               class="flex-1 py-1.5 text-xs rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-1"
-              :class="agent.activeCardTab === 'catalog' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-on-surface-variant hover:text-on-surface'"
+              :class="agent.activeCardTab === 'catalog' ? 'bg-surface text-primary shadow-xs font-bold' : 'text-on-surface-variant hover:text-on-surface'"
             >
               <span>Catalog</span>
               <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary/10 text-primary font-bold">
@@ -121,7 +119,7 @@
               type="button"
               @click="agent.activeCardTab = 'behavior'" 
               class="flex-1 py-1.5 text-xs rounded-lg font-medium transition-all cursor-pointer"
-              :class="agent.activeCardTab === 'behavior' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-on-surface-variant hover:text-on-surface'"
+              :class="agent.activeCardTab === 'behavior' ? 'bg-surface text-primary shadow-xs font-bold' : 'text-on-surface-variant hover:text-on-surface'"
             >
               Settings
             </button>
@@ -197,7 +195,7 @@
                         Stock: {{ prod.stock_quantity }}
                       </span>
                       <span v-if="(prod.images || []).length > 1" class="text-[10px] text-secondary font-semibold">
-                        📷 {{ prod.images.length }} photos
+                        {{ prod.images.length }} photos
                       </span>
                     </div>
                   </div>
@@ -248,7 +246,7 @@
                       <button 
                         type="button" 
                         @click="removeAgentImage(agent, idx)"
-                        class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                        class="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
                         title="Remove"
                       >
                         <span class="material-symbols-outlined text-xs">close</span>
@@ -392,9 +390,8 @@
           <button 
             type="button"
             @click="$emit('disconnect-agent', agent.id)" 
-            class="w-full py-2 text-rose-500 hover:bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            class="w-full py-2 bg-surface-hover hover:bg-primary/10 text-on-surface hover:text-primary border border-outline rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span class="material-symbols-outlined text-sm">delete</span>
             <span>Disconnect Agent</span>
           </button>
         </div>

@@ -18,6 +18,8 @@
     "@supabase/supabase-js": "^2.100.1",
     "@vueuse/core": "^14.2.1",
     "bcryptjs": "^3.0.3",
+    "firebase-admin": "^14.3.0",
+    "gsap": "^3.15.0",
     "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",

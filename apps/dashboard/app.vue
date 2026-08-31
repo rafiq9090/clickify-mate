@@ -31,6 +31,8 @@ onMounted(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--bg);
+  color: var(--on-bg);
 }
 
 html,
@@ -39,6 +41,9 @@ body,
   width: 100%;
   min-width: 0;
   margin: 0;
+  padding: 0;
   overflow-x: hidden;
+  background-color: var(--bg);
+  color: var(--on-bg);
 }
 </style>

@@ -25,10 +25,12 @@ env/
 Thumbs.db
 desktop.ini
 
-# Local env files
+# Local env & secret keys
 .env
 .env.*
 !.env.example
+*firebase-adminsdk*.json
+serviceAccountKey*.json
 
 # TestSprite tests and scripts
 testsprite_tests/

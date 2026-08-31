@@ -2,21 +2,23 @@
 /* Text fonts are managed via @nuxtjs/google-fonts in nuxt.config.ts */
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* =========================
    THEME TOKENS
 ========================= */
 @theme {
-  /* Primary — Royal Blue */
-  --color-primary:         #2575FC;
-  --color-primary-accent:  #1A56DB;
+  /* Primary — Amethyst Royal Plum */
+  --color-primary:         #7B4C85;
+  --color-primary-accent:  #341F37;
 
-  /* Secondary — Purple */
-  --color-secondary:       #8E2DE2;
-  --color-secondary-accent:#4A00E0;
+  /* Secondary — Purple Magenta */
+  --color-secondary:       #935B9E;
+  --color-secondary-accent:#582C62;
 
   /* Tertiary / Neutral */
-  --color-tertiary:        #2575FC;
-  --color-neutral:         #1A1A1A;
+  --color-tertiary:        #BEACC1;
+  --color-neutral:         #341F37;
 
   /* Semantic layout tokens (resolved per-theme below) */
   --color-background:          var(--bg);
@@ -50,47 +52,47 @@
 }
 
 /* ─────────────────────────────────────────
-   LIGHT MODE (default)
+   LIGHT MODE (default — Clickify Plum & Frosted Lavender)
 ───────────────────────────────────────── */
 :root {
-  --bg:                #F4F6FB;
-  --on-bg:             #0F172A;
+  --bg:                #FAF8FC;
+  --on-bg:             #341F37;
   --surface:           #FFFFFF;
-  --surface-hover:     #EEF2FF;
-  --outline:           #E2E8F0;
-  --on-surface:        #0F172A;
-  --on-surface-variant:#64748B;
+  --surface-hover:     #F5EFF8;
+  --outline:           rgba(52, 31, 55, 0.10);
+  --on-surface:        #341F37;
+  --on-surface-variant:#6B5570;
 
   /* Dashboard cards */
-  --card-bg:           rgba(255,255,255,0.85);
-  --card-border:       rgba(226,232,240,0.9);
-  --card-text:         #1E293B;
-  --muted:             #64748B;
-  --heading:           #0F172A;
-  --badge-bg:          rgba(37,117,252,0.08);
+  --card-bg:           rgba(255, 255, 255, 0.95);
+  --card-border:       rgba(52, 31, 55, 0.08);
+  --card-text:         #341F37;
+  --muted:             #7E6A82;
+  --heading:           #341F37;
+  --badge-bg:          rgba(123, 76, 133, 0.10);
 
   color-scheme: light;
 }
 
 /* ─────────────────────────────────────────
-   DARK MODE
+   DARK MODE (Clickify Obsidian Velvet)
 ───────────────────────────────────────── */
 .dark {
-  --bg:                #0D0F16;
-  --on-bg:             #F1F5F9;
-  --surface:           #161A24;
-  --surface-hover:     #1E2433;
-  --outline:           #2D3447;
-  --on-surface:        #F1F5F9;
-  --on-surface-variant:#94A3B8;
+  --bg:                #1E1221;
+  --on-bg:             #FAF8FC;
+  --surface:           #27162A;
+  --surface-hover:     #351F3A;
+  --outline:           rgba(224, 216, 235, 0.12);
+  --on-surface:        #FAF8FC;
+  --on-surface-variant:#BEACC1;
 
   /* Dashboard cards */
-  --card-bg:           rgba(22,26,36,0.7);
-  --card-border:       rgba(255,255,255,0.07);
-  --card-text:         #E2E8F0;
-  --muted:             #64748B;
-  --heading:           #F1F5F9;
-  --badge-bg:          rgba(37,117,252,0.12);
+  --card-bg:           rgba(39, 22, 42, 0.85);
+  --card-border:       rgba(224, 216, 235, 0.10);
+  --card-text:         #FAF8FC;
+  --muted:             #9D89A2;
+  --heading:           #FAF8FC;
+  --badge-bg:          rgba(147, 91, 158, 0.20);
 
   color-scheme: dark;
 }
@@ -98,13 +100,128 @@
 /* ─────────────────────────────────────────
    ROOT / BODY
 ───────────────────────────────────────── */
+html {
+  background-color: var(--bg);
+  color: var(--on-bg);
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: none !important;
+}
+
+html.dark,
+.dark body {
+  color-scheme: dark;
+  background-color: #0D0F16 !important;
+  color: #F1F5F9 !important;
+}
+
+html:not(.dark),
+:root:not(.dark) body {
+  color-scheme: light;
+  background-color: #F4F6FB !important;
+}
+
 body {
   font-family: var(--font-body);
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--on-bg);
   -webkit-font-smoothing: antialiased;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: none !important;
+  width: 100%;
+  min-height: 100vh;
   transition: background-color 0.4s cubic-bezier(0.4,0,0.2,1),
               color 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+
+#__nuxt,
+.app-container,
+.dashboard-shell {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: none !important;
+}
+
+/* ─────────────────────────────────────────
+   NAVBAR & FOOTER (MATCHED LIGHT/DARK)
+───────────────────────────────────────── */
+.landing-nav {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+html.dark .landing-nav,
+.dark .landing-nav {
+  background: rgba(13, 15, 22, 0.9) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5) !important;
+}
+
+.landing-brand {
+  color: #0f172a !important;
+  transition: color 0.3s ease;
+}
+.landing-brand b {
+  color: #2575fc !important;
+  font-weight: 900;
+}
+
+html.dark .landing-brand,
+.dark .landing-brand {
+  color: #f1f5f9 !important;
+}
+html.dark .landing-brand b,
+.dark .landing-brand b {
+  color: #3b82f6 !important;
+}
+
+.site-footer {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease !important;
+}
+
+html.dark .site-footer,
+.dark .site-footer {
+  background-color: #0d0f16 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Custom sleek dark/light scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* ─────────────────────────────────────────

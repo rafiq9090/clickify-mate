@@ -22,13 +22,13 @@
             title="Create New Order / Lead Manually"
           >
             <span class="material-symbols-outlined text-base">add_circle</span>
-            Add Order / Lead
+            Add Order
           </button>
 
           <button 
             @click="$emit('refresh')"
             :disabled="loading"
-            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer disabled:opacity-50"
             title="Refresh Leads"
           >
             <span class="material-symbols-outlined text-base text-primary" :class="loading ? 'animate-spin' : ''">refresh</span>
@@ -47,7 +47,7 @@
           <button 
             v-if="selectedLeads.length > 0"
             @click="$emit('bulk-delete')"
-            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 transition-all shadow-xs cursor-pointer animate-in fade-in"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface hover:text-primary transition-all shadow-xs cursor-pointer animate-in fade-in"
             title="Delete Selected Orders"
           >
             <span class="material-symbols-outlined text-base">delete_sweep</span>
@@ -59,7 +59,7 @@
             v-if="selectedLeads.length > 0"
             @click="$emit('bulk-send-to-steadfast')"
             :disabled="sendingToSteadfast"
-            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all shadow-sm disabled:opacity-50 cursor-pointer animate-in fade-in"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary-accent transition-all shadow-xs disabled:opacity-50 cursor-pointer animate-in fade-in"
           >
             <span class="material-symbols-outlined text-base" :class="sendingToSteadfast ? 'animate-spin' : ''">local_shipping</span>
             Send {{ selectedLeads.length }} to Courier
@@ -246,7 +246,7 @@
                     </button>
                     <button 
                       @click="$emit('delete', lead.id)" 
-                      class="p-1.5 rounded-lg hover:bg-rose-500/10 text-on-surface-variant hover:text-rose-600 transition-colors cursor-pointer" 
+                      class="p-1.5 rounded-lg hover:bg-primary/10 text-on-surface-variant hover:text-primary transition-colors cursor-pointer" 
                       title="Delete this Lead"
                     >
                       <span class="material-symbols-outlined text-base">delete</span>
@@ -260,46 +260,44 @@
                 <td colspan="8" class="p-4 sm:p-6 bg-surface-hover/30 border-b border-outline">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
                     <!-- Order Items Breakdown -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline">
-                      <div class="flex items-center gap-1.5 font-semibold text-on-surface">
-                        <span class="material-symbols-outlined text-sm text-primary">receipt_long</span>
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0">
+                      <div class="font-semibold text-on-surface">
                         <span>Order Items & Details</span>
                       </div>
                       <div v-if="lead.data?.order && lead.data.order.includes(':')" class="space-y-1 pt-1">
                         <div 
                           v-for="(part, i) in lead.data.order.split('|')" 
                           :key="i"
-                          class="flex items-center justify-between py-1 border-b border-outline/40 last:border-0"
+                          class="flex items-center justify-between py-1 border-b border-outline/40 last:border-0 gap-2"
                         >
-                          <span class="text-on-surface-variant">{{ part.split(':')[0]?.trim() }}</span>
-                          <span class="font-semibold text-on-surface">{{ part.split(':')[1]?.trim() }}</span>
+                          <span class="text-on-surface-variant truncate">{{ part.split(':')[0]?.trim() }}</span>
+                          <span class="font-semibold text-on-surface shrink-0">{{ part.split(':')[1]?.trim() }}</span>
                         </div>
                       </div>
-                      <p v-else class="text-on-surface font-medium pt-1">
+                      <p v-else class="text-on-surface font-medium pt-1 break-words">
                         {{ lead.data?.order || 'No specific order items listed' }}
                       </p>
 
                       <div v-if="lead.data?.address" class="pt-2 border-t border-outline/30">
                         <span class="text-[10px] text-on-surface-variant font-semibold uppercase tracking-wider block mb-0.5">Delivery Address</span>
-                        <p class="text-on-surface text-xs font-medium">{{ lead.data.address }}</p>
+                        <p class="text-on-surface text-xs font-medium break-words leading-relaxed">{{ lead.data.address }}</p>
                       </div>
                     </div>
 
                     <!-- Courier & Fulfillment -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline">
-                      <div class="flex items-center gap-1.5 font-semibold text-on-surface">
-                        <span class="material-symbols-outlined text-sm text-orange-500">local_shipping</span>
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0">
+                      <div class="font-semibold text-on-surface">
                         <span>Courier Dispatch</span>
                       </div>
 
                       <div v-if="lead.data?.tracking_code" class="space-y-1.5 pt-1">
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between gap-2">
                           <span class="text-on-surface-variant">Tracking:</span>
-                          <span class="font-mono font-semibold text-orange-500 select-all">{{ lead.data.tracking_code }}</span>
+                          <span class="font-mono font-semibold text-primary select-all truncate">{{ lead.data.tracking_code }}</span>
                         </div>
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between gap-2">
                           <span class="text-on-surface-variant">Status:</span>
-                          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-hover text-on-surface border border-outline">
                             {{ lead.data.delivery_status || 'Handed Over' }}
                           </span>
                         </div>
@@ -309,22 +307,20 @@
                         <button 
                           @click.stop="$emit('send-to-steadfast', lead.id)" 
                           :disabled="sendingToSteadfast"
-                          class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white border border-orange-500/20 rounded-lg text-xs font-semibold transition-colors cursor-pointer w-max"
+                          class="inline-flex items-center justify-center px-3.5 py-2 bg-primary text-white hover:bg-primary-accent rounded-xl text-xs font-semibold transition-colors cursor-pointer w-max shadow-xs disabled:opacity-50"
                         >
-                          <span class="material-symbols-outlined text-sm">local_shipping</span>
                           Dispatch via Steadfast
                         </button>
                       </div>
                     </div>
 
                     <!-- Action Controls -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline flex flex-col justify-between">
+                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0 flex flex-col justify-between">
                       <div>
-                        <div class="flex items-center gap-1.5 font-semibold text-on-surface mb-2">
-                          <span class="material-symbols-outlined text-sm text-secondary">tune</span>
+                        <div class="font-semibold text-on-surface mb-1">
                           <span>Record Controls</span>
                         </div>
-                        <p class="text-[11px] text-on-surface-variant">
+                        <p class="text-[11px] text-on-surface-variant leading-relaxed">
                           Update order status, change details, or archive this customer lead.
                         </p>
                       </div>
@@ -332,16 +328,14 @@
                       <div class="flex items-center gap-2 pt-2">
                         <button 
                           @click.stop="$emit('open-edit', lead)" 
-                          class="flex-1 py-1.5 px-3 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          class="flex-1 py-2 px-3 rounded-xl bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-semibold transition-colors flex items-center justify-center cursor-pointer"
                         >
-                          <span class="material-symbols-outlined text-sm">edit</span>
                           Edit Details
                         </button>
                         <button 
                           @click.stop="$emit('delete', lead.id)" 
-                          class="py-1.5 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-500/20 font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          class="py-2 px-3.5 rounded-xl bg-surface-hover hover:bg-primary/10 text-on-surface hover:text-primary border border-outline font-semibold transition-colors flex items-center justify-center cursor-pointer"
                         >
-                          <span class="material-symbols-outlined text-sm">delete</span>
                           Delete
                         </button>
                       </div>
@@ -475,16 +469,10 @@ const toggleSelectLead = (id) => {
 }
 
 const getPlatformBadgeClass = (platform) => {
-  if (platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-  if (platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
-  if (platform === 'facebook' || platform === 'messenger' || platform === 'fb_comment') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-  return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+  return 'bg-surface-hover text-on-surface border-outline/70'
 }
 
 const getStatusBadgeClass = (status) => {
-  if (status === 'complete') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-  if (status === 'hold') return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-  if (status === 'cancelled') return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-  return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+  return 'bg-primary/10 text-primary border-primary/20'
 }
 </script>

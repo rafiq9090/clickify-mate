@@ -24,12 +24,13 @@ export const useAgents = (supabase: any, showToast: Function) => {
                 console.log(`[DASHBOARD DEBUG]: Found ${data.length} agents.`)
                 agents.value = data.map((a: any) => {
                     const rawImages = Array.isArray(a.product_images) ? a.product_images : []
-                    const images = rawImages.map((img: any) => {
-                        if (typeof img === 'string') return { id: '', url: img }
-                        if (img && typeof img === 'object') return { id: img.id || '', url: img.url || '' }
-                        return { id: '', url: '' }
-                    })
-                    while (images.length < 3) images.push({ id: '', url: '' })
+                    const images = rawImages
+                        .map((img: any) => {
+                            if (typeof img === 'string') return { id: '', url: img }
+                            if (img && typeof img === 'object') return { id: img.id || '', url: img.url || '' }
+                            return { id: '', url: '' }
+                        })
+                        .filter((img: any) => img.id.trim() !== '' || img.url.trim() !== '')
                     const behavior = a.agent_behavior || {}
                     if (behavior.fb_private_reply_prices === undefined) behavior.fb_private_reply_prices = true
                     if (behavior.fb_private_reply_orders === undefined) behavior.fb_private_reply_orders = true
@@ -58,8 +59,15 @@ export const useAgents = (supabase: any, showToast: Function) => {
         try {
             const rawImages = Array.isArray(agent.product_images)
                 ? agent.product_images
-                    .map((img: any) => typeof img === 'string' ? img.trim() : (img?.url || '').trim())
-                    .filter((url: string) => url.length > 0)
+                    .filter((img: any) => {
+                        const id = typeof img === 'object' ? (img.id || '').trim() : ''
+                        const url = typeof img === 'object' ? (img.url || '').trim() : (typeof img === 'string' ? img.trim() : '')
+                        return id.length > 0 || url.length > 0
+                    })
+                    .map((img: any) => {
+                        if (typeof img === 'string') return { id: '', url: img.trim() }
+                        return { id: (img.id || '').trim(), url: (img.url || '').trim() }
+                    })
                 : []
 
             const res: any = await $fetch('/api/agents/update', {

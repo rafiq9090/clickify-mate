@@ -14,14 +14,29 @@
     <div class="space-y-5">
       <!-- 1. Steadfast Courier Integration Card -->
       <div class="bg-surface border border-outline rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
-        <div class="flex items-center justify-between border-b border-outline/40 pb-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline/40 pb-3">
           <div class="flex items-center gap-3">
-           
             <div>
               <h3 class="text-sm font-bold text-on-surface">Steadfast Courier Logistics</h3>
               <p class="text-xs text-on-surface-variant">Automate parcel booking and tracking code generation directly from customer orders.</p>
             </div>
           </div>
+
+          <button 
+            type="button" 
+            @click="testSteadfastConnection" 
+            :disabled="testingSteadfast"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-2xs cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            <span class="material-symbols-outlined text-sm" :class="testingSteadfast ? 'animate-spin' : 'network_check'">
+              {{ testingSteadfast ? 'sync' : 'network_check' }}
+            </span>
+            <span>{{ testingSteadfast ? 'Testing...' : 'Test Connection' }}</span>
+          </button>
+        </div>
+
+        <div v-if="steadfastFeedback.message" class="p-3 rounded-xl text-xs font-medium border" :class="steadfastFeedback.success ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'">
+          {{ steadfastFeedback.message }}
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -62,7 +77,7 @@
 
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-primary-accent shadow-xs cursor-pointer"
             @click="$emit('switch-tab', 'payment-gateways')"
           >
             Manage gateways
@@ -146,15 +161,51 @@
 </template>
 
 <script setup>
-defineProps({
+import { ref, reactive } from 'vue'
+
+const props = defineProps({
   integrations: { type: Object, required: true },
   savingIntegrations: { type: Boolean, required: true }
 })
 
-defineEmits([
+const emit = defineEmits([
   'update:integration-field',
   'save-integrations',
   'copy-text',
-  'switch-tab'
+  'switch-tab',
+  'show-toast'
 ])
+
+const testingSteadfast = ref(false)
+const steadfastFeedback = reactive({
+  success: false,
+  message: ''
+})
+
+const testSteadfastConnection = async () => {
+  const apiKey = props.integrations?.steadfast_api_key?.trim()
+  const secretKey = props.integrations?.steadfast_secret_key?.trim()
+
+  if (!apiKey || !secretKey) {
+    steadfastFeedback.success = false
+    steadfastFeedback.message = '❌ Please enter both Steadfast API Key and Secret Key first.'
+    return
+  }
+
+  testingSteadfast.value = true
+  steadfastFeedback.message = ''
+  try {
+    const res = await $fetch('/api/courier/test-steadfast', {
+      method: 'POST',
+      body: { apiKey, secretKey }
+    })
+    steadfastFeedback.success = true
+    steadfastFeedback.message = `✅ ${res.message || 'Connected to Steadfast successfully!'}`
+  } catch (err) {
+    steadfastFeedback.success = false
+    steadfastFeedback.message = `❌ ${err?.data?.statusMessage || err?.statusMessage || err?.message || 'Failed to connect to Steadfast'}`
+  } finally {
+    testingSteadfast.value = false
+  }
+}
 </script>

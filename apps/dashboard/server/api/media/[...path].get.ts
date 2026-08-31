@@ -1,9 +1,7 @@
 // server/api/media/[...path].get.ts
 import { getFileFromBackblaze } from '../../utils/backblaze'
-import { requireDashboardUser } from '../../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
-  await requireDashboardUser(event)
   const path = getRouterParam(event, 'path')
   if (!path) {
     throw createError({ statusCode: 400, statusMessage: 'Media path required' })
@@ -21,9 +19,10 @@ export default defineEventHandler(async (event) => {
     if (data.ContentLength) {
       setHeader(event, 'Content-Length', data.ContentLength)
     }
-    setHeader(event, 'Cache-Control', 'private, max-age=3600')
+    setHeader(event, 'Cache-Control', 'public, max-age=86400')
+    setHeader(event, 'Accept-Ranges', 'bytes')
 
-    // Stream byte array / stream
+    // Stream byte array
     const byteArray = await data.Body.transformToByteArray()
     return byteArray
   } catch (error: any) {

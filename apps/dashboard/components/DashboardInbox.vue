@@ -11,18 +11,6 @@
           Monitor real-time AI conversations across WhatsApp, Telegram, and Facebook Messenger.
         </p>
       </div>
-
-      <!-- Action Buttons -->
-      <div class="flex items-center gap-2">
-        <button 
-          @click="refreshMessages" 
-          :disabled="loading"
-          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface border border-outline hover:bg-surface-hover text-on-surface transition-all shadow-xs cursor-pointer"
-        >
-          <span class="material-symbols-outlined text-base" :class="loading ? 'animate-spin' : ''">replay</span>
-          <span>{{ loading ? 'Refreshing...' : 'Refresh Inbox' }}</span>
-        </button>
-      </div>
     </div>
 
     <!-- Main Inbox Split View with Fixed Height & Independent Column Scrolling -->
@@ -172,11 +160,11 @@
                 <div class="flex items-center gap-2 mt-0.5">
                   <span 
                     class="text-[10px] sm:text-[11px] flex items-center gap-1 font-medium truncate"
-                    :class="selectedThread.ai_disabled ? 'text-amber-500' : 'text-emerald-500'"
+                    :class="selectedThread.ai_disabled ? 'text-on-surface-variant' : 'text-primary'"
                   >
                     <span 
                       class="w-1.5 h-1.5 rounded-full shrink-0"
-                      :class="selectedThread.ai_disabled ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'"
+                      :class="selectedThread.ai_disabled ? 'bg-on-surface-variant/50' : 'bg-primary animate-pulse'"
                     ></span>
                     {{ selectedThread.ai_disabled ? 'Manual Mode' : 'AI Active' }}
                   </span>
@@ -189,26 +177,23 @@
               <button 
                 @click="toggleAiForThread(selectedThread)"
                 :disabled="togglingAi"
-                class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer shadow-2xs"
+                class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border border-outline transition-all cursor-pointer shadow-2xs"
                 :class="selectedThread.ai_disabled 
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' 
-                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20'"
+                  ? 'bg-primary text-white hover:bg-primary-accent border-primary' 
+                  : 'bg-surface-hover text-on-surface hover:text-primary hover:bg-primary/10'"
                 :title="selectedThread.ai_disabled ? 'Start AI Auto-Pilot for this customer' : 'Pause AI Auto-Pilot to take over manually'"
               >
-                <!-- <span class="material-symbols-outlined text-sm">
-                  {{ selectedThread.ai_disabled ? 'play_arrow' : 'pause' }}
-                </span> -->
                 <span>{{ selectedThread.ai_disabled ? 'Start AI Reply' : 'Stop AI Reply' }}</span>
               </button>
 
-              <span class="text-[10px] sm:text-[11px] font-semibold text-on-surface-variant bg-surface-hover px-2 py-1 rounded-lg border border-outline uppercase">
+              <span class="text-[10px] sm:text-[11px] font-semibold text-on-surface bg-surface-hover px-2 py-1 rounded-lg border border-outline/70 uppercase">
                 {{ selectedThread.platform }}
               </span>
 
               <!-- Clear Conversation Button -->
               <button 
                 @click="handleClearThread(selectedThread)"
-                class="p-1.5 rounded-lg text-on-surface-variant/70 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                class="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                 title="Clear / Delete entire conversation"
               >
                 <span class="material-symbols-outlined text-base">delete_sweep</span>
@@ -410,10 +395,9 @@
               <button 
                 @click="handleSendReply"
                 :disabled="!replyText.trim() || sendingReply"
-                class="px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent transition-colors disabled:opacity-40 flex items-center gap-1 cursor-pointer"
+                class="px-4 py-2  rounded-xl cursor-pointer"
               >
-                <span class="material-symbols-outlined text-sm">send</span>
-                <span>Send</span>
+                <span class="material-symbols-outlined text-sm text-primary">send</span>
               </button>
             </div>
           </div>
@@ -947,9 +931,7 @@ const getPlatformIcon = (platform) => {
 }
 
 const getPlatformBadgeClass = (platform) => {
-  if (platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-  if (platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
-  return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+  return 'bg-surface-hover text-on-surface border-outline/70'
 }
 
 onMounted(() => {

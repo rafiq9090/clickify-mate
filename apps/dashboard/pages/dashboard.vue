@@ -20,9 +20,9 @@
         <!-- Logo / Brand Header -->
         <div class="min-h-16 px-4 lg:px-5 border-b border-outline flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm shadow-primary/30">
-              <span class="material-symbols-outlined text-xl">auto_awesome</span>
-            </div>
+            <!-- <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm shadow-primary/30">
+              <span class="material-symbols-outlined text-xl">chat</span>
+            </div> -->
             <div>
               <h1 class="text-base font-bold tracking-tight text-on-surface">Clickify Mate</h1>
               <p class="text-[11px] font-medium text-primary">Social AI Commerce</p>
@@ -41,13 +41,36 @@
 
         <!-- Navigation Menu -->
         <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 lg:p-4 flex flex-col gap-1.5 scrollbar-none">
-          <!-- Group 1: Live Operations -->
+          <!-- Group 0: Overview & Insights -->
           <div class="hidden lg:block px-3 py-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
+            Overview
+          </div>
+
+          <button 
+            @click="selectMenu('analytics')"
+            class="flex min-h-11 w-full items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer"
+            :class="currentMenu === 'analytics' 
+              ? 'bg-primary text-white shadow-xs font-semibold' 
+              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-hover font-medium'"
+          >
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-lg">analytics</span>
+              <span>Analytics</span>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold transition-colors shadow-2xs"
+              :class="currentMenu === 'analytics' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'"
+            >
+              Live
+            </span>
+          </button>
+
+          <!-- Group 1: Live Operations -->
+          <div class="hidden lg:block px-3 pt-3 pb-1 text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">
             Conversations
           </div>
           
           <button 
-            v-for="item in menuItems.slice(0, 2)" 
+            v-for="item in menuItems.slice(1, 3)" 
             :key="item.id" 
             @click="selectMenu(item.id)"
             class="flex min-h-11 w-full items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer"
@@ -67,7 +90,7 @@
           </div>
 
           <button 
-            v-for="item in menuItems.slice(2, 5)" 
+            v-for="item in menuItems.slice(3, 6)" 
             :key="item.id" 
             @click="selectMenu(item.id)"
             class="flex min-h-11 w-full items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer"
@@ -83,19 +106,19 @@
             <!-- Dynamic Badges on Navigation -->
             <span v-if="item.id === 'catalog' && lowStockProductsCount > 0" 
               class="px-2 py-0.5 rounded-full text-[10px] font-extrabold transition-colors shadow-2xs"
-              :class="currentMenu === item.id ? 'bg-white/20 text-white' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'"
+              :class="currentMenu === item.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary border border-primary/20'"
             >
               {{ lowStockProductsCount }} Low
             </span>
             <span v-else-if="item.id === 'leads' && totalLeads > 0" 
               class="px-2 py-0.5 rounded-full text-[10px] font-extrabold transition-colors shadow-2xs"
-              :class="currentMenu === item.id ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'"
+              :class="currentMenu === item.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary border border-primary/20'"
             >
               {{ totalLeads }} New
             </span>
             <span v-else-if="item.id === 'orders' && totalOrders > 0" 
               class="px-2 py-0.5 rounded-full text-[10px] font-extrabold transition-colors shadow-2xs"
-              :class="currentMenu === item.id ? 'bg-white/20 text-white' : 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20'"
+              :class="currentMenu === item.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary border border-primary/20'"
             >
               {{ totalOrders }}
             </span>
@@ -107,7 +130,7 @@
           </div>
 
           <button 
-            v-for="item in menuItems.slice(5)" 
+            v-for="item in menuItems.slice(6)" 
             :key="item.id" 
             @click="selectMenu(item.id)"
             class="flex min-h-11 w-full items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer"
@@ -292,9 +315,20 @@
 
       <!-- Subview Content Area -->
       <div class="dashboard-content p-2.5 sm:p-5 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-3 sm:space-y-6 md:space-y-8 flex-1 min-w-0">
+        <!-- 0. Analytics & Store Performance Tab -->
+        <DashboardAnalytics
+          v-if="currentMenu === 'analytics'"
+          :key="'analytics'"
+          :leads="leads"
+          :orders="orders"
+          :mockInventory="mockInventory"
+          :agents="agents"
+          @refresh="() => { fetchLeads(); fetchOrders(); fetchInventory(); }"
+        />
+
         <!-- 1. Live Chat Inbox (Default) -->
         <DashboardInbox
-          v-if="currentMenu === 'inbox'"
+          v-else-if="currentMenu === 'inbox'"
           :key="'inbox'"
           :agents="agents"
           :mockInventory="mockInventory"
@@ -424,6 +458,13 @@
           @run-test="runWebhookMockTest"
           @update-knowledge="updateKnowledge"
           @copy-text="copyText"
+        />
+
+        <!-- 9. User Problem & Feedback Tab (Stored in Firebase) -->
+        <DashboardFeedback
+          v-else-if="currentMenu === 'feedback'"
+          :key="'feedback'"
+          @show-toast="({ message, type }) => showToast(message, type)"
         />
       </div>
     </main>
@@ -842,17 +883,8 @@
       <Transition name="fade">
         <div 
           v-if="toast.show" 
-          class="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl text-xs font-semibold text-white transition-all animate-in slide-in-from-bottom-2 duration-200"
-          :class="{
-            'bg-emerald-600': toast.type === 'success',
-            'bg-rose-600': toast.type === 'error',
-            'bg-amber-600': toast.type === 'warning',
-            'bg-primary': toast.type === 'info'
-          }"
+          class="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold bg-primary text-white transition-all animate-in slide-in-from-bottom-2 duration-200 border border-white/10"
         >
-          <span class="material-symbols-outlined text-base">
-            {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : toast.type === 'warning' ? 'warning' : 'info' }}
-          </span>
           <span>{{ toast.message }}</span>
         </div>
       </Transition>
@@ -870,6 +902,7 @@ import {
   knowledgeBaseGuideline
 } from '~/shared/templates'
 
+import DashboardAnalytics from '~/components/DashboardAnalytics.vue'
 import DashboardInbox from '~/components/DashboardInbox.vue'
 import DashboardAgents from '~/components/DashboardAgents.vue'
 import DashboardCatalog from '~/components/DashboardCatalog.vue'
@@ -878,10 +911,14 @@ import DashboardOrders from '~/components/DashboardOrders.vue'
 import DashboardPaymentGateways from '~/components/DashboardPaymentGateways.vue'
 import DashboardIntegrations from '~/components/DashboardIntegrations.vue'
 import DashboardWebhooks from '~/components/DashboardWebhooks.vue'
+import DashboardFeedback from '~/components/DashboardFeedback.vue'
 
 definePageMeta({
   layout: false
 })
+
+const route = useRoute()
+const router = useRouter()
 
 const supabase = useSupabase()
 const userEmail = ref('')
@@ -891,9 +928,39 @@ const orders = ref([])
 const selectedLeads = ref([])
 const sendingToSteadfast = ref(false)
 
-const currentMenu = ref('inbox')
+const validMenuIds = [
+  'analytics',
+  'inbox',
+  'agents',
+  'catalog',
+  'leads',
+  'orders',
+  'payment-gateways',
+  'integrations',
+  'webhooks',
+  'feedback'
+]
+
+const getInitialMenu = () => {
+  const queryTab = route.query?.tab
+  if (queryTab && typeof queryTab === 'string' && validMenuIds.includes(queryTab)) {
+    return queryTab
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('clickify_active_tab')
+      if (saved && validMenuIds.includes(saved)) {
+        return saved
+      }
+    } catch (e) {}
+  }
+  return 'inbox'
+}
+
+const currentMenu = ref(getInitialMenu())
 const mobileMenuOpen = ref(false)
 const menuItems = [
+  { id: 'analytics', label: 'Analytics', icon: 'analytics' },
   { id: 'inbox', label: 'Live Inbox', icon: 'forum' },
   { id: 'agents', label: 'AI Agents', icon: 'smart_toy' },
   { id: 'catalog', label: 'Product Catalog', icon: 'inventory_2' },
@@ -901,7 +968,8 @@ const menuItems = [
   { id: 'orders', label: 'Paid Orders', icon: 'payments' },
   { id: 'payment-gateways', label: 'Payment Gateways', icon: 'account_balance_wallet' },
   { id: 'integrations', label: 'Settings & Courier', icon: 'settings' },
-  { id: 'webhooks', label: 'Webhook Tools', icon: 'hub' }
+  { id: 'webhooks', label: 'Webhook Tools', icon: 'hub' },
+  { id: 'feedback', label: 'Problem & Feedback', icon: 'help_outline' }
 ]
 
 const closeMobileMenu = () => {
@@ -915,6 +983,12 @@ const toggleMobileMenu = () => {
 const selectMenu = (menuId) => {
   currentMenu.value = menuId
   closeMobileMenu()
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('clickify_active_tab', menuId)
+      router.replace({ query: { ...route.query, tab: menuId } })
+    } catch (e) {}
+  }
 }
 
 const handleDashboardKeydown = (event) => {
@@ -933,8 +1007,21 @@ const currentMenuTitle = computed(() => {
   return match ? match.label : 'Live Inbox'
 })
 
+watch(() => route.query.tab, (newTab) => {
+  if (newTab && typeof newTab === 'string' && validMenuIds.includes(newTab) && newTab !== currentMenu.value) {
+    currentMenu.value = newTab
+    try {
+      localStorage.setItem('clickify_active_tab', newTab)
+    } catch (e) {}
+  }
+})
+
 watch(currentMenu, (newTab) => {
-  if (newTab === 'leads') {
+  if (newTab === 'analytics') {
+    fetchLeads()
+    fetchOrders()
+    fetchInventory()
+  } else if (newTab === 'leads') {
     fetchLeads()
   } else if (newTab === 'orders') {
     fetchOrders()
@@ -1540,12 +1627,13 @@ const fetchAgents = async () => {
     if (data) {
       agents.value = data.map(a => {
         const rawImages = Array.isArray(a.product_images) ? a.product_images : []
-        const images = rawImages.map(img => {
-          if (typeof img === 'string') return { id: '', url: img }
-          if (img && typeof img === 'object') return { id: img.id || '', url: img.url || '' }
-          return { id: '', url: '' }
-        })
-        while (images.length < 3) images.push({ id: '', url: '' })
+        const images = rawImages
+          .map(img => {
+            if (typeof img === 'string') return { id: '', url: img }
+            if (img && typeof img === 'object') return { id: img.id || '', url: img.url || '' }
+            return { id: '', url: '' }
+          })
+          .filter(img => (img.id && img.id.trim() !== '') || (img.url && img.url.trim() !== ''))
 
         const behavior = a.agent_behavior || {}
         return {
@@ -1573,8 +1661,15 @@ const updateKnowledge = async (agent) => {
   try {
     const rawImages = Array.isArray(agent.product_images)
       ? agent.product_images
-          .map(img => typeof img === 'string' ? img.trim() : (img?.url || '').trim())
-          .filter(url => url.length > 0)
+          .filter(img => {
+            const id = typeof img === 'object' ? (img.id || '').trim() : ''
+            const url = typeof img === 'object' ? (img.url || '').trim() : (typeof img === 'string' ? img.trim() : '')
+            return id.length > 0 || url.length > 0
+          })
+          .map(img => {
+            if (typeof img === 'string') return { id: '', url: img.trim() }
+            return { id: (img.id || '').trim(), url: (img.url || '').trim() }
+          })
       : []
 
     const res = await $fetch('/api/agents/update', {
@@ -1890,11 +1985,32 @@ const deleteOrder = async (id) => {
 }
 
 const sendToSteadfast = async (id) => {
+  const apiKey = integrations.steadfast_api_key?.trim()
+  const secretKey = integrations.steadfast_secret_key?.trim()
+
+  if (!apiKey || !secretKey) {
+    showToast('Steadfast Courier is not connected. Please enter your Steadfast API Key and Secret Key in Store Settings & Integrations first.', 'error')
+    return
+  }
+
   sendingToSteadfast.value = true
   try {
-    showToast('Dispatched to Steadfast Courier tracking #SF-' + Math.floor(100000 + Math.random() * 900000), 'success')
-    await fetchLeads()
-    await fetchOrders()
+    const res = await $fetch('/api/steadfast-proxy', {
+      method: 'POST',
+      body: { lead_ids: [id] }
+    })
+
+    const orderResult = res?.results?.[0]
+    if (orderResult?.success) {
+      showToast(`Dispatched to Steadfast Courier! Tracking: #${orderResult.tracking_code || orderResult.consignment_id}`, 'success')
+      await fetchLeads()
+      await fetchOrders()
+    } else {
+      showToast(`Courier Dispatch Failed: ${orderResult?.message || 'Invalid recipient or courier error'}`, 'error')
+    }
+  } catch (err) {
+    const msg = err?.data?.statusMessage || err?.statusMessage || err?.message || 'Failed to dispatch to Steadfast'
+    showToast(`Courier Error: ${msg}`, 'error')
   } finally {
     sendingToSteadfast.value = false
   }
@@ -1902,11 +2018,37 @@ const sendToSteadfast = async (id) => {
 
 const bulkSendToSteadfast = async () => {
   if (selectedLeads.value.length === 0) return
+
+  const apiKey = integrations.steadfast_api_key?.trim()
+  const secretKey = integrations.steadfast_secret_key?.trim()
+
+  if (!apiKey || !secretKey) {
+    showToast('Steadfast Courier is not connected. Please configure your credentials in Store Settings & Integrations first.', 'error')
+    return
+  }
+
   sendingToSteadfast.value = true
   try {
-    showToast(`Bulk dispatched ${selectedLeads.value.length} orders to courier`, 'success')
-    selectedLeads.value = []
-    await fetchLeads()
+    const res = await $fetch('/api/steadfast-proxy', {
+      method: 'POST',
+      body: { lead_ids: selectedLeads.value }
+    })
+
+    const successCount = res?.summary?.successful || 0
+    const failCount = res?.summary?.failed || 0
+
+    if (successCount > 0) {
+      showToast(`Dispatched ${successCount} orders to Steadfast Courier!${failCount > 0 ? ` (${failCount} failed)` : ''}`, failCount > 0 ? 'warning' : 'success')
+      selectedLeads.value = []
+      await fetchLeads()
+      await fetchOrders()
+    } else {
+      const firstError = res?.results?.find(r => !r.success)?.message || 'Steadfast rejected the orders'
+      showToast(`Bulk Dispatch Failed: ${firstError}`, 'error')
+    }
+  } catch (err) {
+    const msg = err?.data?.statusMessage || err?.statusMessage || err?.message || 'Bulk dispatch failed'
+    showToast(`Courier Error: ${msg}`, 'error')
   } finally {
     sendingToSteadfast.value = false
   }
@@ -2049,6 +2191,11 @@ onMounted(async () => {
       await fetchApiKeys()
       await fetchRealNotifications()
       checkBackendStatus()
+
+      // Sync URL tab query parameter
+      if (route.query?.tab !== currentMenu.value) {
+        router.replace({ query: { ...route.query, tab: currentMenu.value } })
+      }
 
       // Realtime Polling Engine (every 5 seconds)
       realtimeSyncInterval = setInterval(async () => {

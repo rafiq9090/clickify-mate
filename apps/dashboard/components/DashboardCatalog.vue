@@ -8,21 +8,33 @@
           <h2 class="text-xl font-bold tracking-tight text-on-surface">Product Catalog &amp; Cloud Stock</h2>
         </div>
         <p class="text-xs text-on-surface-variant mt-1">
-          Manage multi-image galleries, auto-link batch photos with Backblaze B2, and assign stock to AI agents.
+          Manage multi-image galleries, upload products via CSV, and edit or delete products.
         </p>
       </div>
 
       <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
-        <!-- Smart Batch Auto-Linker Button -->
-        <label class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-secondary/10 hover:bg-secondary text-secondary hover:text-white border border-secondary/20 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer">
-          <span class="truncate">Batch Images</span>
-          <input type="file" multiple accept="image/*" class="hidden" @change="handleBatchUpload" />
+        <!-- Download Sample CSV Template Button -->
+        <button 
+          type="button"
+          @click="downloadSampleCsv"
+          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-surface hover:bg-surface-hover text-on-surface-variant hover:text-primary border border-outline hover:border-primary/40 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap"
+          title="Download sample CSV file with all product columns"
+        >
+          <span class="material-symbols-outlined text-base text-primary">download</span>
+          <span>Sample CSV</span>
+        </button>
+
+        <!-- Import CSV File Button -->
+        <label class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-surface hover:bg-surface-hover text-on-surface-variant hover:text-primary border border-outline hover:border-primary/40 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap">
+          <span class="material-symbols-outlined text-base text-primary">upload_file</span>
+          <span>Import CSV</span>
+          <input type="file" accept=".csv,text/csv" class="hidden" @change="handleCsvUpload" />
         </label>
 
         <!-- Add Single Product Button -->
         <button 
           @click="openAddModal"
-          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent shadow-xs transition-all cursor-pointer"
+          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-accent shadow-xs transition-all cursor-pointer whitespace-nowrap"
         >
           <span class="material-symbols-outlined text-base">add</span>
           <span>Add Product</span>
@@ -30,7 +42,7 @@
       </div>
     </div>
 
-    <!-- KPI Summary Pills -->
+    <!-- KPI Summary Cards -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <div class="p-3.5 rounded-2xl bg-surface border border-outline flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
@@ -43,32 +55,32 @@
       </div>
 
       <div class="p-3.5 rounded-2xl bg-surface border border-outline flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+        <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
           <span class="material-symbols-outlined text-lg">inventory</span>
         </div>
         <div>
           <span class="text-xs text-on-surface-variant block">In Stock</span>
-          <span class="text-base font-bold text-emerald-600 dark:text-emerald-400">{{ inStockCount }}</span>
+          <span class="text-base font-bold text-on-surface">{{ inStockCount }}</span>
         </div>
       </div>
 
       <div class="p-3.5 rounded-2xl bg-surface border border-outline flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+        <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
           <span class="material-symbols-outlined text-lg">production_quantity_limits</span>
         </div>
         <div>
           <span class="text-xs text-on-surface-variant block">Low Stock (&le; 3)</span>
-          <span class="text-base font-bold text-amber-600 dark:text-amber-400">{{ lowStockCount }}</span>
+          <span class="text-base font-bold text-on-surface">{{ lowStockCount }}</span>
         </div>
       </div>
 
       <div class="p-3.5 rounded-2xl bg-surface border border-outline flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
+        <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
           <span class="material-symbols-outlined text-lg">cloud_done</span>
         </div>
         <div>
-          <span class="text-xs text-on-surface-variant block">Backblaze Gallery</span>
-          <span class="text-base font-bold text-purple-600 dark:text-purple-400">{{ totalImagesCount }} Photos</span>
+          <span class="text-xs text-on-surface-variant block">Gallery</span>
+          <span class="text-base font-bold text-on-surface">{{ totalImagesCount }} Photos</span>
         </div>
       </div>
     </div>
@@ -146,8 +158,7 @@
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 shadow-2xs" :style="{ backgroundColor: getColorHex(col.name) }"></span>
                         <span class="capitalize font-semibold">{{ col.name }}</span>
                         <span v-if="col.quantity !== undefined" 
-                          class="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                          :class="col.quantity > 3 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : (col.quantity > 0 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 font-extrabold' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400')"
+                          class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-surface border border-outline text-on-surface-variant"
                         >
                           {{ col.quantity }} left{{ col.quantity <= 3 && col.quantity > 0 ? ' (Low)' : (col.quantity === 0 ? ' (Out)' : '') }}
                         </span>
@@ -160,7 +171,7 @@
 
               <!-- SKU -->
               <td class="py-3.5 px-4 whitespace-nowrap">
-                <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 inline-block shadow-2xs">
+                <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded-lg bg-surface-hover text-primary border border-outline inline-block shadow-2xs">
                   {{ item.sku }}
                 </span>
               </td>
@@ -168,10 +179,9 @@
               <!-- Target Agent / Channel -->
               <td class="py-3.5 px-4 whitespace-nowrap">
                 <span 
-                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border whitespace-nowrap shadow-2xs"
+                  class="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-semibold border whitespace-nowrap shadow-2xs"
                   :class="getAgentBadgeClass(item.assigned_agent)"
                 >
-                  <span class="material-symbols-outlined text-sm shrink-0">{{ getAgentIcon(item.assigned_agent) }}</span>
                   <span class="truncate max-w-[130px]">{{ getAgentLabel(item.assigned_agent) }}</span>
                 </span>
               </td>
@@ -182,7 +192,7 @@
                   <span class="font-bold text-xs text-on-surface">৳{{ Number(item.price || 0).toLocaleString() }}</span>
                   <div v-if="item.regular_price && item.regular_price > item.price" class="flex items-center gap-1 mt-0.5">
                     <span class="text-[10px] text-on-surface-variant/60 line-through">৳{{ Number(item.regular_price).toLocaleString() }}</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
                       {{ Math.round(((item.regular_price - item.price) / item.regular_price) * 100) }}% OFF
                     </span>
                   </div>
@@ -211,14 +221,8 @@
               <!-- Stock Status Pill -->
               <td class="py-3.5 px-4 text-center whitespace-nowrap">
                 <span 
-                  class="inline-flex items-center justify-center px-3 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap shadow-2xs"
-                  :class="item.stock_quantity > 3 
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                    : item.stock_quantity > 0 
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                      : 'bg-rose-500/10 text-rose-600 border-rose-500/20'"
+                  class="inline-flex items-center justify-center px-3 py-1 rounded-full text-[11px] font-semibold bg-surface-hover text-on-surface border border-outline whitespace-nowrap shadow-2xs"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full mr-1.5 shrink-0" :class="item.stock_quantity > 3 ? 'bg-emerald-500' : item.stock_quantity > 0 ? 'bg-amber-500' : 'bg-rose-500'"></span>
                   {{ item.stock_quantity > 3 ? 'In Stock' : item.stock_quantity > 0 ? 'Low Stock' : 'Sold Out' }}
                 </span>
               </td>
@@ -235,7 +239,7 @@
                   </button>
                   <button 
                     @click="removeProduct(item.sku)" 
-                    class="p-1.5 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer shadow-2xs"
+                    class="p-1.5 rounded-xl text-on-surface-variant hover:text-primary hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-all cursor-pointer shadow-2xs"
                     title="Delete Product"
                   >
                     <span class="material-symbols-outlined text-base">delete</span>
@@ -290,7 +294,7 @@
                   <div class="flex items-center justify-between">
                     <label class="font-medium text-on-surface-variant flex items-center gap-1">
                       <span>SKU Code</span>
-                      <span class="text-[10px] font-semibold" :class="isSkuCustomized ? 'text-purple-500' : 'text-emerald-500'">
+                      <span class="text-[10px] font-semibold text-primary">
                         ({{ isSkuCustomized ? 'Custom' : 'Auto' }})
                       </span>
                     </label>
@@ -490,7 +494,7 @@
                       <button 
                         type="button" 
                         @click="productForm.images.splice(idx, 1)"
-                        class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 cursor-pointer shrink-0 mt-3"
+                        class="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 cursor-pointer shrink-0 mt-3 transition-colors"
                         title="Remove"
                       >
                         <span class="material-symbols-outlined text-base">close</span>
@@ -523,10 +527,9 @@
                             <span class="text-rose-500 font-bold">*</span>
                           </label>
                           <span v-if="img.quantity !== undefined" 
-                            class="text-[9px] font-bold px-1.5 py-0.5 rounded-md border shadow-2xs"
-                            :class="img.quantity > 3 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : (img.quantity > 0 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20')"
+                            class="text-[9px] font-bold px-1.5 py-0.5 rounded-md border shadow-2xs bg-surface text-on-surface-variant border-outline"
                           >
-                            {{ img.quantity > 3 ? 'In Stock' : (img.quantity > 0 ? '🟡 Low Stock' : '🔴 Out of Stock') }}
+                            {{ img.quantity > 3 ? 'In Stock' : (img.quantity > 0 ? 'Low Stock' : 'Out of Stock') }}
                           </span>
                         </div>
                         <div class="flex items-center bg-surface px-2.5 py-1.5 rounded-xl border border-outline focus-within:border-primary/50">
@@ -606,112 +609,111 @@
       </Transition>
     </Teleport>
 
-    <!-- Modal 2: Visual Auto-Link Review & Confirmation Modal -->
+
+
+    <!-- Modal 3: CSV Bulk Product Import Review Modal -->
     <Teleport to="body">
       <Transition name="fade">
-        <div v-if="showAutoLinkModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div class="bg-surface border border-outline rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div v-if="showCsvImportModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div class="bg-surface border border-outline rounded-3xl p-5 sm:p-8 max-w-3xl w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto in-scroll animate-in zoom-in-95 duration-200">
             <div class="flex items-center justify-between border-b border-outline/40 pb-3">
               <div class="flex items-center gap-2.5">
-                <div class="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
-                  <span class="material-symbols-outlined text-xl">auto_fix_high</span>
+                <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <span class="material-symbols-outlined text-xl">table_view</span>
                 </div>
                 <div>
-                  <h3 class="text-base font-bold text-on-surface">Review Auto-Linked Images</h3>
-                  <p class="text-xs text-on-surface-variant">Verify matched products before applying to your AI agents</p>
+                  <h3 class="text-base font-bold text-on-surface">Review CSV Products Import</h3>
+                  <p class="text-xs text-on-surface-variant">Verify {{ csvImportQueue.length }} products found in your CSV file</p>
                 </div>
               </div>
-              <button @click="showAutoLinkModal = false" class="p-1 rounded-lg text-on-surface-variant hover:bg-surface-hover transition-colors cursor-pointer">
+              <button @click="showCsvImportModal = false" class="p-1 rounded-lg text-on-surface-variant hover:bg-surface-hover transition-colors cursor-pointer">
                 <span class="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <!-- Uploading state -->
-            <div v-if="batchUploading" class="py-12 text-center space-y-3">
-              <div class="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p class="text-xs font-medium text-on-surface">Uploading {{ batchUploadQueue.length }} photos to Backblaze B2 &amp; auto-matching...</p>
-            </div>
-
-            <!-- Matched results grid -->
-            <div v-else class="space-y-4">
-              <div 
-                v-for="group in autoMatchedGroups" 
-                :key="group.productSku" 
-                class="p-4 rounded-2xl bg-surface-hover/70 border border-outline space-y-3"
+            <!-- CSV Columns Helper banner -->
+            <div class="p-3.5 rounded-2xl bg-surface-hover/70 border border-outline flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+              <div>
+                <span class="font-bold text-on-surface block">CSV Supported Columns:</span>
+                <span class="text-on-surface-variant font-mono text-[11px]">name, sku, price, regular_price, stock_quantity, sizes, colors, images, description, target_agent</span>
+              </div>
+              <button 
+                type="button" 
+                @click="downloadSampleCsv" 
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface border border-outline hover:bg-surface-hover text-primary font-semibold text-[11px] shrink-0 cursor-pointer shadow-2xs"
               >
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span class="font-bold text-xs text-on-surface">{{ group.productName }}</span>
-                    <span class="font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">({{ group.productSku }})</span>
-                  </div>
-                  <span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
-                    {{ group.confidence }}% Match
-                  </span>
-                </div>
-
-                <!-- Matched images in this group -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div 
-                    v-for="(photo, pIdx) in group.matchedImages" 
-                    :key="pIdx"
-                    class="p-2 rounded-xl bg-surface border border-outline/70 space-y-1.5 relative group/card"
-                  >
-                    <div class="h-20 rounded-lg bg-surface-hover overflow-hidden border border-outline">
-                      <img :src="resolveImage(photo.url)" alt="Matched" class="w-full h-full object-cover" />
-                    </div>
-                    <div class="flex items-center justify-between text-[10px]">
-                      <span class="font-bold uppercase text-primary">{{ photo.role }}</span>
-                      <button 
-                        @click="group.matchedImages.splice(pIdx, 1)" 
-                        class="text-rose-500 hover:text-rose-700 cursor-pointer"
-                        title="Unlink"
-                      >
-                        <span class="material-symbols-outlined text-xs">close</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Unmatched items if any -->
-              <div v-if="unmatchedImages.length > 0" class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2">
-                <div class="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                  <span class="material-symbols-outlined text-sm">warning</span>
-                  <span>{{ unmatchedImages.length }} Unmatched Images (Manual Assignment)</span>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div v-for="(photo, uIdx) in unmatchedImages" :key="uIdx" class="p-2 rounded-xl bg-surface border border-outline text-xs space-y-1">
-                    <div class="h-16 rounded-lg overflow-hidden border border-outline">
-                      <img :src="resolveImage(photo.url)" alt="Unmatched" class="w-full h-full object-cover" />
-                    </div>
-                    <select 
-                      @change="assignUnmatched(photo, uIdx, $event.target.value)"
-                      class="w-full bg-surface-hover px-1.5 py-1 rounded text-[10px] text-on-surface outline-none border border-outline cursor-pointer"
-                    >
-                      <option value="">Assign To Product...</option>
-                      <option v-for="p in products" :key="p.sku" :value="p.sku">{{ p.name }}</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+                <span class="material-symbols-outlined text-sm">download</span>
+                <span>Download Sample CSV</span>
+              </button>
             </div>
 
-            <!-- Footer Action Controls -->
+            <!-- Preview Table -->
+            <div class="border border-outline rounded-2xl overflow-x-auto max-h-72 in-scroll">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-surface-hover/80 text-on-surface-variant font-semibold border-b border-outline sticky top-0 z-10">
+                  <tr>
+                    <th class="py-2.5 px-3">#</th>
+                    <th class="py-2.5 px-3">Product Name</th>
+                    <th class="py-2.5 px-3">SKU</th>
+                    <th class="py-2.5 px-3">Sale Price (৳)</th>
+                    <th class="py-2.5 px-3">Reg. Price (৳)</th>
+                    <th class="py-2.5 px-3">Stock</th>
+                    <th class="py-2.5 px-3">Variants</th>
+                    <th class="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-outline/50">
+                  <tr v-for="(item, idx) in csvImportQueue" :key="idx" class="hover:bg-surface-hover/40 transition-colors">
+                    <td class="py-2 px-3 text-on-surface-variant font-mono text-[11px]">{{ idx + 1 }}</td>
+                    <td class="py-2 px-3 font-semibold text-on-surface">
+                      <div class="max-w-[180px] truncate" :title="item.name">{{ item.name }}</div>
+                    </td>
+                    <td class="py-2 px-3 font-mono text-[11px] text-primary">
+                      <div class="max-w-[130px] truncate" :title="item.sku">{{ item.sku }}</div>
+                    </td>
+                    <td class="py-2 px-3 font-bold text-on-surface font-mono">৳{{ item.price }}</td>
+                    <td class="py-2 px-3 text-on-surface-variant/70 font-mono">{{ item.regular_price ? '৳' + item.regular_price : '-' }}</td>
+                    <td class="py-2 px-3 font-medium text-on-surface">{{ item.stock_quantity }}</td>
+                    <td class="py-2 px-3 text-[11px] text-on-surface-variant">
+                      <div class="flex items-center gap-1 flex-wrap max-w-[150px]">
+                        <span v-if="item.sizes?.length" class="px-1.5 py-0.2 rounded bg-surface border border-outline text-[10px]">
+                          {{ item.sizes.join(', ') }}
+                        </span>
+                        <span v-if="item.images?.length" class="px-1.5 py-0.2 rounded bg-primary/10 text-primary text-[10px] font-bold">
+                          {{ item.images.length }} img
+                        </span>
+                      </div>
+                    </td>
+                    <td class="py-2 px-3 text-right">
+                      <button 
+                        type="button" 
+                        @click="csvImportQueue.splice(idx, 1)" 
+                        class="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                        title="Remove row"
+                      >
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Footer Buttons -->
             <div class="flex items-center gap-2 pt-3 border-t border-outline/40">
               <button 
-                @click="showAutoLinkModal = false" 
+                @click="showCsvImportModal = false" 
                 class="flex-1 py-2.5 rounded-xl border border-outline text-xs font-semibold hover:bg-surface-hover transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button 
-                @click="approveAutoLinkedGroups" 
-                :disabled="batchUploading || autoMatchedGroups.length === 0"
+                @click="confirmCsvImport" 
+                :disabled="csvImportQueue.length === 0"
                 class="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-accent transition-colors shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 <span class="material-symbols-outlined text-base">check_circle</span>
-                <span>🚀 Approve &amp; Sync All ({{ totalMatchedImagesCount }} Images)</span>
+                <span>Confirm &amp; Import {{ csvImportQueue.length }} Products</span>
               </button>
             </div>
           </div>
@@ -738,11 +740,8 @@ const showAddModal = ref(false)
 const isEditing = ref(false)
 const isSkuCustomized = ref(false)
 const originalSku = ref('')
-const showAutoLinkModal = ref(false)
-const batchUploading = ref(false)
-const batchUploadQueue = ref([])
-const autoMatchedGroups = ref([])
-const unmatchedImages = ref([])
+const showCsvImportModal = ref(false)
+const csvImportQueue = ref([])
 
 const productForm = reactive({
   name: '',
@@ -1052,129 +1051,7 @@ const handleSingleGalleryUpload = async (event) => {
   }
 }
 
-// Smart Batch Auto-Linker
-const handleBatchUpload = async (event) => {
-  const files = Array.from(event.target.files || [])
-  if (files.length === 0) return
 
-  batchUploadQueue.value = files
-  autoMatchedGroups.value = []
-  unmatchedImages.value = []
-  batchUploading.value = true
-  showAutoLinkModal.value = true
-
-  const uploadedFiles = []
-
-  // 1. Upload all in parallel to Backblaze B2
-  for (const file of files) {
-    const formData = new FormData()
-    formData.append('file', file)
-    try {
-      const res = await $fetch('/api/upload', { method: 'POST', body: formData })
-      if (res?.url) {
-        uploadedFiles.push({
-          filename: file.name.toLowerCase(),
-          url: res.url
-        })
-      }
-    } catch (e) {
-      console.error('Batch item upload error:', e)
-    }
-  }
-
-  // 2. Pattern match uploaded files with existing Products
-  const groupMap = {}
-
-  uploadedFiles.forEach(item => {
-    let matchedProduct = null
-    let matchedRole = 'hero'
-
-    // Detect Role from filename
-    if (item.filename.includes('back') || item.filename.includes('rear')) matchedRole = 'back'
-    else if (item.filename.includes('chart') || item.filename.includes('size')) matchedRole = 'chart'
-    else if (item.filename.includes('detail') || item.filename.includes('fabric')) matchedRole = 'detail'
-    else if (item.filename.includes('model') || item.filename.includes('wear')) matchedRole = 'model'
-
-    // Match product by SKU or Title keyword
-    for (const prod of products.value) {
-      const skuClean = prod.sku.toLowerCase().replace(/[^a-z0-9]/g, '')
-      const nameParts = prod.name.toLowerCase().split(' ').filter(w => w.length > 2)
-      const fileClean = item.filename.replace(/[^a-z0-9]/g, '')
-
-      const skuMatch = fileClean.includes(skuClean) || skuClean.includes(fileClean)
-      const nameMatch = nameParts.some(part => item.filename.includes(part))
-
-      if (skuMatch || nameMatch) {
-        matchedProduct = prod
-        break
-      }
-    }
-
-    if (matchedProduct) {
-      if (!groupMap[matchedProduct.sku]) {
-        groupMap[matchedProduct.sku] = {
-          productSku: matchedProduct.sku,
-          productName: matchedProduct.name,
-          confidence: 98,
-          matchedImages: []
-        }
-      }
-      groupMap[matchedProduct.sku].matchedImages.push({
-        role: matchedRole,
-        url: item.url
-      })
-    } else {
-      unmatchedImages.value.push({
-        url: item.url,
-        filename: item.filename,
-        role: matchedRole
-      })
-    }
-  })
-
-  autoMatchedGroups.value = Object.values(groupMap)
-  batchUploading.value = false
-}
-
-const assignUnmatched = (photo, index, targetSku) => {
-  if (!targetSku) return
-  const prod = products.value.find(p => p.sku === targetSku)
-  if (!prod) return
-
-  let group = autoMatchedGroups.value.find(g => g.productSku === targetSku)
-  if (!group) {
-    group = {
-      productSku: prod.sku,
-      productName: prod.name,
-      confidence: 100,
-      matchedImages: []
-    }
-    autoMatchedGroups.value.push(group)
-  }
-
-  group.matchedImages.push({
-    role: photo.role || 'hero',
-    url: photo.url
-  })
-
-  unmatchedImages.value.splice(index, 1)
-}
-
-const approveAutoLinkedGroups = async () => {
-  autoMatchedGroups.value.forEach(group => {
-    const targetProduct = products.value.find(p => p.sku === group.productSku)
-    if (targetProduct) {
-      if (!targetProduct.images) targetProduct.images = []
-      group.matchedImages.forEach(newImg => {
-        targetProduct.images.push(newImg)
-      })
-    }
-  })
-
-  await syncInventory()
-  showAutoLinkModal.value = false
-  alert(`Successfully linked ${totalMatchedImagesCount.value} photos to your product catalog!`)
-}
 
 const saveProduct = async () => {
   if (!productForm.name || !productForm.name.trim()) {
@@ -1244,21 +1121,223 @@ const getAgentLabel = (assignedAgent) => {
   return 'Specific Agent'
 }
 
-const getAgentIcon = (assignedAgent) => {
-  if (!assignedAgent || assignedAgent === 'all') return 'hub'
-  const found = (props.agents || []).find(a => a.id === assignedAgent)
-  if (found?.platform === 'telegram') return ''
-  if (found?.platform === 'whatsapp') return ''
-  if (found?.platform === 'messenger') return ''
-  return 'smart_toy'
-}
+
 
 const getAgentBadgeClass = (assignedAgent) => {
   if (!assignedAgent || assignedAgent === 'all') return 'bg-primary/10 text-primary border-primary/20'
-  const found = (props.agents || []).find(a => a.id === assignedAgent)
-  if (found?.platform === 'telegram') return 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
-  if (found?.platform === 'whatsapp') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-  if (found?.platform === 'messenger') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-  return 'bg-secondary/10 text-secondary border-secondary/20'
+  return 'bg-surface-hover text-on-surface border-outline/80'
+}
+
+// --- CSV Bulk Products Import & Sample Download ---
+const downloadSampleCsv = () => {
+  const headers = ['name', 'sku', 'price', 'regular_price', 'stock_quantity', 'sizes', 'colors', 'images', 'description', 'target_agent']
+  const sampleRows = [
+    [
+      'Classic Cotton Hoodie',
+      'classic-cotton-hoodie',
+      '1200',
+      '1500',
+      '25',
+      'M, L, XL, XXL',
+      'Black, Maroon, Navy Blue',
+      'https://images.unsplash.com/photo-1556905055-8f358a7a47b2',
+      '100% combed cotton fleece, warm and comfortable for winter',
+      'all'
+    ],
+    [
+      'Maroon Slim Fit Polo T-Shirt',
+      'maroon-polo-tshirt',
+      '650',
+      '850',
+      '40',
+      'S, M, L, XL',
+      'Maroon, White, Royal Blue',
+      'https://images.unsplash.com/photo-1581655353564-df123a1eb820',
+      'Premium honeycomb pique cotton fabric with embroidered logo',
+      'all'
+    ],
+    [
+      'Vintage Denim Jacket',
+      'vintage-denim-jacket',
+      '2200',
+      '2600',
+      '15',
+      'M, L, XL',
+      'Blue Wash, Dark Indigo',
+      'https://images.unsplash.com/photo-1578768079052-aa76e520008b',
+      'Heavyweight 14oz washed denim jacket with metal buttons',
+      'all'
+    ]
+  ]
+
+  const csvContent = [
+    headers.join(','),
+    ...sampleRows.map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', 'clickify_products_sample.csv')
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+const parseCsvLine = (text) => {
+  const result = []
+  let cur = ''
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (c === ',' && !inQuotes) {
+      result.push(cur.trim())
+      cur = ''
+    } else {
+      cur += c
+    }
+  }
+  result.push(cur.trim())
+  return result
+}
+
+const handleCsvUpload = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const rawText = e.target.result || ''
+      const lines = rawText.split(/\r?\n/).filter(line => line.trim().length > 0)
+      if (lines.length < 2) {
+        alert('CSV file must have a header row and at least 1 product row.')
+        return
+      }
+
+      const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+      const parsedItems = []
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCsvLine(lines[i])
+        if (!values || values.length === 0) continue
+
+        const row = {}
+        headers.forEach((h, idx) => {
+          row[h] = values[idx] !== undefined ? values[idx] : ''
+        })
+
+        const name = row.name || row.title || row.product_name || ''
+        if (!name.trim()) continue
+
+        const price = Number(row.price || row.sale_price || row.offer_price || 0)
+        const regularPrice = row.regular_price || row.original_price ? Number(row.regular_price || row.original_price) : null
+        const stock = row.stock_quantity || row.stock || row.qty ? Number(row.stock_quantity || row.stock || row.qty) : 10
+        
+        let sku = row.sku || ''
+        if (!sku) {
+          sku = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        }
+
+        const sizeList = row.sizes ? row.sizes.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : []
+        const colorList = row.colors ? row.colors.split(',').map(c => c.trim()).filter(Boolean) : []
+        const imageList = row.images 
+          ? row.images.split(',').map(u => u.trim()).filter(Boolean).map((u, uIdx) => ({
+              role: uIdx === 0 ? 'hero' : 'gallery',
+              url: u,
+              color: colorList[uIdx] || '',
+              size: sizeList[0] || '',
+              quantity: Math.floor(stock / Math.max(1, sizeList.length)) || 1
+            }))
+          : []
+
+        parsedItems.push({
+          name: name.trim(),
+          sku: sku.trim(),
+          price: price > 0 ? price : 1000,
+          regular_price: regularPrice && regularPrice > price ? regularPrice : null,
+          stock_quantity: stock >= 0 ? stock : 10,
+          size: sizeList.join(', '),
+          sizes: sizeList,
+          color: colorList.join(', '),
+          colors: colorList,
+          description: row.description || '',
+          assigned_agent: row.target_agent || row.agent_id || 'all',
+          images: imageList
+        })
+      }
+
+      if (parsedItems.length === 0) {
+        alert('No valid products could be read from the CSV. Please check the format.')
+        return
+      }
+
+      csvImportQueue.value = parsedItems
+      showCsvImportModal.value = true
+    } catch (err) {
+      alert('Error parsing CSV file: ' + err.message)
+    } finally {
+      event.target.value = ''
+    }
+  }
+  reader.readAsText(file)
+}
+
+const confirmCsvImport = async () => {
+  if (csvImportQueue.value.length === 0) return
+
+  let addedCount = 0
+  let updatedCount = 0
+
+  csvImportQueue.value.forEach(imported => {
+    const existingIdx = products.value.findIndex(p => p.sku.toLowerCase() === imported.sku.toLowerCase())
+    if (existingIdx !== -1) {
+      // Update existing
+      products.value[existingIdx] = {
+        ...products.value[existingIdx],
+        name: imported.name,
+        price: imported.price,
+        regular_price: imported.regular_price,
+        stock_quantity: imported.stock_quantity,
+        size: imported.size || products.value[existingIdx].size,
+        color: imported.color || products.value[existingIdx].color,
+        description: imported.description || products.value[existingIdx].description,
+        assigned_agent: imported.assigned_agent || products.value[existingIdx].assigned_agent,
+        images: imported.images?.length > 0 ? imported.images : products.value[existingIdx].images
+      }
+      updatedCount++
+    } else {
+      // Add new
+      products.value.unshift({
+        id: 'item-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        name: imported.name,
+        sku: imported.sku,
+        price: imported.price,
+        regular_price: imported.regular_price,
+        stock_quantity: imported.stock_quantity,
+        size: imported.size,
+        color: imported.color,
+        description: imported.description,
+        assigned_agent: imported.assigned_agent,
+        images: imported.images
+      })
+      addedCount++
+    }
+  })
+
+  await syncInventory()
+  showCsvImportModal.value = false
+  csvImportQueue.value = []
+  alert(`Imported successfully! (${addedCount} added, ${updatedCount} updated)`)
 }
 </script>

@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
         if (['messenger', 'fb_comment', 'facebook', 'whatsapp', 'instagram', 'ig_comment'].includes(platform)) {
             try {
                 // 1. Get the main account ID (Page ID, WABA ID, or connected Instagram Account)
-                const metaData: any = await $fetch(`https://graph.facebook.com/v19.0/me?fields=id,name,instagram_business_account{id,username}&access_token=${token}`).catch(() => null)
+                const metaData: any = await $fetch(`https://graph.facebook.com/v19.0/me?fields=id,name,instagram_business_account{id,username}&access_token=${token}`)
                 if (metaData?.id) {
                     externalId = metaData.id
                     if (!detectedName && metaData.name) {
@@ -49,6 +49,8 @@ export default defineEventHandler(async (event) => {
                                 detectedName = `@${metaData.instagram_business_account.username} (Instagram)`
                             }
                             console.log(`[AGENT CONNECT]: Auto-detected Instagram Business ID: ${externalId}`)
+                        } else {
+                            throw new Error('No linked Instagram Business Account found for this Facebook Page token. Link your Instagram account in Facebook Page Settings first.')
                         }
                     }
                     
@@ -69,25 +71,37 @@ export default defineEventHandler(async (event) => {
                     } else {
                         console.log(`[AGENT CONNECT]: Auto-detected Meta ID: ${externalId}`)
                     }
+                } else {
+                    throw new Error('Meta API returned empty account details')
                 }
             } catch (metaErr: any) {
-                console.warn(`[AGENT CONNECT]: Could not auto-detect Meta ID: ${metaErr.message}`)
+                const errorDetail = metaErr?.data?.error?.message || metaErr?.message || 'Access token invalid or expired'
+                throw createError({
+                    statusCode: 400,
+                    statusMessage: `Meta / ${platform.toUpperCase()} Token Error: ${errorDetail}`
+                })
             }
         }
 
         // Auto-detect External ID for Telegram
         if (platform === 'telegram') {
             try {
-                const tgData: any = await $fetch(`https://api.telegram.org/bot${token}/getMe`).catch(() => null)
+                const tgData: any = await $fetch(`https://api.telegram.org/bot${token}/getMe`)
                 if (tgData?.result?.id) {
                     externalId = tgData.result.id.toString()
                     if (!detectedName && (tgData.result.first_name || tgData.result.username)) {
                         detectedName = tgData.result.first_name || `@${tgData.result.username}`
                     }
                     console.log(`[AGENT CONNECT]: Auto-detected Telegram Bot: ${detectedName} (${externalId})`)
+                } else {
+                    throw new Error('Telegram bot verification returned invalid response')
                 }
             } catch (tgErr: any) {
-                console.warn(`[AGENT CONNECT]: Could not fetch Telegram Bot info: ${tgErr.message}`)
+                const tgDesc = tgErr?.data?.description || tgErr?.message || 'Unauthorized / Invalid Bot Token'
+                throw createError({
+                    statusCode: 400,
+                    statusMessage: `Invalid Telegram Bot Token (${tgDesc}). Please copy the full bot token from @BotFather.`
+                })
             }
         }
 

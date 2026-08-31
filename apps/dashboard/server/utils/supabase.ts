@@ -335,6 +335,12 @@ export async function executeQuery(query: {
         } else if (f.op === 'eq') {
           clauses.push(`${colExpr} != $${paramIndex++}`)
           values.push(f.value)
+        } else if (f.op === 'ilike') {
+          clauses.push(`${colExpr} NOT ILIKE $${paramIndex++}`)
+          values.push(f.value)
+        } else if (f.op === 'like') {
+          clauses.push(`${colExpr} NOT LIKE $${paramIndex++}`)
+          values.push(f.value)
         } else {
           throw new Error('Unsafe NOT filter')
         }

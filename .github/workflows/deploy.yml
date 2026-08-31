@@ -1,0 +1,121 @@
+name: Production CI/CD & VPS Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      service_target:
+        description: 'Target to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - dashboard
+          - full_stack
+
+permissions:
+  contents: read
+
+jobs:
+  # =========================================================================
+  # 1. CI VALIDATION & TEST STAGE
+  # =========================================================================
+  validate:
+    name: Lint, Test & Build Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/dashboard
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Run Test Suite
+        run: npm test
+        env:
+          JWT_SECRET: "ci_jwt_secret_32_characters_long_min"
+          ADMIN_SESSION_SECRET: "ci_admin_secret_32_chars_long_min"
+          AGENT_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          PAYMENT_CREDENTIALS_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+      - name: Typecheck Nuxt Application
+        run: npm run typecheck
+
+      - name: Build Dashboard Bundle
+        run: npm run build
+        env:
+          NODE_ENV: production
+          NITRO_PRESET: node-server
+
+  # =========================================================================
+  # 2. CONTINUOUS DEPLOYMENT (CD) TO PRODUCTION VPS
+  # =========================================================================
+  deploy-vps:
+    name: Deploy to Production VPS
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Execute Remote Deployment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          command_timeout: 10m
+          script: |
+            echo "🚀 [Deploy] Initiating Clickify Mate Production Deployment..."
+
+            # Locate application repository directory
+            APP_DIR="/opt/clickify-mate"
+            if [ ! -d "$APP_DIR" ]; then
+              APP_DIR="$HOME/clickify-mate"
+            fi
+
+            if [ ! -d "$APP_DIR" ]; then
+              echo "[-] Application directory not found at /opt/clickify-mate or $HOME/clickify-mate"
+              exit 1
+            fi
+
+            cd "$APP_DIR"
+            echo "[+] Navigated to: $(pwd)"
+
+            # Pull latest changes from main branch
+            echo "[+] Pulling latest updates from Git..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Build and reload Docker containers
+            echo "[+] Rebuilding and starting production Docker containers..."
+            docker compose up -d --build dashboard
+
+            # Prune orphan and dangling Docker images to preserve VPS disk space
+            echo "[+] Cleaning dangling images..."
+            docker image prune -f
+
+            # Perform local health check
+            echo "[+] Verifying container health..."
+            sleep 8
+            if curl -f -s http://127.0.0.1:3000/api/status > /dev/null; then
+              echo "✅ [Deploy Success] Clickify Mate is live and healthy!"
+            else
+              echo "⚠️ [Warning] Health check pending or still initializing, check container logs."
+            fi

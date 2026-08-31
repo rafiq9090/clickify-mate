@@ -12,11 +12,22 @@ export default defineEventHandler(async (event) => {
 
     const supabase = useSupabaseAdmin()
 
-    // Clean product_images: only save non-empty strings/URLs
+    // Clean product_images: only save non-empty items
     const cleanImages = Array.isArray(product_images)
         ? product_images
-            .map((img: any) => typeof img === 'string' ? img.trim() : (img?.url || '').trim())
-            .filter((url: string) => url.length > 0)
+            .map((img: any) => {
+                if (typeof img === 'string') {
+                    const trimmed = img.trim()
+                    return trimmed ? { id: '', url: trimmed } : null
+                }
+                if (img && typeof img === 'object') {
+                    const id = (img.id || '').trim()
+                    const url = (img.url || '').trim()
+                    if (id || url) return { id, url }
+                }
+                return null
+            })
+            .filter(Boolean)
         : []
 
     const updatePayload: Record<string, any> = {
