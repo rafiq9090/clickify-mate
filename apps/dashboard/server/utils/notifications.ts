@@ -1,7 +1,7 @@
 export const sendAdminAlert = async (subject: string, message: string) => {
     const config = useRuntimeConfig()
-    const resendKey = process.env.RESEND_API_KEY || config.public.resendApiKey
-    const adminEmail = process.env.ADMIN_EMAIL || 'your-email@example.com'
+    const resendKey = process.env.RESEND_API_KEY || (config.public as any)?.resendApiKey
+    const adminEmail = process.env.ADMIN_EMAIL || 'islamrafiq9090@gmail.com'
 
     console.error(`[ADMIN ALERT]: ${subject} - ${message}`)
 
@@ -18,7 +18,7 @@ export const sendAdminAlert = async (subject: string, message: string) => {
                 'Content-Type': 'application/json'
             },
             body: {
-                from: 'AI Agent Alert <alerts@resend.dev>',
+                from: 'Clickify Mate <onboarding@resend.dev>',
                 to: adminEmail,
                 subject: `🚨 SYSTEM ALERT: ${subject}`,
                 html: `
@@ -50,7 +50,8 @@ function escapeHtml(value: string) {
 
 export async function sendPasswordResetEmail(email: string, code: string) {
     const resendKey = process.env.RESEND_API_KEY
-    const from = process.env.AUTH_EMAIL_FROM || 'Clickify Mate <auth@resend.dev>'
+    const from = process.env.AUTH_EMAIL_FROM || 'Clickify Mate <onboarding@resend.dev>'
+
     if (!resendKey) {
         if (process.env.NODE_ENV === 'production') {
             throw new Error('Password reset email delivery is not configured.')
@@ -59,17 +60,43 @@ export async function sendPasswordResetEmail(email: string, code: string) {
         return
     }
 
-    await $fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${resendKey}`,
-            'Content-Type': 'application/json'
-        },
-        body: {
-            from,
-            to: email,
-            subject: 'Your Clickify Mate password reset code',
-            html: `<p>Your password reset code is:</p><p style="font-size:24px;font-weight:700;letter-spacing:3px">${escapeHtml(code)}</p><p>This code expires in 15 minutes. If you did not request it, ignore this email.</p>`
-        }
-    })
+    try {
+        const response: any = await $fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${resendKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: {
+                from,
+                to: email,
+                subject: '🚀 Clickify Mate Password Recovery Code',
+                html: `
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 32px 24px; background: #fafafa;">
+                    <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;">
+                      <div style="text-align: center; margin-bottom: 24px;">
+                        <h1 style="color: #6366f1; font-size: 24px; margin: 0; font-weight: 800;">Clickify Mate</h1>
+                        <p style="color: #6b7280; font-size: 14px; margin-top: 4px;">Account Security & Recovery</p>
+                      </div>
+                      
+                      <p style="color: #374151; font-size: 15px; line-height: 1.5;">Hello,</p>
+                      <p style="color: #374151; font-size: 15px; line-height: 1.5;">You requested a password reset for your Clickify Mate account. Enter this 12-character recovery code in your browser:</p>
+                      
+                      <div style="margin: 28px 0; padding: 18px 24px; background: #f5f3ff; border: 2px dashed #a78bfa; border-radius: 12px; font-size: 24px; font-weight: 800; letter-spacing: 4px; color: #4338ca; text-align: center;">
+                        ${escapeHtml(code)}
+                      </div>
+                      
+                      <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">
+                        This recovery code expires in 15 minutes.<br>
+                        If you did not request this, you can safely ignore this email.
+                      </p>
+                    </div>
+                  </div>
+                `
+            }
+        })
+        console.log(`[PASSWORD RESET]: Email successfully dispatched via Resend to ${email} (ID: ${response?.id})`)
+    } catch (err: any) {
+        console.error(`[PASSWORD RESET ERROR]: Failed to send email via Resend:`, err?.data || err?.message || err)
+    }
 }
