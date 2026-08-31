@@ -70,23 +70,23 @@ export async function sendPasswordResetEmail(email: string, code: string) {
             body: {
                 from,
                 to: email,
-                subject: '🚀 Clickify Mate Password Recovery Code',
+                subject: 'Clickify Mate Password Recovery Code',
                 html: `
-                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 32px 24px; background: #fafafa;">
-                    <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;">
-                      <div style="text-align: center; margin-bottom: 24px;">
-                        <h1 style="color: #6366f1; font-size: 24px; margin: 0; font-weight: 800;">Clickify Mate</h1>
-                        <p style="color: #6b7280; font-size: 14px; margin-top: 4px;">Account Security & Recovery</p>
+                  <div style="font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; background-color: #E0D8EB;">
+                    <div style="max-width: 460px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 36px 32px; box-shadow: 0 10px 30px rgba(52, 31, 55, 0.08); border: 1px solid #D8CEE6;">
+                      <div style="text-align: center; margin-bottom: 28px;">
+                        <h1 style="color: #341F37; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Clickify Mate</h1>
+                        <p style="color: #6e5873; font-size: 13px; margin-top: 6px; font-weight: 500;">Account Security & Recovery</p>
                       </div>
                       
-                      <p style="color: #374151; font-size: 15px; line-height: 1.5;">Hello,</p>
-                      <p style="color: #374151; font-size: 15px; line-height: 1.5;">You requested a password reset for your Clickify Mate account. Enter this 12-character recovery code in your browser:</p>
+                      <p style="color: #2b172e; font-size: 15px; line-height: 1.6; margin: 0 0 10px 0;">Hello,</p>
+                      <p style="color: #4b364e; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">You requested a password reset for your Clickify Mate account. Enter this 12-character recovery code in your browser to proceed:</p>
                       
-                      <div style="margin: 28px 0; padding: 18px 24px; background: #f5f3ff; border: 2px dashed #a78bfa; border-radius: 12px; font-size: 24px; font-weight: 800; letter-spacing: 4px; color: #4338ca; text-align: center;">
+                      <div style="margin: 24px 0; padding: 18px 24px; background-color: #F9F5FF; border: 1.5px solid #D8CEE6; border-radius: 14px; font-size: 24px; font-weight: 800; letter-spacing: 4px; color: #341F37; text-align: center;">
                         ${escapeHtml(code)}
                       </div>
                       
-                      <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">
+                      <p style="color: #8a758f; font-size: 12px; text-align: center; margin: 28px 0 0 0; line-height: 1.5;">
                         This recovery code expires in 15 minutes.<br>
                         If you did not request this, you can safely ignore this email.
                       </p>
@@ -95,8 +95,11 @@ export async function sendPasswordResetEmail(email: string, code: string) {
                 `
             }
         })
-        console.log(`[PASSWORD RESET]: Email successfully dispatched via Resend to ${email} (ID: ${response?.id})`)
     } catch (err: any) {
-        console.error(`[PASSWORD RESET ERROR]: Failed to send email via Resend:`, err?.data || err?.message || err)
+        if (err?.data?.statusCode === 403 || err?.statusCode === 403) {
+            console.warn(`[RESEND SANDBOX]: Free Resend sandbox can only send to your account email (islamrafiq9090@gmail.com). To send to other recipients (${email}), verify your domain at resend.com/domains.`)
+        } else {
+            console.error(`[PASSWORD RESET ERROR]: Failed to send email via Resend:`, err?.data || err?.message || err)
+        }
     }
 }

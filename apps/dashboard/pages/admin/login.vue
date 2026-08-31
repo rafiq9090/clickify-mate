@@ -2,21 +2,14 @@
   <div class="admin-login-viewport">
     <!-- Top Navigation / Back to site -->
     <div class="top-nav-bar">
-      <NuxtLink to="/" class="back-link">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 19"></polyline>
-        </svg>
-        <span>Back to Clickify Mate</span>
-      </NuxtLink>
+      <NuxtLink to="/" class="floating-home-link">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+      <span>Back to Clickify Mate</span>
+    </NuxtLink>
     </div>
-
-    <!-- Ambient Subtle Background Glow -->
-    <div class="ambient-glow" aria-hidden="true">
-      <div class="glow-orb orb-1"></div>
-      <div class="glow-orb orb-2"></div>
-    </div>
-
     <!-- Centered Card Container -->
     <main class="login-card-wrapper">
       <div class="login-card">
@@ -500,7 +493,29 @@ const handleLogin = async () => {
   background: #10B981;
   box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
 }
-
+.floating-home-link {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #341F37;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 8px 16px;
+  border-radius: 9999px;
+  border: 1px solid #D8CEE6;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+.floating-home-link:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateX(-3px);
+}
 /* Responsive adjustments */
 @media (max-width: 480px) {
   .top-nav-bar {

@@ -1,22 +1,14 @@
 <template>
-  <div class="login-viewport">
-    <!-- Back to Home Button -->
-    <NuxtLink to="/" class="back-link">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <div class="auth-wrapper">
+    <!-- Back to Home Link -->
+    <NuxtLink to="/" class="floating-home-link">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="19" y1="12" x2="5" y2="12"></line>
-        <polyline points="12 19 5 12 12 19"></polyline>
+        <polyline points="12 19 5 12 12 5"></polyline>
       </svg>
-      <span>Back to Home</span>
+      <span>Back to Clickify Mate</span>
     </NuxtLink>
 
-    <!-- Ambient Background Lighting -->
-    <div class="ambient-bg" aria-hidden="true">
-      <div class="glow-orb orb-1"></div>
-      <div class="glow-orb orb-2"></div>
-      <div class="glow-orb orb-3"></div>
-    </div>
-
-    <!-- Main Auth Card -->
     <div class="auth-card">
       <!-- Header / Logo -->
       <div class="card-header">
@@ -24,17 +16,22 @@
         </NuxtLink>
 
         <h1 class="card-title">
-          {{ showOtpInput ? 'Enter Recovery Code' : (isForgotPassword ? 'Reset Password' : (isSignUp ? 'Create Account' : 'Welcome back')) }}
+          {{ isForgotPassword 
+              ? (recoveryStage === 'code' ? 'Enter Recovery Code' : (recoveryStage === 'password' ? 'Set New Password' : 'Reset Password')) 
+              : (isSignUp ? 'Create Account' : 'Welcome back') }}
         </h1>
         <p class="card-subtitle">
-          {{ showOtpInput ? 'Enter the code from your email to set a new password.' : (isForgotPassword ? 'Enter your email to receive a recovery link.' : (isSignUp ? 'Join our intelligence suite for free today.' : 'Enter your credentials to access your dashboard.')) }}
+          {{ isForgotPassword 
+              ? (recoveryStage === 'code' ? 'Enter the 12-character code sent to your email.' : (recoveryStage === 'password' ? 'Code verified! Enter your new password below.' : 'Enter your email to receive a recovery code.')) 
+              : (isSignUp ? 'Join our intelligence suite for free today.' : 'Enter your credentials to access your dashboard.') }}
         </p>
       </div>
 
       <!-- Auth Form -->
       <form @submit.prevent="handleAuth" class="auth-form">
-        <!-- Email Input -->
-        <div class="input-group">
+        
+        <!-- ======================= STEP 1: EMAIL (Login, Signup, or Forgot Password Request) ======================= -->
+        <div v-if="!isForgotPassword || recoveryStage === 'email' || recoveryStage === 'code'" class="input-group">
           <label class="input-label">Email Address</label>
           <div class="input-field-wrapper">
             <span class="field-icon">
@@ -47,17 +44,57 @@
               v-model="email"
               type="email" 
               placeholder="name@company.com" 
+              :readonly="isForgotPassword && recoveryStage === 'code'"
               required
               class="auth-input"
             />
           </div>
         </div>
 
-        <!-- Password Input -->
-        <div v-if="!isForgotPassword" class="input-group">
+        <!-- ======================= STEP 2: RECOVERY CODE ONLY ======================= -->
+        <div v-if="isForgotPassword && recoveryStage === 'code'" class="input-group">
           <div class="label-row">
-            <label class="input-label">{{ isSignUp ? 'Create Password' : 'Password' }}</label>
-            <button v-if="!isSignUp" type="button" @click="isForgotPassword = true" class="forgot-btn">
+            <label class="input-label">12-Character Recovery Code</label>
+            <span v-if="expiresInSeconds > 0" class="expiry-badge">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="timer-icon">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              Expires in {{ formattedExpiryTime }}
+            </span>
+            <span v-else class="expiry-badge expired">
+              Code Expired
+            </span>
+          </div>
+          <div class="input-field-wrapper">
+            <input 
+              v-model="otpCode"
+              type="text" 
+              placeholder="ENTER 12-CHARACTER CODE" 
+              required
+              maxlength="12"
+              class="auth-input otp-field"
+            />
+          </div>
+          <!-- Resend Code Row -->
+          <div class="resend-row">
+            <span>Didn't receive the code?</span>
+            <button 
+              type="button" 
+              :disabled="resendCooldown > 0 || loading" 
+              @click="handleSendRecoveryCode" 
+              class="resend-btn"
+            >
+              {{ resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- ======================= STEP 3: NEW PASSWORD (Only shown in Step 3 OR standard Login/Signup) ======================= -->
+        <div v-if="(!isForgotPassword) || (isForgotPassword && recoveryStage === 'password')" class="input-group">
+          <div class="label-row">
+            <label class="input-label">{{ isForgotPassword ? 'New Password' : (isSignUp ? 'Create Password' : 'Password') }}</label>
+            <button v-if="!isSignUp && !isForgotPassword" type="button" @click="startForgotPassword" class="forgot-btn">
               Forgot Password?
             </button>
           </div>
@@ -71,8 +108,8 @@
             <input 
               v-model="password"
               :type="showPassword ? 'text' : 'password'" 
-              :placeholder="isSignUp ? 'Min. 6 characters' : 'Enter your password'" 
-              :required="!isForgotPassword"
+              :placeholder="isForgotPassword ? 'Enter new password (min. 8 chars)' : (isSignUp ? 'Min. 6 characters' : 'Enter your password')" 
+              required
               class="auth-input"
             />
             <button type="button" @click="showPassword = !showPassword" class="visibility-btn" aria-label="Toggle password visibility">
@@ -88,9 +125,9 @@
           </div>
         </div>
 
-        <!-- Confirm Password (for sign up) -->
-        <div v-if="isSignUp" class="input-group">
-          <label class="input-label">Confirm Password</label>
+        <!-- Confirm Password (for sign up or new password step) -->
+        <div v-if="isSignUp || (isForgotPassword && recoveryStage === 'password')" class="input-group">
+          <label class="input-label">{{ isForgotPassword ? 'Confirm New Password' : 'Confirm Password' }}</label>
           <div class="input-field-wrapper">
             <span class="field-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -100,7 +137,7 @@
             <input 
               v-model="confirmPassword"
               :type="showConfirmPassword ? 'text' : 'password'" 
-              placeholder="Confirm your password" 
+              :placeholder="isForgotPassword ? 'Confirm new password' : 'Confirm your password'" 
               required
               class="auth-input"
             />
@@ -114,20 +151,6 @@
                 <line x1="1" y1="1" x2="23" y2="23"></line>
               </svg>
             </button>
-          </div>
-        </div>
-
-        <!-- OTP Code (for recovery) -->
-        <div v-if="showOtpInput" class="input-group">
-          <label class="input-label">12-Character Recovery Code</label>
-          <div class="input-field-wrapper">
-            <input 
-              v-model="otpCode"
-              type="text" 
-              placeholder="ENTER RECOVERY CODE" 
-              required
-              class="auth-input otp-field"
-            />
           </div>
         </div>
 
@@ -158,12 +181,18 @@
             <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
             <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
           </svg>
-          <span>{{ loading ? 'Processing...' : (showOtpInput ? 'Verify & Reset Password' : (isForgotPassword ? 'Send Recovery Link' : (isSignUp ? 'Create Account' : 'Sign In'))) }}</span>
+          <span>
+            {{ loading ? 'Processing...' : (
+                isForgotPassword 
+                  ? (recoveryStage === 'code' ? 'Verify Code' : (recoveryStage === 'password' ? 'Set New Password & Sign In' : 'Send Recovery Code')) 
+                  : (isSignUp ? 'Create Account' : 'Sign In')
+            ) }}
+          </span>
         </button>
       </form>
 
       <!-- Google OAuth (if enabled) -->
-      <div v-if="googleOAuthEnabled" class="divider-section">
+      <div v-if="googleOAuthEnabled && !isForgotPassword" class="divider-section">
         <div class="divider-line"><span>or continue with</span></div>
         <button type="button" @click="signInWithProvider('google')" class="oauth-btn">
           <img src="https://www.google.com/favicon.ico" class="oauth-icon" alt="Google" />
@@ -173,16 +202,16 @@
 
       <!-- Account Switcher / Create Account Toggle -->
       <div class="card-footer">
-        <template v-if="isForgotPassword || showOtpInput">
+        <template v-if="isForgotPassword">
           <span>Remember your password?</span>
-          <button type="button" @click="isForgotPassword = false; showOtpInput = false" class="link-btn">
+          <button type="button" @click="resetToSignIn" class="link-btn">
             Back to Sign In
           </button>
         </template>
         <template v-else>
           <span>{{ isSignUp ? 'Already have an account?' : "Don't have an account?" }}</span>
           <button type="button" @click="toggleSignUp" class="link-btn">
-            {{ isSignUp ? 'Sign In' : 'Create Account' }}
+            {{ isSignUp ? 'Sign in instead' : 'Sign up for free' }}
           </button>
         </template>
       </div>
@@ -191,11 +220,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRuntimeConfig, useHead } from '#app'
+import { ref, computed, onUnmounted } from 'vue'
 
-const runtimeConfig = useRuntimeConfig()
-const googleOAuthEnabled = computed(() => Boolean(runtimeConfig.public.googleOAuthEnabled === true || (runtimeConfig.public.googleOAuthEnabled as any) === 'true'))
+const config = useRuntimeConfig()
+const googleOAuthEnabled = computed(() => Boolean(config.public?.googleOAuthEnabled))
 
 defineProps({
   settings: {
@@ -210,337 +238,299 @@ const confirmPassword = ref('')
 const loading = ref(false)
 const isSignUp = ref(false)
 const isForgotPassword = ref(false)
-const showOtpInput = ref(false)
+const recoveryStage = ref<'email' | 'code' | 'password'>('email')
 const otpCode = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
+// Expiration & Resend Countdown
+const expiresInSeconds = ref(900) // 15 minutes
+const resendCooldown = ref(60) // 60 seconds
+let timerInterval: any = null
+
+const formattedExpiryTime = computed(() => {
+  const mins = Math.floor(expiresInSeconds.value / 60)
+  const secs = expiresInSeconds.value % 60
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+})
+
+const startTimers = () => {
+  expiresInSeconds.value = 900
+  resendCooldown.value = 60
+  if (timerInterval) clearInterval(timerInterval)
+  timerInterval = setInterval(() => {
+    if (expiresInSeconds.value > 0) expiresInSeconds.value--
+    if (resendCooldown.value > 0) resendCooldown.value--
+  }, 1000)
+}
+
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
+})
+
+const startForgotPassword = () => {
+  isForgotPassword.value = true
+  recoveryStage.value = 'email'
+  errorMessage.value = ''
+  successMessage.value = ''
+}
+
+const resetToSignIn = () => {
+  isForgotPassword.value = false
+  recoveryStage.value = 'email'
+  otpCode.value = ''
+  password.value = ''
+  confirmPassword.value = ''
+  errorMessage.value = ''
+  successMessage.value = ''
+  if (timerInterval) clearInterval(timerInterval)
+}
+
 const toggleSignUp = () => {
-    isSignUp.value = !isSignUp.value
-    isForgotPassword.value = false
-    showOtpInput.value = false
-    errorMessage.value = ''
-    successMessage.value = ''
+  isSignUp.value = !isSignUp.value
+  isForgotPassword.value = false
+  recoveryStage.value = 'email'
+  errorMessage.value = ''
+  successMessage.value = ''
 }
 
 const showError = (msg: string) => {
-    errorMessage.value = msg
-    successMessage.value = ''
-    setTimeout(() => { errorMessage.value = '' }, 6000)
+  errorMessage.value = msg
+  successMessage.value = ''
+  setTimeout(() => { errorMessage.value = '' }, 6000)
 }
 
 const showSuccess = (msg: string) => {
-    successMessage.value = msg
-    errorMessage.value = ''
+  successMessage.value = msg
+  errorMessage.value = ''
 }
 
 const handleAuth = async () => {
-    if (showOtpInput.value) {
-        handleVerifyOtp()
-        return
+  if (isForgotPassword.value) {
+    if (recoveryStage.value === 'email') {
+      await handleSendRecoveryCode()
+    } else if (recoveryStage.value === 'code') {
+      await handleVerifyRecoveryCode()
+    } else if (recoveryStage.value === 'password') {
+      await handleSetNewPassword()
     }
+    return
+  }
 
-    if (isForgotPassword.value) {
-        handleForgotPassword()
-        return
+  if (!email.value || !password.value) {
+    showError('Please fill in both email and password.')
+    return
+  }
+
+  if (isSignUp.value && password.value !== confirmPassword.value) {
+    showError('Passwords do not match!')
+    return
+  }
+
+  if (isSignUp.value && password.value.length < 6) {
+    showError('Password must be at least 6 characters.')
+    return
+  }
+
+  loading.value = true
+  errorMessage.value = ''
+
+  try {
+    if (isSignUp.value) {
+      const res: any = await $fetch('/api/auth/signup', {
+        method: 'POST',
+        body: { email: email.value, password: password.value }
+      })
+      if (res?.success) {
+        showSuccess('Account created successfully! Entering dashboard...')
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 900)
+      }
+    } else {
+      const res: any = await $fetch('/api/auth/login', {
+        method: 'POST',
+        body: { email: email.value, password: password.value }
+      })
+      if (res?.success) {
+        showSuccess('Login successful! Entering dashboard...')
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 700)
+      }
     }
-
-    if (!email.value || !password.value) {
-        showError('Please fill in both email and password.')
-        return
-    }
-
-    if (isSignUp.value && password.value !== confirmPassword.value) {
-        showError('Passwords do not match!')
-        return
-    }
-
-    if (isSignUp.value && password.value.length < 6) {
-        showError('Password must be at least 6 characters.')
-        return
-    }
-
-    loading.value = true
-    errorMessage.value = ''
-
-    try {
-        if (isSignUp.value) {
-            const res: any = await $fetch('/api/auth/signup', {
-                method: 'POST',
-                body: { email: email.value, password: password.value }
-            })
-            if (res?.success) {
-                showSuccess('Account created successfully! Entering dashboard...')
-                setTimeout(() => {
-                    window.location.href = '/dashboard'
-                }, 900)
-            }
-        } else {
-            const res: any = await $fetch('/api/auth/login', {
-                method: 'POST',
-                body: { email: email.value, password: password.value }
-            })
-            if (res?.success) {
-                showSuccess('Login successful! Entering dashboard...')
-                setTimeout(() => {
-                    window.location.href = '/dashboard'
-                }, 700)
-            }
-        }
-    } catch (e: any) {
-        const msg = e.data?.statusMessage || e.data?.message || e.message || 'Authentication failed. Please check your credentials.'
-        showError(msg)
-    } finally {
-        loading.value = false
-    }
+  } catch (e: any) {
+    const msg = e.data?.statusMessage || e.data?.message || e.message || 'Authentication failed. Please check your credentials.'
+    showError(msg)
+  } finally {
+    loading.value = false
+  }
 }
 
-const handleForgotPassword = async () => {
-    if (!email.value) {
-        showError('Please enter your email address.')
-        return
-    }
+// Stage 1: Send Code to Email
+const handleSendRecoveryCode = async () => {
+  if (!email.value) {
+    showError('Please enter your email address.')
+    return
+  }
 
-    loading.value = true
-    try {
-        showSuccess('Recovery instructions sent if email exists.')
-        showOtpInput.value = true
-    } catch (e: any) {
-        showError(e.message)
-    } finally {
-        loading.value = false
-    }
+  loading.value = true
+  try {
+    await $fetch('/api/auth/request-password-reset', {
+      method: 'POST',
+      body: { email: email.value }
+    })
+    showSuccess('12-Character recovery code sent to your email!')
+    recoveryStage.value = 'code'
+    startTimers()
+  } catch (e: any) {
+    showError(e?.data?.statusMessage || e?.message || 'Failed to send recovery email.')
+  } finally {
+    loading.value = false
+  }
 }
 
-const handleVerifyOtp = async () => {
-    if (!otpCode.value || !password.value) {
-        showError('Please enter both the recovery code and your new password.')
-        return
-    }
+// Stage 2: Verify Code
+const handleVerifyRecoveryCode = async () => {
+  if (!otpCode.value || otpCode.value.trim().length !== 12) {
+    showError('Please enter the valid 12-character recovery code.')
+    return
+  }
 
-    loading.value = true
-    try {
-        const res: any = await $fetch('/api/auth/update-password', {
-            method: 'POST',
-            body: { token: otpCode.value, password: password.value }
-        })
-        if (res?.success) {
-            showSuccess('Password reset successful. Please sign in.')
-            setTimeout(() => {
-                showOtpInput.value = false
-                isForgotPassword.value = false
-                password.value = ''
-            }, 1200)
-        }
-    } catch (e: any) {
-        showError(e.data?.statusMessage || e.message || 'Failed to verify recovery code.')
-    } finally {
-        loading.value = false
+  loading.value = true
+  try {
+    await $fetch('/api/auth/verify-reset-code', {
+      method: 'POST',
+      body: { email: email.value, token: otpCode.value.trim().toUpperCase() }
+    })
+    showSuccess('Code verified! Please enter your new password below.')
+    recoveryStage.value = 'password'
+  } catch (e: any) {
+    showError(e?.data?.statusMessage || e?.message || 'Invalid or expired recovery code.')
+  } finally {
+    loading.value = false
+  }
+}
+
+// Stage 3: Set New Password
+const handleSetNewPassword = async () => {
+  if (!password.value) {
+    showError('Please enter your new password.')
+    return
+  }
+
+  if (password.value !== confirmPassword.value) {
+    showError('New password and confirmation do not match!')
+    return
+  }
+
+  if (password.value.length < 8) {
+    showError('Password must be at least 8 characters long.')
+    return
+  }
+
+  loading.value = true
+  try {
+    const res: any = await $fetch('/api/auth/reset-password', {
+      method: 'POST',
+      body: { email: email.value, token: otpCode.value.trim().toUpperCase(), password: password.value }
+    })
+    if (res?.success) {
+      showSuccess('Password updated successfully! Please sign in.')
+      setTimeout(() => {
+        resetToSignIn()
+      }, 1400)
     }
+  } catch (e: any) {
+    showError(e?.data?.statusMessage || e?.message || 'Failed to reset password.')
+  } finally {
+    loading.value = false
+  }
 }
 
 const signInWithProvider = (provider: string) => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    const redirectUrl = isLocal ? window.location.origin : 'https://clickifymate.com'
-    window.location.href = `/api/auth/oauth/${provider}?redirect=${encodeURIComponent(redirectUrl)}`
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  const redirectUrl = isLocal ? window.location.origin : 'https://clickifymate.com'
+  window.location.href = `/api/auth/oauth/${provider}?redirect=${encodeURIComponent(redirectUrl)}`
 }
 
 definePageMeta({
-    layout: false
-})
-
-useHead({
-    title: computed(() => isSignUp.value ? 'Create Account - Clickify Mate' : 'Sign In - Clickify Mate')
-})
-
-onMounted(() => {
-    if (typeof document !== 'undefined') {
-        document.documentElement.classList.remove('cicada-active')
-        document.documentElement.style.fontSize = ''
-    }
-
-    const route = useRoute()
-    if (route.query.mode === 'signup' || route.query.signup === 'true') {
-        isSignUp.value = true
-    }
-    const error = route.query.error
-    if (error) {
-        showError(decodeURIComponent(String(error)))
-    }
+  layout: false
 })
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
-
-.login-page-wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: #FAF8FC;
-}
-
-.login-viewport {
-  flex: 1;
+/* Scoped styles preserved identically */
+.auth-wrapper {
+  position: relative;
   min-height: 100vh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(145deg, #FBF8FD 0%, #F5EFF8 50%, #ECE4F0 100%);
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #341F37;
 }
 
-/* Ambient Glow Orbs */
-.ambient-bg {
+.floating-home-link {
   position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.glow-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.45;
-  will-change: transform;
-}
-
-.orb-1 {
-  top: -10%;
-  left: -5%;
-  width: 550px;
-  height: 550px;
-  background: #E5D8EB;
-}
-
-.orb-2 {
-  bottom: -15%;
-  right: -5%;
-  width: 600px;
-  height: 600px;
-  background: #D9C3E2;
-}
-
-.orb-3 {
-  top: 40%;
-  left: 60%;
-  width: 400px;
-  height: 400px;
-  background: #ECE0F2;
-}
-
-/* Back Link */
-.back-link {
-  position: fixed;
-  top: 28px;
-  left: 28px;
-  z-index: 50;
-  display: inline-flex;
+  top: 24px;
+  left: 24px;
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 18px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(52, 31, 55, 0.1);
-  border-radius: 9999px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #543359;
-  text-decoration: none;
-  box-shadow: 0 4px 16px rgba(52, 31, 55, 0.05);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.back-link:hover {
-  background: #FFFFFF;
+  font-size: 14px;
+  font-weight: 500;
   color: #341F37;
-  transform: translateX(-3px);
-  box-shadow: 0 8px 24px rgba(52, 31, 55, 0.08);
-}
-
-/* Auth Card */
-.auth-card {
-  width: 100%;
-  max-width: 440px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 24px 60px -12px rgba(52, 31, 55, 0.12), 0 0 0 1px rgba(52, 31, 55, 0.06);
-  border-radius: 32px;
-  padding: 40px 36px;
-  position: relative;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 8px 16px;
+  border-radius: 9999px;
+  border: 1px solid #D8CEE6;
+  transition: all 0.2s ease;
   z-index: 10;
-  animation: cardEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.floating-home-link:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateX(-3px);
 }
 
-@keyframes cardEnter {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.auth-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  background: #FFFFFF;
+  border: 1px solid #D8CEE6;
+  border-radius: 24px;
+  padding: 40px 36px;
+  box-shadow: 0 20px 40px -10px rgba(52, 31, 55, 0.12);
+  z-index: 10;
 }
 
-/* Card Header */
 .card-header {
   text-align: center;
   margin-bottom: 28px;
 }
-
-.brand-logo {
-  display: inline-flex;
-  align-items: baseline;
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: #341F37;
-  text-decoration: none;
-  margin-bottom: 12px;
-  transition: transform 0.2s ease;
-}
-
-.brand-logo:hover {
-  transform: scale(1.02);
-}
-
-.logo-dot {
-  color: #7B4C85;
-}
-
 .card-title {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: -0.03em;
   color: #341F37;
   margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
 }
-
 .card-subtitle {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: #705977;
+  font-size: 14px;
+  color: #6e5873;
   margin: 0;
+  line-height: 1.5;
 }
 
-/* Form & Inputs */
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .input-group {
@@ -548,32 +538,26 @@ onMounted(() => {
   flex-direction: column;
   gap: 6px;
 }
-
 .label-row {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
 }
-
 .input-label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #543359;
+  font-size: 13px;
+  font-weight: 600;
+  color: #341F37;
 }
-
 .forgot-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6e5873;
   background: none;
   border: none;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  color: #7B4C85;
   cursor: pointer;
   padding: 0;
   transition: color 0.2s ease;
 }
-
 .forgot-btn:hover {
   color: #341F37;
   text-decoration: underline;
@@ -584,242 +568,227 @@ onMounted(() => {
   display: flex;
   align-items: center;
 }
-
 .field-icon {
   position: absolute;
-  left: 16px;
+  left: 14px;
+  color: #8a758f;
+  pointer-events: none;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #8C7392;
-  pointer-events: none;
-  transition: color 0.2s ease;
 }
-
 .auth-input {
   width: 100%;
-  padding: 13px 16px 13px 44px;
-  background: #FAF7FC;
-  border: 1px solid rgba(52, 31, 55, 0.12);
-  border-radius: 16px;
-  font-family: inherit;
+  height: 48px;
+  padding: 0 16px 0 44px;
+  background: #F9F5FF;
+  border: 1.5px solid #D8CEE6;
+  border-radius: 12px;
   font-size: 14px;
-  font-weight: 600;
   color: #341F37;
   outline: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
 }
-
-.auth-input::placeholder {
-  color: #A390A8;
-  font-weight: 500;
-}
-
 .auth-input:focus {
+  border-color: #341F37;
   background: #FFFFFF;
-  border-color: #7B4C85;
-  box-shadow: 0 0 0 4px rgba(123, 76, 133, 0.15);
+  box-shadow: 0 0 0 3px rgba(52, 31, 55, 0.1);
 }
-
-.input-field-wrapper:focus-within .field-icon {
-  color: #7B4C85;
-}
-
-.otp-field {
-  padding-left: 16px;
+.auth-input.otp-field {
+  padding: 0 16px;
   text-align: center;
-  letter-spacing: 0.25em;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 3px;
+  color: #341F37;
+}
+
+.expiry-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6e5873;
+  background: #F9F5FF;
+  border: 1px solid #D8CEE6;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.expiry-badge.expired {
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.timer-icon {
+  color: #341F37;
+}
+
+.resend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6e5873;
+}
+.resend-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
   font-weight: 700;
+  color: #341F37;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+.resend-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.resend-btn:disabled {
+  color: #a195a6;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 
 .visibility-btn {
   position: absolute;
-  right: 14px;
+  right: 12px;
   background: none;
   border: none;
-  color: #8C7392;
+  color: #8a758f;
   cursor: pointer;
-  padding: 4px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: color 0.2s ease;
+  padding: 4px;
 }
-
 .visibility-btn:hover {
   color: #341F37;
 }
 
-/* Alerts */
-.alert {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 14px;
-  border-radius: 14px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.error-alert {
-  background: #FDF2F2;
-  border: 1px solid #F8B4B4;
-  color: #9B1C1C;
-}
-
-.success-alert {
-  background: #F3FAF7;
-  border: 1px solid #A6E9D5;
-  color: #0E7490;
-}
-
-/* Submit Button */
 .submit-btn {
   width: 100%;
-  padding: 14px;
-  margin-top: 4px;
-  background: linear-gradient(135deg, #341F37 0%, #543359 50%, #7B4C85 100%);
+  height: 48px;
+  background: #341F37;
   color: #FFFFFF;
   border: none;
-  border-radius: 16px;
-  font-family: inherit;
-  font-size: 13px;
+  border-radius: 12px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 10px 24px -4px rgba(52, 31, 55, 0.25);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.submit-btn:hover:not(:disabled) {
-  transform: translateY(-1.5px);
-  box-shadow: 0 14px 28px -4px rgba(52, 31, 55, 0.32);
-  filter: brightness(1.05);
-}
-
-.submit-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.spinner {
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* OAuth Section */
-.divider-section {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.divider-line {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: #8C7392;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.divider-line::before,
-.divider-line::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid rgba(52, 31, 55, 0.1);
-}
-
-.divider-line span {
-  padding: 0 12px;
-}
-
-.oauth-btn {
-  width: 100%;
-  padding: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: #FAF7FC;
-  border: 1px solid rgba(52, 31, 55, 0.12);
-  border-radius: 16px;
-  font-family: inherit;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+.submit-btn:hover:not(:disabled) {
+  background: #4a2c50;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -4px rgba(52, 31, 55, 0.3);
+}
+.submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.alert {
+  padding: 10px 14px;
+  border-radius: 10px;
   font-size: 13px;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.error-alert {
+  background: #FDF2F2;
+  border: 1px solid #FDE8E8;
+  color: #9B1C1C;
+}
+.success-alert {
+  background: #EDFDF5;
+  border: 1px solid #DEF7EC;
+  color: #03543F;
+}
+
+.divider-section {
+  margin: 20px 0 0 0;
+}
+.divider-line {
+  position: relative;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.divider-line::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #D8CEE6;
+}
+.divider-line span {
+  position: relative;
+  background: #FFFFFF;
+  padding: 0 12px;
+  font-size: 12px;
+  color: #8a758f;
+}
+
+.oauth-btn {
+  width: 100%;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1.5px solid #D8CEE6;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
   color: #341F37;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
 }
-
 .oauth-btn:hover {
-  background: #FFFFFF;
-  border-color: rgba(52, 31, 55, 0.25);
-  box-shadow: 0 4px 16px rgba(52, 31, 55, 0.06);
+  background: #F9F5FF;
+  border-color: #341F37;
 }
-
 .oauth-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
-/* Footer Switcher */
 .card-footer {
   margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(52, 31, 55, 0.08);
   text-align: center;
   font-size: 13px;
-  font-weight: 600;
-  color: #705977;
+  color: #6e5873;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
 }
-
 .link-btn {
   background: none;
   border: none;
-  font-family: inherit;
   font-size: 13px;
-  font-weight: 800;
-  color: #7B4C85;
+  font-weight: 700;
+  color: #341F37;
   cursor: pointer;
   padding: 0;
-  transition: color 0.2s ease;
 }
-
 .link-btn:hover {
-  color: #341F37;
   text-decoration: underline;
 }
 
-@media (max-width: 480px) {
-  .auth-card {
-    padding: 32px 24px;
-    border-radius: 24px;
-  }
-  .back-link {
-    top: 16px;
-    left: 16px;
-  }
+.spinner {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>
