@@ -68,13 +68,27 @@ jobs:
   deploy-vps:
     name: Deploy to Production VPS
     needs: validate
-    if: github.ref == 'refs/heads/main' && secrets.VPS_HOST != ''
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Check VPS Secrets Configuration
+        id: check-secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          if [ -n "$VPS_HOST" ]; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+            echo "✅ VPS_HOST is configured in GitHub secrets."
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ VPS_HOST is not set in GitHub secrets yet. Skipping remote SSH deploy step."
+          fi
+
       - name: Execute Remote Deployment via SSH
+        if: steps.check-secrets.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
