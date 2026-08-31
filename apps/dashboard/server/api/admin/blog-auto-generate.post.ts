@@ -96,9 +96,9 @@ Tone Style: ${tone}`
 
       if (titleMatch || parsedContent.length > 500) {
         parsed = {
-          title: titleMatch ? titleMatch[1].replace(/["']/g, '').trim() : (topic.includes('2026') ? topic : `${topic}: The 2026 Complete Engineering Playbook`),
-          slug: slugMatch ? slugMatch[1].replace(/["']/g, '').trim().toLowerCase() : topic.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'),
-          excerpt: excerptMatch ? excerptMatch[1].replace(/["']/g, '').trim() : `Mastering ${topic} to cut latency and scale revenue.`,
+          title: titleMatch?.[1] ? titleMatch[1].replace(/["']/g, '').trim() : (topic.includes('2026') ? topic : `${topic}: The 2026 Complete Engineering Playbook`),
+          slug: slugMatch?.[1] ? slugMatch[1].replace(/["']/g, '').trim().toLowerCase() : topic.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'),
+          excerpt: excerptMatch?.[1] ? excerptMatch[1].replace(/["']/g, '').trim() : `Mastering ${topic} to cut latency and scale revenue.`,
           author_name: 'Md. Rafiqul Islam',
           author_role: 'Chief AI Architect',
           category,

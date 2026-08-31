@@ -2210,7 +2210,7 @@ const autoPickRandomTopic = () => {
   const unused = allTrendingTopicsPool.filter(t => !blogs.value.some((b: any) => (b.title || '').toLowerCase().includes(t.toLowerCase().slice(0, 15))))
   const poolToUse = unused.length > 0 ? unused : allTrendingTopicsPool
   const picked = poolToUse[Math.floor(Math.random() * poolToUse.length)]
-  aiBlogPrompt.topic = picked
+  aiBlogPrompt.topic = picked || ''
 }
 
 const aiBlogPrompt = reactive({
@@ -2467,7 +2467,7 @@ const unsplashCuratedCommercePhotos = [
 let unsplashIndex = 0
 const generateUnsplashCoverImage = () => {
   unsplashIndex = (unsplashIndex + 1) % unsplashCuratedCommercePhotos.length
-  newBlog.image = unsplashCuratedCommercePhotos[unsplashIndex]
+  newBlog.image = unsplashCuratedCommercePhotos[unsplashIndex] || ''
 }
 
 const generateFreeAiCoverImage = async () => {

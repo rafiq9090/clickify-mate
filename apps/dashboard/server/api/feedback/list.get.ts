@@ -6,7 +6,8 @@ export default defineEventHandler(async (event) => {
   const session = await requireDashboardRole(event, ['owner', 'admin', 'manager'])
   
   try {
-    const userEmail = session?.email || session?.user?.email || ''
+    const s = session as any
+    const userEmail = s?.email || s?.user?.email || ''
     const tickets = await getUserFeedbackListFromFirestore(userEmail)
     return {
       success: true,

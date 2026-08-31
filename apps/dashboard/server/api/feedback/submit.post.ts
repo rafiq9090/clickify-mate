@@ -12,14 +12,15 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const s = session as any
     const feedbackPayload = {
       title: String(title).trim().slice(0, 180),
       category: category || 'Bug Report',
       priority: priority || 'Medium',
       description: String(description).trim(),
       attachments: Array.isArray(attachments) ? attachments : [],
-      user_id: session?.id || session?.user?.id || 'unknown',
-      user_email: session?.email || session?.user?.email || 'user@example.com',
+      user_id: s?.id || s?.user?.id || 'unknown',
+      user_email: s?.email || s?.user?.email || 'user@example.com',
       status: 'open',
       admin_reply: '',
       submitted_at: new Date().toISOString(),

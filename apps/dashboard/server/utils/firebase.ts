@@ -585,7 +585,7 @@ export async function getUserFeedbackListFromFirestore(userEmail?: string): Prom
         query = query.where('user_email', '==', userEmail)
       }
       const snap = await query.get()
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      return snap.docs.map((d: any) => ({ id: d.id, ...d.data() }))
     }
   } catch {
     // Graceful fallback to REST engine
