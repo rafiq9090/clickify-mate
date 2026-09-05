@@ -516,6 +516,7 @@ const handleLogin = async () => {
   background: rgba(255, 255, 255, 0.9);
   transform: translateX(-3px);
 }
+
 /* Responsive adjustments */
 @media (max-width: 480px) {
   .top-nav-bar {

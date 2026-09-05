@@ -4,9 +4,9 @@ const VERSION = 'v1'
 const IV_LENGTH = 12
 
 function paymentKey() {
-  const keyHex = process.env.PAYMENT_CREDENTIALS_KEY || ''
+  const keyHex = process.env.PAYMENT_CREDENTIALS_KEY || process.env.AGENT_ENCRYPTION_KEY || ''
   if (!/^[0-9a-f]{64}$/i.test(keyHex)) {
-    throw new Error('PAYMENT_CREDENTIALS_KEY must be a 64-character hexadecimal key.')
+    throw new Error('PAYMENT_CREDENTIALS_KEY or AGENT_ENCRYPTION_KEY must be a 64-character hexadecimal key.')
   }
   return Buffer.from(keyHex, 'hex')
 }

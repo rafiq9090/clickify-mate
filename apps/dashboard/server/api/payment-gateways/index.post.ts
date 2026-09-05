@@ -11,6 +11,9 @@ const PROVIDERS = {
   },
   stripe: {
     credentialFields: ['secretKey', 'webhookSecret']
+  },
+  sslcommerz: {
+    credentialFields: ['storeId', 'storePassword']
   }
 } as const
 
@@ -53,7 +56,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const provider = String(body?.provider || '').toLowerCase() as Provider
   if (!(provider in PROVIDERS)) {
-    throw createError({ statusCode: 400, statusMessage: 'Provider must be bKash, Nagad, or Stripe.' })
+    throw createError({ statusCode: 400, statusMessage: 'Provider must be bKash, Nagad, Stripe, or SSLCOMMERZ.' })
   }
 
   const merchantName = cleanText(body?.merchantName, 'Merchant name', 120, true)
@@ -187,7 +190,7 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error: any) {
     if (error?.statusCode) throw error
-    console.error(`[Payment Gateway] Failed to save ${provider} settings for user ${user.id}:`, error?.message || error)
-    throw createError({ statusCode: 500, statusMessage: 'Unable to save payment gateway settings.' })
+    console.error(`[Payment Gateway] Failed to save ${provider} settings for user ${user.id}:`, error)
+    throw createError({ statusCode: 500, statusMessage: error?.message || 'Unable to save payment gateway settings.' })
   }
 })

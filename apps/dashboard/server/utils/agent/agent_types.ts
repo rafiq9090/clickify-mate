@@ -39,6 +39,7 @@ export type AgentIntent =
     | 'STOCK_QUERY'
     | 'PRICE_QUERY'
     | 'ORDER_START'
+    | 'NEW_ORDER'
     | 'ORDER_CONFIRM'
     | 'ORDER_TRACKING'
     | 'DELIVERY_QUERY'

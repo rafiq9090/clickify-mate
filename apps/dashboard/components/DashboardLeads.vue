@@ -200,7 +200,7 @@
                 <td class="py-3.5 px-4">
                   <div class="flex flex-col gap-0.5">
                     <div class="flex items-center gap-2">
-                      <span class="font-semibold text-on-surface capitalize">{{ lead.data?.customer || 'Anonymous Customer' }}</span>
+                      <span class="font-semibold text-on-surface capitalize">{{ lead.data?.name || lead.data?.customer_name || lead.data?.customer || 'Customer' }}</span>
                       <span 
                         class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold border"
                         :class="getStatusBadgeClass(lead.data?.status)"
@@ -219,11 +219,11 @@
                 <!-- Order ID -->
                 <td class="py-3.5 px-4" @click.stop>
                   <button 
-                    @click="$emit('copy-text', lead.id)" 
+                    @click="$emit('copy-text', lead.data?.invoice_number || lead.id)" 
                     class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline text-on-surface-variant text-xs font-mono transition-colors cursor-pointer group/id"
                     title="Click to copy full ID"
                   >
-                    <span>#{{ lead.id.slice(0, 8) }}</span>
+                    <span>#{{ lead.data?.invoice_number || lead.id.slice(0, 8) }}</span>
                     <span class="material-symbols-outlined text-xs opacity-50 group-hover/id:opacity-100">content_copy</span>
                   </button>
                 </td>
@@ -272,6 +272,32 @@
                         >
                           <span class="text-on-surface-variant truncate">{{ part.split(':')[0]?.trim() }}</span>
                           <span class="font-semibold text-on-surface shrink-0">{{ part.split(':')[1]?.trim() }}</span>
+                        </div>
+                      </div>
+                      <div v-else-if="lead.data?.product" class="space-y-1 pt-1">
+                        <div class="flex items-center justify-between py-1 border-b border-outline/40 gap-2">
+                          <span class="text-on-surface-variant">Product</span>
+                          <span class="font-semibold text-on-surface">{{ lead.data.product }}</span>
+                        </div>
+                        <div v-if="lead.data?.size || lead.data?.color" class="flex items-center justify-between py-1 border-b border-outline/40 gap-2">
+                          <span class="text-on-surface-variant">Variant</span>
+                          <span class="font-semibold text-on-surface">{{ [lead.data.size, lead.data.color].filter(Boolean).join(' / ') }}</span>
+                        </div>
+                        <div v-if="lead.data?.quantity" class="flex items-center justify-between py-1 border-b border-outline/40 gap-2">
+                          <span class="text-on-surface-variant">Quantity</span>
+                          <span class="font-semibold text-on-surface">{{ lead.data.quantity }} pcs</span>
+                        </div>
+                        <div v-if="lead.data?.delivery_fee" class="flex items-center justify-between py-1 border-b border-outline/40 gap-2">
+                          <span class="text-on-surface-variant">Delivery Fee</span>
+                          <span class="font-semibold text-on-surface">৳{{ lead.data.delivery_fee }}</span>
+                        </div>
+                        <div v-if="lead.data?.total || lead.data?.price" class="flex items-center justify-between py-1 border-b border-outline/40 gap-2">
+                          <span class="text-on-surface-variant">Total</span>
+                          <span class="font-bold text-primary">৳{{ lead.data.total || lead.data.price }}</span>
+                        </div>
+                        <div v-if="lead.data?.payment_method" class="flex items-center justify-between py-1 gap-2">
+                          <span class="text-on-surface-variant">Method</span>
+                          <span class="font-semibold text-on-surface uppercase">{{ lead.data.payment_method }}</span>
                         </div>
                       </div>
                       <p v-else class="text-on-surface font-medium pt-1 break-words">

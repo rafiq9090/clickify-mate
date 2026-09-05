@@ -298,7 +298,7 @@ export async function executeQuery(query: {
         clauses.push(`${colExpr} = $${paramIndex++}`)
         values.push(f.value)
       } else if (f.type === 'neq') {
-        clauses.push(`${colExpr} != $${paramIndex++}`)
+        clauses.push(`(${colExpr} IS NULL OR ${colExpr} != $${paramIndex++})`)
         values.push(f.value)
       } else if (f.type === 'in') {
         clauses.push(`${colExpr} = ANY($${paramIndex++})`)
@@ -317,23 +317,23 @@ export async function executeQuery(query: {
         values.push(f.value)
       } else if (f.type === 'is') {
         if (f.value === null) {
-          clauses.push(`${colExpr} IS NULL`)
+          clauses.push(`(${colExpr} IS NULL OR ${colExpr} = '')`)
         } else if (f.value === true) {
-          clauses.push(`${colExpr} IS TRUE`)
+          clauses.push(`(${colExpr} IS TRUE OR ${colExpr} = 'true')`)
         } else if (f.value === false) {
-          clauses.push(`${colExpr} IS FALSE`)
+          clauses.push(`(${colExpr} IS FALSE OR ${colExpr} = 'false')`)
         } else {
           throw new Error('Unsafe IS filter value')
         }
       } else if (f.type === 'not') {
         if (f.op === 'is' && f.value === null) {
-          clauses.push(`${colExpr} IS NOT NULL`)
+          clauses.push(`(${colExpr} IS NOT NULL AND ${colExpr} != '')`)
         } else if (f.op === 'is' && f.value === true) {
           clauses.push(`${colExpr} IS NOT TRUE`)
         } else if (f.op === 'is' && f.value === false) {
           clauses.push(`${colExpr} IS NOT FALSE`)
         } else if (f.op === 'eq') {
-          clauses.push(`${colExpr} != $${paramIndex++}`)
+          clauses.push(`(${colExpr} IS NULL OR ${colExpr} != $${paramIndex++})`)
           values.push(f.value)
         } else if (f.op === 'ilike') {
           clauses.push(`${colExpr} NOT ILIKE $${paramIndex++}`)
@@ -351,6 +351,17 @@ export async function executeQuery(query: {
         const orParts = (f.value || '').split(',').map((p: string) => p.trim()).filter(Boolean)
         const orClauses: string[] = []
         for (const part of orParts) {
+          const isNullMatch = part.match(/^([^.]+)\.(not\.is\.null|is\.not\.null|is\.null)$/i)
+          if (isNullMatch) {
+            const cExpr = formatColumnExpr(isNullMatch[1])
+            const opRaw = isNullMatch[2].toLowerCase()
+            if (opRaw === 'is.null') {
+              orClauses.push(`(${cExpr} IS NULL OR ${cExpr} = '')`)
+            } else {
+              orClauses.push(`(${cExpr} IS NOT NULL AND ${cExpr} != '')`)
+            }
+            continue
+          }
           const match = part.match(/^([^.]+)\.(eq|neq|ilike|like|gt|gte|lt|lte)\.(.*)$/i)
           if (match) {
             const cExpr = formatColumnExpr(match[1])

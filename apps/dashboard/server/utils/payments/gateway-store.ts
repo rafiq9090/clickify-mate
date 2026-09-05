@@ -5,7 +5,8 @@ import type { MerchantGatewayConfig, PaymentProviderName } from './providers'
 const REQUIRED_CREDENTIALS: Record<PaymentProviderName, string[]> = {
   bkash: ['username', 'password', 'appKey', 'appSecret'],
   nagad: ['privateKey', 'publicKey'],
-  stripe: ['secretKey', 'webhookSecret']
+  stripe: ['secretKey', 'webhookSecret'],
+  sslcommerz: ['storeId', 'storePassword']
 }
 
 function mapGateway(row: any, credentials: Record<string, string>): MerchantGatewayConfig {
@@ -44,7 +45,24 @@ export async function loadActiveGateway(userId: string, provider: PaymentProvide
       LIMIT 1`,
     [userId, provider]
   )
-  const row = result.rows[0]
+  let row = result.rows[0]
+
+  // If merchant does not have a direct provider account (e.g. direct bKash/Nagad),
+  // but has SSLCOMMERZ active, seamlessly route through SSLCOMMERZ since it aggregates bKash, Nagad, Cards & Banks.
+  if (!row && (provider === 'bkash' || provider === 'nagad')) {
+    const sslResult = await queryPg(
+      `SELECT id, user_id, provider, merchant_name, merchant_number, environment,
+              callback_url, credentials_encrypted
+         FROM public.payment_gateways
+        WHERE user_id = $1 AND provider = 'sslcommerz' AND is_active = true
+        LIMIT 1`,
+      [userId]
+    )
+    if (sslResult.rows[0]) {
+      row = sslResult.rows[0]
+    }
+  }
+
   if (!row) throw new Error(`No active ${provider} merchant account is configured for this shop.`)
   return mapGateway(row, await decryptCredentials(row))
 }

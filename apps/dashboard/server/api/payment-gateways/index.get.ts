@@ -5,7 +5,8 @@ import { requireDashboardUser } from '../../utils/auth-session'
 const CREDENTIAL_FIELDS: Record<string, string[]> = {
   bkash: ['username', 'password', 'appKey', 'appSecret'],
   nagad: ['accountNumber', 'privateKey', 'publicKey'],
-  stripe: ['secretKey', 'webhookSecret']
+  stripe: ['secretKey', 'webhookSecret'],
+  sslcommerz: ['storeId', 'storePassword']
 }
 
 export default defineEventHandler(async (event) => {

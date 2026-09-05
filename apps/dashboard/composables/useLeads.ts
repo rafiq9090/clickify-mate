@@ -56,6 +56,7 @@ export const useLeads = (supabase: any, showToast: Function, askConfirm: Functio
                 .eq('source', 'ai_agent')
                 .filter('data->>user_id', 'eq', user.id)
                 .is('data->>payment_transaction_id', null)
+                .neq('data->>payment_status', 'paid')
                 .order('created_at', { ascending: false })
             if (activeTab.value !== 'all') {
                 if (activeTab.value === 'facebook') query = query.or('data->>platform.eq.messenger,data->>platform.eq.fb_comment')

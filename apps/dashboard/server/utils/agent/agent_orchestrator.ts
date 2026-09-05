@@ -63,6 +63,7 @@ async function runDeterministicTurn(
     const toolCalls: AgentToolCall[] = []
     const toolResults: AgentToolResult[] = []
     const allowedUrls: string[] = []
+    const lang = context.session.language || 'bn'
 
     const runTool = async (name: string, args: Record<string, any>) => {
         const id = `det_${name}_${toolCalls.length + 1}`
@@ -111,7 +112,6 @@ async function runDeterministicTurn(
 
     if (understanding.intent === 'NEGATION') {
         context.session.lastAskedField = undefined
-        const lang = context.session.language || 'bn'
         return finish(
             lang === 'en'
                 ? 'Alright, no problem. How else can I assist you?'
@@ -120,8 +120,45 @@ async function runDeterministicTurn(
         )
     }
 
+    if (understanding.intent === 'NEW_ORDER') {
+        context.orderDraft = {
+            name: context.customer?.name || context.customerName,
+            phone: context.customer?.phone,
+            address: context.customer?.address,
+            quantity: 1
+        }
+        context.selection = { quantity: 1 }
+        context.session.state = 'SALES_INQUIRING'
+        context.session.lastAskedField = 'product'
+        context.session.checkoutToken = 'chk_' + Math.random().toString(36).slice(2, 9)
+
+        const list = buildProductListReply(context)
+        context.session.lastPresentedOptions = list.options
+        const replyText = lang === 'en'
+            ? `Sure! Which product would you like to order next? Here is our available catalog:\n\n${list.text}`
+            : `অবশ্যই! আপনি পরবর্তীতে কোন পণ্যটি অর্ডার করতে চান? আমাদের প্রোডাক্ট তালিকা:\n\n${list.text}`
+
+        return finish(
+            replyText,
+            'PRODUCT_DISCOVERY',
+            {},
+            {
+                sku: null,
+                color: null,
+                size: null,
+                quantity: null,
+                total: null,
+                unitPrice: null,
+                delivery_fee: null,
+                status: null,
+                payment_status: null,
+                awaiting_confirmation: false,
+                last_asked_field: 'product'
+            }
+        )
+    }
+
     if (originalState === 'AWAIT_PAYMENT' && understanding.intent === 'AFFIRMATION') {
-        const lang = context.session.language || 'bn'
         return finish(
             lang === 'en'
                 ? 'Your order is still awaiting verified payment. Complete the secure link previously sent; the order will confirm automatically after the provider webhook is verified.'
@@ -213,6 +250,25 @@ async function runDeterministicTurn(
         return finish(reply, 'VERIFY_PAYMENT')
     }
 
+    if (understanding.intent === 'PAYMENT_QUERY' && !understanding.entities.trxId) {
+        if (context.orderDraft) {
+            context.orderDraft.paymentMethod = undefined
+            context.session.lastAskedField = 'payment'
+            return finish(
+                lang === 'en'
+                    ? 'Sure! Which payment method would you prefer: bKash, Nagad, Bank, or Cash on Delivery (COD)?'
+                    : 'অবশ্যই! আপনি কোন মাধ্যমে পেমেন্ট করতে চান: bKash, Nagad, ব্যাংক অথবা Cash on Delivery (COD)?',
+                'VERIFY_ORDER'
+            )
+        }
+        return finish(
+            lang === 'en'
+                ? 'We accept bKash, Nagad, Bank (Cards & Net Banking), and Cash on Delivery (COD). Which do you prefer?'
+                : 'আমরা bKash, Nagad, ব্যাংক (কার্ড ও নেট ব্যাংকিং) এবং Cash on Delivery (COD) গ্রহণ করি। আপনি কোনটি বেছে নিতে চান?',
+            context.session.state
+        )
+    }
+
     if (understanding.intent === 'IMAGE_REQUEST') {
         if (!selectedSku) {
             const list = buildProductListReply(context)
@@ -244,10 +300,10 @@ async function runDeterministicTurn(
     if (!isOrderProgress) return null
 
     const paymentMethod = context.orderDraft?.paymentMethod
-    if (paymentMethod && !['bkash', 'nagad', 'stripe', 'cod'].includes(paymentMethod)) {
+    if (paymentMethod && !['bkash', 'nagad', 'stripe', 'cod', 'sslcommerz', 'bank'].includes(paymentMethod)) {
         context.orderDraft!.paymentMethod = undefined
         context.session.lastAskedField = 'payment'
-        return finish('এই পেমেন্ট গেটওয়েটি এখন কনফিগার করা নেই। bKash, Nagad, Stripe অথবা COD বেছে নিন।', 'VERIFY_ORDER')
+        return finish('এই পেমেন্ট গেটওয়েটি এখন কনফিগার করা নেই। bKash, Nagad, ব্যাংক অথবা COD বেছে নিন।', 'VERIFY_ORDER')
     }
 
     const missing = getMissingOrderField(context)
@@ -338,19 +394,43 @@ async function runDeterministicTurn(
         )
     }
     if (order.output?.success && order.output.status === 'confirmed') {
+        const receipt = buildConfirmedOrderReceipt(context, order.output)
+        context.orderDraft = {
+            name: context.customer?.name || context.customerName,
+            phone: context.customer?.phone,
+            address: context.customer?.address,
+            quantity: 1
+        }
+        context.selection = { quantity: 1 }
         context.session.lastAskedField = undefined
+        context.session.checkoutToken = 'chk_' + Math.random().toString(36).slice(2, 9)
         return finish(
-            buildConfirmedOrderReceipt(context, order.output),
+            receipt,
             'ORDER_CONFIRMED',
             { orderCreated: true },
-            { status: 'confirmed' }
+            {
+                status: 'confirmed',
+                sku: null,
+                color: null,
+                size: null,
+                quantity: null,
+                total: null,
+                unitPrice: null,
+                delivery_fee: null,
+                payment_method: null,
+                awaiting_confirmation: false
+            }
         )
     }
 
     return finish(
         order.output?.status === 'pending_payment'
-            ? 'আপনার অর্ডারের তথ্য সংরক্ষিত আছে, কিন্তু নিরাপদ পেমেন্ট লিংক তৈরি হয়নি। কোনো পেমেন্ট বা COD কনফার্ম হয়নি—শপ মালিককে গেটওয়ে কনফিগারেশন যাচাই করতে হবে।'
-            : 'দুঃখিত, অর্ডারটি তৈরি করা যায়নি। আপনার তথ্য সংরক্ষিত আছে; কোনো পেমেন্ট বা অর্ডার কনফার্ম হয়নি।',
+            ? (lang === 'en'
+                ? 'Your order details have been recorded, but a secure payment link could not be generated. Please contact the shop owner to check the payment gateway configuration.'
+                : 'আপনার অর্ডারের তথ্য সংরক্ষিত আছে, কিন্তু নিরাপদ পেমেন্ট লিংক তৈরি হয়নি। কোনো পেমেন্ট বা COD কনফার্ম হয়নি—শপ মালিককে গেটওয়ে কনফিগারেশন যাচাই করতে হবে।')
+            : (lang === 'en'
+                ? (order.output?.message || 'Sorry, the order could not be placed. Your details are saved; no payment or order was confirmed.')
+                : (order.output?.message || 'দুঃখিত, অর্ডারটি তৈরি করা যায়নি। আপনার তথ্য সংরক্ষিত আছে; কোনো পেমেন্ট বা অর্ডার কনফার্ম হয়নি।')),
         order.output?.status === 'pending_payment' ? 'AWAIT_PAYMENT' : 'VERIFY_ORDER'
     )
 }
@@ -442,6 +522,21 @@ export async function runAgent(
         }
         await logAgentTrace(context, understanding, outResult, startTime)
         return outResult
+    }
+
+    // New Order Lifecycle: If customer requests another order or starts a new purchase after an order was confirmed, start fresh session
+    if (understanding.intent === 'NEW_ORDER' ||
+        (context.session.state === 'ORDER_CONFIRMED' && (understanding.intent === 'ORDER_START' || understanding.intent === 'PRODUCT_DISCOVERY'))) {
+        context.session.state = 'SALES_INQUIRING'
+        context.session.lastAskedField = 'product'
+        context.session.checkoutToken = 'chk_' + Math.random().toString(36).slice(2, 9)
+        context.selection = { quantity: 1 }
+        context.orderDraft = {
+            name: context.customer?.name || context.customerName,
+            phone: context.customer?.phone,
+            address: context.customer?.address,
+            quantity: 1
+        }
     }
 
     // Deterministic state transitions handle identity, address, variants, payment,
@@ -556,7 +651,7 @@ CORE BEHAVIORAL RULES:
 5. FACTUAL GROUNDING: ALWAYS use tools (check_inventory, get_current_price, calculate_delivery_fee, search_products) before giving facts. Never make up stock numbers, prices, or discounts.
 6. NO MULTI-ROW TABLES FOR ADDRESSES: When calculating delivery fee for a customer's location, calculate it for their specific district once. Never print multi-row tables breaking down every word of their address.
 7. NO FALSE IMAGE CLAIMS: Never claim or assume that the customer uploaded an image unless the message explicitly begins with "[user sent image:".
-8. PAYMENT METHODS: Only bKash, Nagad, Stripe, and COD are supported by the application-controlled checkout flow. Never treat a screenshot or typed TrxID as provider verification.
+8. PAYMENT METHODS: Supported options are bKash, Nagad, Bank (Cards & Net Banking via SSLCOMMERZ), and Cash on Delivery (COD). Present these options clearly as "bKash, Nagad, Bank, or Cash on Delivery (COD)". Never mention Stripe or SSLCOMMERZ brand names directly to customers unless specifically asked. Never treat a screenshot or typed TrxID as provider verification.
 9. NO MARKDOWN IMAGES: Never output markdown image links ![alt](url) in your text. The system automatically sends product photos via chat channels.
 10. MULTILINGUAL FLUENCY: You are fluent in all languages (English, Bengali, Hindi, Arabic, German, Spanish, French, Urdu, etc.). ALWAYS respond in the exact language the customer is speaking or requesting. If the customer asks you to speak in German or asks about the company in German, answer fluently in German. If in Arabic, answer in Arabic. If in Hindi, answer in Hindi. If in Spanish, answer in Spanish. If in English, answer in English. If in Bengali/Banglish, answer in Bengali. Keep responses concise, clear, and under 60 words.`
 

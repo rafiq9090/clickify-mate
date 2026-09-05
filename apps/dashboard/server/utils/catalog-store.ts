@@ -110,9 +110,23 @@ export async function listCatalogForShop(shopId: string): Promise<CatalogProduct
   }
 
   return Array.from(grouped.values()).map(product => {
+    const rawVariants = product._variants || []
+    const expandedVariants: any[] = []
+    for (const v of rawVariants) {
+      const rawSize = String(v.size || '').trim()
+      if (rawSize.includes(',')) {
+        for (const s of rawSize.split(',').map(x => x.trim()).filter(Boolean)) {
+          expandedVariants.push({ color: v.color, size: s, quantity: v.quantity, price: v.price })
+        }
+      } else {
+        expandedVariants.push(v)
+      }
+    }
+    product.variants = expandedVariants
+
     if (Array.isArray(product.images)) {
       product.images = product.images.map((image: any) => {
-        const variant = product._variants.find((item: any) =>
+        const variant = expandedVariants.find((item: any) =>
           (!image.color || slugPart(item.color) === slugPart(image.color)) &&
           (!image.size || slugPart(item.size) === slugPart(image.size))
         )
@@ -294,10 +308,21 @@ export async function deductCatalogStock(args: {
       `SELECT pv.id, pv.stock_quantity, pv.reserved_quantity
          FROM public.product_variants pv
         WHERE pv.shop_id = $1 AND pv.is_active = true
-          AND (lower(pv.sku) = $2 OR lower(pv.metadata->>'base_sku') = $2)
-          AND ($3 = '' OR lower(pv.attributes->>'color') = lower($3))
-          AND ($4 = '' OR lower(pv.attributes->>'size') = lower($4))
-        ORDER BY pv.created_at ASC
+          AND (lower(pv.sku) = lower($2) OR lower(pv.metadata->>'base_sku') = lower($2))
+        ORDER BY
+          CASE 
+            WHEN $3 = '' THEN 0
+            WHEN lower(pv.attributes->>'color') = lower($3) THEN 0
+            WHEN lower(pv.attributes->>'color') LIKE ('%' || lower($3) || '%') THEN 1
+            ELSE 2
+          END,
+          CASE 
+            WHEN $4 = '' THEN 0
+            WHEN lower(pv.attributes->>'size') = lower($4) THEN 0
+            WHEN lower(pv.attributes->>'size') LIKE ('%' || lower($4) || '%') THEN 1
+            ELSE 2
+          END,
+          pv.created_at ASC
         LIMIT 1
         FOR UPDATE`,
       [shopId, sku, String(args.color || ''), String(args.size || '')]
@@ -381,9 +406,22 @@ export async function reserveCatalogStock(args: {
          FROM public.product_variants
         WHERE shop_id = $1 AND is_active = true
           AND (lower(sku) = lower($2) OR lower(metadata->>'base_sku') = lower($2))
-          AND ($3 = '' OR lower(attributes->>'color') = lower($3))
-          AND ($4 = '' OR lower(attributes->>'size') = lower($4))
-        ORDER BY created_at ASC LIMIT 1 FOR UPDATE`,
+        ORDER BY
+          CASE 
+            WHEN $3 = '' THEN 0
+            WHEN lower(attributes->>'color') = lower($3) THEN 0
+            WHEN lower(attributes->>'color') LIKE ('%' || lower($3) || '%') THEN 1
+            ELSE 2
+          END,
+          CASE 
+            WHEN $4 = '' THEN 0
+            WHEN lower(attributes->>'size') = lower($4) THEN 0
+            WHEN lower(attributes->>'size') LIKE ('%' || lower($4) || '%') THEN 1
+            ELSE 2
+          END,
+          created_at ASC
+        LIMIT 1
+        FOR UPDATE`,
       [shopId, args.sku, String(args.color || ''), String(args.size || '')]
     )
     const variant = result.rows[0]

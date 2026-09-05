@@ -149,7 +149,7 @@ const post = computed(() => {
       author: d.author || {
         name: d.author_name || 'Engineering Team',
         role: d.author_role || 'Commerce AI Specialist',
-        avatar: d.author_photo ,
+        avatar: d.author_photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
       },
       readTime: d.readTime || `${Math.max(1, Math.ceil((typeof d.content === 'string' ? d.content.split(/\s+/).length : 500) / 200))} min read`,
       publishedAt: d.publishedAt || (d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Recent')

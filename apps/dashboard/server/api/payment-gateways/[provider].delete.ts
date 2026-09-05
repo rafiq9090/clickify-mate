@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store')
 
   const provider = String(getRouterParam(event, 'provider') || '').toLowerCase()
-  if (!['bkash', 'nagad', 'stripe'].includes(provider)) {
+  if (!['bkash', 'nagad', 'stripe', 'sslcommerz'].includes(provider)) {
     throw createError({ statusCode: 400, statusMessage: 'Unknown payment provider.' })
   }
 

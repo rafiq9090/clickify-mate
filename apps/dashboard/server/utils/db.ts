@@ -12,6 +12,8 @@ const POSTGRES_URL = databaseUrl('DATABASE_URL', 'postgresql://postgres@localhos
 const MONGODB_URL = databaseUrl('MONGODB_URL', 'mongodb://localhost:27017/clickify_mate')
 
 // Extend global namespace to cache pools in development HMR
+
+// Extend global namespace to cache pools in development HMR
 declare global {
   var __pgPool: pg.Pool | undefined
   var __mongoClient: MongoClient | undefined
@@ -24,6 +26,9 @@ if (!globalThis.__pgPool) {
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+  })
+  globalThis.__pgPool.on('error', (err) => {
+    console.error('[POSTGRES POOL CLIENT ERROR]:', err?.message || err)
   })
 }
 const pool = globalThis.__pgPool!

@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody, createError } from 'h3'
 import { saveContactInquiryToFirestore } from '~/server/utils/firebase'
+import { loginAttemptKey, assertLoginAllowed, recordLoginFailure } from '../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -8,6 +9,10 @@ export default defineEventHandler(async (event) => {
   if (!email || !message) {
     throw createError({ statusCode: 400, statusMessage: 'Email and message are required.' })
   }
+
+  const rateKey = loginAttemptKey(event, 'contact_form')
+  await assertLoginAllowed(rateKey)
+  await recordLoginFailure(rateKey)
 
   try {
     const formattedMessage = platform || volume 

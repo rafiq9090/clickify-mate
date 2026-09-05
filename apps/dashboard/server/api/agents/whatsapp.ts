@@ -58,11 +58,15 @@ export default defineEventHandler(async (event) => {
         const challenge = query['hub.challenge']
 
         const config = useRuntimeConfig()
-        const verifyToken = config.public.verifyToken || 'papersnap_secure_verify'
+        const verifyToken = config.public.verifyToken || (process.env.NODE_ENV === 'production' ? '' : 'papersnap_secure_verify')
 
-        if (mode === 'subscribe' && token === verifyToken) {
+        if (mode === 'subscribe' && verifyToken && token === verifyToken) {
             console.log(`[WHATSAPP DEBUG V${VERSION}]: Handshake Successful!`)
             return challenge
+        }
+        if (mode === 'subscribe') {
+            console.warn(`[WHATSAPP WEBHOOK HANDSHAKE REJECTED]: Invalid or unconfigured verify token.`)
+            throw createError({ statusCode: 403, statusMessage: 'Webhook verification token mismatch' })
         }
         return { status: 'WhatsApp Agent Active', version: VERSION }
     }

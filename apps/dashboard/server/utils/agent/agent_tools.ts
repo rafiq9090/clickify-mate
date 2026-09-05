@@ -191,8 +191,8 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
                 throw new Error('Cannot create order: verified price, delivery fee, and total are required.')
             }
             const paymentProvider = String(args.paymentProvider || '').toLowerCase()
-            if (!['bkash', 'nagad', 'stripe', 'cod'].includes(paymentProvider)) {
-                throw new Error('Cannot create order: payment method must be bKash, Nagad, Stripe, or COD.')
+            if (!['bkash', 'nagad', 'stripe', 'cod', 'sslcommerz', 'bank'].includes(paymentProvider)) {
+                throw new Error('Cannot create order: payment method must be bKash, Nagad, Bank, or COD.')
             }
             const draft = {
                 agentId: ctx?.agentId || '',

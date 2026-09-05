@@ -126,13 +126,29 @@ export async function saveFsmState(
             }
         }
 
-        if (existing?.id) {
+        const isExistingFinalized = existing?.data?.status === 'confirmed' ||
+            existing?.data?.payment_status === 'paid'
+
+        if (existing?.id && !isExistingFinalized) {
             await supabase.from('leads').update({ data: mergedData }).eq('id', existing.id)
         } else {
+            const newLeadData = {
+                customer: customerId,
+                agent_id: agentId,
+                platform: channel,
+                current_state: state,
+                previous_valid_state: previousValidState || state,
+                name: collectedDetails?.name || existing?.data?.name,
+                phone: collectedDetails?.phone || existing?.data?.phone,
+                address: collectedDetails?.address || existing?.data?.address,
+                collected_details: {
+                    ...(collectedDetails || {})
+                }
+            }
             await supabase.from('leads').insert({
                 email: emailKey,
                 source: 'ai_agent',
-                data: mergedData
+                data: newLeadData
             })
         }
     } catch (e: any) {

@@ -46,17 +46,17 @@ export const useOrders = (supabase: any) => {
                 .select('*', { count: 'exact' })
                 .eq('source', 'ai_agent')
                 .filter('data->>user_id', 'eq', user.id)
-                .not('data->>payment_transaction_id', 'is', null)
+                .or('data->>payment_transaction_id.not.is.null,data->>trx_id.not.is.null,data->>payment_status.eq.paid,data->>is_paid.eq.true')
                 .order('created_at', { ascending: false })
             if (ordersActiveTab.value !== 'all') {
-                if (ordersActiveTab.value === 'facebook') query = query.or('data->>platform.eq.messenger,data->>platform.eq.fb_comment')
+                if (ordersActiveTab.value === 'facebook') query = query.or('data->>platform.eq.messenger,data->>platform.eq.fb_comment,data->>platform.eq.facebook')
                 else query = query.eq('data->>platform', ordersActiveTab.value)
             }
             if (ordersSearchQuery.value) {
                 const term = ordersSearchQuery.value.trim()
                 const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term)
                 if (isUuid) query = query.eq('id', term)
-                else query = query.or(`email.ilike.%${term}%,data->>customer.ilike.%${term}%,data->>order.ilike.%${term}%,data->>payment_transaction_id.ilike.%${term}%`)
+                else query = query.or(`email.ilike.%${term}%,data->>customer.ilike.%${term}%,data->>name.ilike.%${term}%,data->>phone.ilike.%${term}%,data->>invoice_number.ilike.%${term}%,data->>payment_transaction_id.ilike.%${term}%,data->>trx_id.ilike.%${term}%,data->>payment_method.ilike.%${term}%,data->>payment_channel.ilike.%${term}%,data->>payment_provider.ilike.%${term}%`)
             }
             if (ordersStartDate.value) query = query.gte('created_at', ordersStartDate.value)
             if (ordersEndDate.value) {

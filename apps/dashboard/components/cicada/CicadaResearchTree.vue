@@ -101,16 +101,16 @@
           </svg>
         </div>
         <div class="tree-wings__item tree-wings__top-left">
-          <img src="https://cdn.zajno.com/dev/codepen/cicada/butterfly-top_left.png" alt="Top Left Wing">
+          <img src="/images/cicada/butterfly-top_left.png" alt="Top Left Wing">
         </div>
         <div class="tree-wings__item tree-wings__top-right">
-          <img class="wing-flipped" src="https://cdn.zajno.com/dev/codepen/cicada/butterfly-top_left.png" alt="Top Right Wing">
+          <img class="wing-flipped" src="/images/cicada/butterfly-top_left.png" alt="Top Right Wing">
         </div>
         <div class="tree-wings__item tree-wings__bottom-left">
-          <img src="https://cdn.zajno.com/dev/codepen/cicada/butterfly-bottom_left.png" alt="Bottom Left Wing">
+          <img src="/images/cicada/butterfly-bottom_left.png" alt="Bottom Left Wing">
         </div>
         <div class="tree-wings__item tree-wings__bottom-right">
-          <img class="wing-flipped" src="https://cdn.zajno.com/dev/codepen/cicada/butterfly-bottom_left.png" alt="Bottom Right Wing">
+          <img class="wing-flipped" src="/images/cicada/butterfly-bottom_left.png" alt="Bottom Right Wing">
         </div>
       </div>
     </div>

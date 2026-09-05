@@ -6,7 +6,7 @@
           <h2 class="text-xl font-bold text-on-surface">Payment Gateways</h2>
         </div>
         <p class="mt-1 text-xs leading-relaxed text-on-surface-variant">
-          Connect your shop's own bKash, Nagad, and Stripe merchant accounts. Each account is private to the signed-in shop owner.
+          Connect your shop's own bKash, Nagad, Stripe, and SSLCOMMERZ merchant accounts. Each account is private to the signed-in shop owner.
         </p>
       </div>
     </div>
@@ -42,6 +42,10 @@
               <svg viewBox="0 0 24 24" class="w-full h-full fill-white" xmlns="http://www.w3.org/2000/svg">
                 <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697.5 12.522.5 6.85.5 2.896 3.446 2.896 8.604c0 6.04 8.307 5.093 8.307 7.706 0 .984-.874 1.398-2.172 1.398-2.474 0-5.35-1.192-7.25-2.225l-.89 5.568c2.093 1.096 5.088 1.699 8.232 1.699 5.82 0 10.088-2.868 10.088-8.212 0-6.273-8.235-5.289-8.235-7.69z"/>
               </svg>
+            </div>
+
+            <div v-else-if="provider.id === 'sslcommerz'" class="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-outline/80 shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl shrink-0 p-1 overflow-hidden">
+              <img src="/images/gateways/sslcommerz.png" alt="SSLCOMMERZ" class="w-full h-full object-contain rounded-lg" />
             </div>
 
             <div v-else class="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black text-white shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl shrink-0" :class="provider.logoClass">
@@ -127,6 +131,10 @@
 
             <div v-if="provider.id === 'stripe'" class="mb-3 rounded-xl border border-outline bg-surface-hover/60 px-3 py-2 text-[10px] leading-relaxed text-on-surface-variant">
               Register <strong class="break-all text-on-surface">/api/payments/webhook/stripe</strong> as a Stripe webhook endpoint and subscribe to Checkout Session completed, async succeeded/failed, and expired events.
+            </div>
+
+            <div v-else-if="provider.id === 'sslcommerz'" class="mb-3 rounded-xl border border-outline bg-surface-hover/60 px-3 py-2 text-[10px] leading-relaxed text-on-surface-variant">
+              Enter your SSLCOMMERZ Store ID and Store Password. In Sandbox mode, test credentials like <code class="text-primary font-mono font-bold">testbox</code> and store password <code class="text-primary font-mono font-bold">qwerty</code> can be used.
             </div>
 
             <div class="grid gap-3 sm:grid-cols-2">
@@ -238,6 +246,19 @@ const providers = [
       { key: 'secretKey', label: 'Secret API key', placeholder: 'sk_test_... or sk_live_...' },
       { key: 'webhookSecret', label: 'Webhook signing secret', placeholder: 'whsec_...' }
     ]
+  },
+  {
+    id: 'sslcommerz',
+    name: 'SSLCOMMERZ',
+    shortName: 'SSL',
+    logoClass: 'bg-[#135e96]',
+    description: 'Cards, Mobile Banking (bKash/Nagad/Rocket), and Net Banking aggregator',
+    numberLabel: 'SSLCOMMERZ Store ID',
+    numberPlaceholder: 'Store ID (e.g. testbox or your store ID)',
+    credentialFields: [
+      { key: 'storeId', label: 'Store ID', placeholder: 'Merchant Store ID' },
+      { key: 'storePassword', label: 'Store Password', placeholder: 'Store password / Secret API key' }
+    ]
   }
 ]
 
@@ -258,7 +279,8 @@ function emptyDraft(providerId) {
 const drafts = reactive({
   bkash: emptyDraft('bkash'),
   nagad: emptyDraft('nagad'),
-  stripe: emptyDraft('stripe')
+  stripe: emptyDraft('stripe'),
+  sslcommerz: emptyDraft('sslcommerz')
 })
 
 const loading = ref(false)
@@ -268,7 +290,7 @@ const savingProvider = ref('')
 const deletingProvider = ref('')
 
 function errorMessage(error, fallback) {
-  return error?.data?.statusMessage || error?.statusMessage || error?.message || fallback
+  return error?.data?.statusMessage || error?.data?.message || error?.statusMessage || error?.message || fallback
 }
 
 function applyGateway(gateway) {
@@ -293,6 +315,7 @@ async function loadGateways() {
     drafts.bkash = emptyDraft('bkash')
     drafts.nagad = emptyDraft('nagad')
     drafts.stripe = emptyDraft('stripe')
+    drafts.sslcommerz = emptyDraft('sslcommerz')
     for (const gateway of response.gateways || []) applyGateway(gateway)
     hasLoaded.value = true
   } catch (error) {

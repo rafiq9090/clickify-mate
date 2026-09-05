@@ -5,9 +5,11 @@ import { normalizeEmail } from '../../utils/password-policy'
 
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
-  const isSignupAllowed = Boolean(runtimeConfig.public.allowSignup === true || 
-                          (runtimeConfig.public.allowSignup as any) === 'true' || 
-                          process.env.ALLOW_SIGNUP !== 'false')
+  const isSignupAllowed = Boolean(
+    runtimeConfig.public.allowSignup === true || 
+    (runtimeConfig.public.allowSignup as any) === 'true' || 
+    process.env.ALLOW_SIGNUP === 'true'
+  )
 
   if (!isSignupAllowed) {
     throw createError({ statusCode: 403, statusMessage: 'Public registration is disabled.' })
@@ -21,7 +23,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Password must be between 6 and 128 characters.' })
   }
 
-  const passwordHash = bcrypt.hashSync(password, 10)
+  const passwordHash = await bcrypt.hash(password, 10)
 
   try {
     const user = await withPgTransaction(async client => {

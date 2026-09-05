@@ -11,8 +11,8 @@ export default defineEventHandler(async event => {
   if (!UUID_PATTERN.test(orderId)) {
     throw createError({ statusCode: 400, statusMessage: 'A valid order ID is required.' })
   }
-  if (!['bkash', 'nagad', 'stripe'].includes(provider)) {
-    throw createError({ statusCode: 400, statusMessage: 'Provider must be bKash, Nagad, or Stripe.' })
+  if (!['bkash', 'nagad', 'stripe', 'sslcommerz'].includes(provider)) {
+    throw createError({ statusCode: 400, statusMessage: 'Provider must be bKash, Nagad, Stripe, or SSLCOMMERZ.' })
   }
 
   try {

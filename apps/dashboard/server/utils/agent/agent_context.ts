@@ -17,6 +17,7 @@ export async function buildAgentContext(
     let customerPhone: string | undefined = undefined
     let customerAddress: string | undefined = undefined
     let aiDisabled = false
+    let isCompletedOrder = false
 
     if (supabase && supabase.from) {
         const emailKey = `${event.customerId}@${event.channel || 'telegram'}.org`
@@ -31,11 +32,30 @@ export async function buildAgentContext(
             const lead = leads[0]
             leadId = lead.id
             aiDisabled = leads.some(l => l.data?.ai_disabled === true)
-            currentState = (lead.data?.current_state as ConversationState) || 'SALES_INQUIRING'
-            previousValidState = (lead.data?.previous_valid_state as ConversationState) || currentState
-            collectedDetails = lead.data?.collected_details || {}
-            customerPhone = lead.phone || collectedDetails.phone
-            customerAddress = collectedDetails.address
+            const leadStatus = lead.data?.status
+            const leadPaymentStatus = lead.data?.payment_status
+            isCompletedOrder = leadStatus === 'confirmed' || leadPaymentStatus === 'paid'
+
+            if (isCompletedOrder) {
+                // The previous lead was already completed/confirmed. Reset state to fresh inquiry,
+                // while preserving customer profile details for seamless future checkout.
+                currentState = 'SALES_INQUIRING'
+                previousValidState = 'SALES_INQUIRING'
+                collectedDetails = {
+                    name: lead.data?.name || lead.data?.customer_name,
+                    phone: lead.phone || lead.data?.phone,
+                    address: lead.data?.address,
+                    language: lead.data?.collected_details?.language
+                }
+                customerPhone = lead.phone || collectedDetails.phone
+                customerAddress = collectedDetails.address
+            } else {
+                currentState = (lead.data?.current_state as ConversationState) || 'SALES_INQUIRING'
+                previousValidState = (lead.data?.previous_valid_state as ConversationState) || currentState
+                collectedDetails = lead.data?.collected_details || {}
+                customerPhone = lead.phone || collectedDetails.phone
+                customerAddress = collectedDetails.address
+            }
         }
     }
 
@@ -115,19 +135,23 @@ export async function buildAgentContext(
             id: event.customerId,
             name: event.customerName,
             phone: customerPhone,
-            address: customerAddress
+            address: customerAddress,
+            preferredLanguage: collectedDetails.language
         },
         session: {
             state: currentState,
             previousValidState,
             leadId,
             aiDisabled,
-            checkoutToken: collectedDetails.checkout_token || ('chk_' + Math.random().toString(36).slice(2, 9)),
+            language: collectedDetails.language,
+            checkoutToken: isCompletedOrder
+                ? ('chk_' + Math.random().toString(36).slice(2, 9))
+                : (collectedDetails.checkout_token || ('chk_' + Math.random().toString(36).slice(2, 9))),
             lastPresentedOptions: collectedDetails.last_presented_options || {},
-            lastAskedField: collectedDetails.last_asked_field,
+            lastAskedField: isCompletedOrder ? undefined : collectedDetails.last_asked_field,
             fallbackCount: Number(collectedDetails.fallback_count || 0)
         },
-        selection: {
+        selection: isCompletedOrder ? { quantity: 1 } : {
             sku: resolvedSku,
             productName: resolvedProductName,
             color: collectedDetails.color,
@@ -135,8 +159,13 @@ export async function buildAgentContext(
             quantity: collectedDetails.quantity ? Number(collectedDetails.quantity) : 1,
             price: resolvedPrice
         },
-        previousSelection: collectedDetails.previous_selection || undefined,
-        orderDraft: {
+        previousSelection: isCompletedOrder ? undefined : (collectedDetails.previous_selection || undefined),
+        orderDraft: isCompletedOrder ? {
+            name: collectedDetails.name || event.customerName,
+            phone: collectedDetails.phone || customerPhone,
+            address: collectedDetails.address || customerAddress,
+            quantity: 1
+        } : {
             name: collectedDetails.name || event.customerName,
             phone: collectedDetails.phone || customerPhone,
             address: collectedDetails.address || customerAddress,

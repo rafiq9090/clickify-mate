@@ -133,6 +133,7 @@ function normalizeOnlineProvider(paymentMethod?: string): PaymentProviderName | 
     if (normalized === 'bkash') return 'bkash'
     if (normalized === 'nagad' || normalized === 'nogot') return 'nagad'
     if (normalized === 'stripe') return 'stripe'
+    if (normalized === 'sslcommerz' || normalized === 'ssl' || normalized === 'bank' || normalized === 'card' || normalized === 'cards') return 'sslcommerz'
     return null
 }
 
@@ -196,14 +197,14 @@ export async function createOrderSafely(
             const ageMs = now - new Date(existingLead.created_at).getTime()
             const leadData = existingLead.data || {}
             const isMatchingKey = leadData.idempotency_key === safeKey
-            const isRecentIdentical = ageMs < 10 * 60 * 1000 &&
-                ['confirmed', 'pending_payment'].includes(leadData.status) &&
+            const isRecentPendingIdentical = ageMs < 10 * 60 * 1000 &&
+                leadData.status === 'pending_payment' &&
                 leadData.phone === draft.phone &&
                 leadData.sku === draft.sku &&
                 (leadData.color || '').toLowerCase() === colorKey &&
                 (leadData.size || '').toLowerCase() === sizeKey
 
-            if (isMatchingKey || isRecentIdentical) {
+            if (isMatchingKey || isRecentPendingIdentical) {
                 console.log(`[ORDER DB DEDUPLICATION]: Found existing order in DB (${existingLead.id}). Zero stock deducted.`)
                 let checkout: any = null
                 if (leadData.status === 'pending_payment') {

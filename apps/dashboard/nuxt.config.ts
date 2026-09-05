@@ -36,7 +36,8 @@ export default defineNuxtConfig({
       'Noto+Sans+Bengali': [400, 700],
       Outfit: [300, 400, 600, 700],
       'Plus+Jakarta+Sans': [400, 500, 600, 700, 800],
-      'Hanken+Grotesk': [300, 400, 500, 600, 700]
+      'Hanken+Grotesk': [300, 400, 500, 600, 700],
+      'Work+Sans': [400, 500, 600, 700, 800]
     },
     display: 'swap',
     download: false,

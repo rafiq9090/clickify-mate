@@ -142,8 +142,8 @@ const faqs = [
         <!-- Tree Video Background -->
         <div class="mobile-hero-bg-tree" aria-hidden="true">
           <video autoplay muted loop playsinline class="mobile-tree-video">
-            <source src="https://cdn.zajno.com/dev/codepen/cicada/cicada_tree.webm" type="video/webm">
-            <source src="https://cdn.zajno.com/dev/codepen/cicada/cicada_tree.mp4" type="video/mp4">
+            <source src="/videos/cicada_tree.mov" type='video/mp4; codecs="hvc1"'>
+            <source src="/videos/cicada_tree.webm" type="video/webm">
           </video>
           <div class="tree-bg-overlay"></div>
         </div>

@@ -5,13 +5,14 @@ function normalizeDigits(text: string): string {
     return (text || '').replace(/[০-৯]/g, digit => String(bengali.indexOf(digit)))
 }
 
-export function normalizePaymentMethod(text: string): 'bkash' | 'nagad' | 'cod' | 'rocket' | 'stripe' | 'paypal' | undefined {
+export function normalizePaymentMethod(text: string): 'bkash' | 'nagad' | 'cod' | 'rocket' | 'stripe' | 'paypal' | 'sslcommerz' | undefined {
     const lower = (text || '').toLowerCase().replace(/[\s*_`-]+/g, ' ').trim()
     if (/(?:\bbkash\b|\bb kash\b|বিকাশ)/i.test(lower)) return 'bkash'
     if (/(?:\bnagad\b|\bnogot\b|\bnogod\b|নগদ)/i.test(lower)) return 'nagad'
     if (/(?:\bcod\b|cash on delivery|cash delivery|\bcash\b|ক্যাশ অন ডেলিভারি|ক্যাশ)/i.test(lower)) return 'cod'
     if (/(?:\brocket\b|রকেট)/i.test(lower)) return 'rocket'
-    if (/(?:\bstripe\b|\bstrip\b|\bcard\b|\bvisa\b|\bmastercard\b|কার্ড)/i.test(lower)) return 'stripe'
+    if (/(?:\bstripe\b|\bstrip\b)/i.test(lower)) return 'stripe'
+    if (/(?:\bsslcommerz\b|\bssl\b|\bsslcommerce\b|\bbank\b|\bbanks\b|\bbanking\b|\bnet banking\b|\bcard\b|\bvisa\b|\bmastercard\b|ব্যাংক|কার্ড|এসএসএল)/i.test(lower)) return 'sslcommerz'
     if (/\bpaypal\b/i.test(lower)) return 'paypal'
     return undefined
 }
@@ -73,6 +74,15 @@ export function extractEntitiesDeterministic(text: string, catalog: any[] = []):
         }
     }
 
+    // 4.1 Fallback standard colors if catalog is empty or does not specify
+    if (!entities.color) {
+        const commonColorMatch = normalizedText.match(/\b(black|white|red|blue|green|yellow|navy|olive|maroon|grey|gray|কালো|সাদা|লাল|নীল|সবুজ|হলুদ)\b/i)
+        if (commonColorMatch && commonColorMatch[1]) {
+            const rawCol = commonColorMatch[1]
+            entities.color = rawCol.charAt(0).toUpperCase() + rawCol.slice(1).toLowerCase()
+        }
+    }
+
     // 5. Size detection
     const sizeMatch = normalizedText.match(/\b(XXL|XL|L|M|S)\b/i) || normalizedText.match(/\b(xxl|xl|large|medium|small)\b/i)
     if (sizeMatch && sizeMatch[1]) {
@@ -81,10 +91,10 @@ export function extractEntitiesDeterministic(text: string, catalog: any[] = []):
 
     // 6. Quantity detection
     const looksLikeCopiedTableRow = (normalizedText.match(/\|/g) || []).length >= 2
-    const looksLikeVariantRow = looksLikeCopiedTableRow || /\b(XXL|XL|L|M|S)\b\s*[,|]\s*\d+\s*\|?\s*$/i.test(normalizedText)
     const qtyMatch = looksLikeCopiedTableRow ? null : (
         normalizedText.match(/\b(\d+)\s*(?:ta|pcs|pc|piece|pieces|ti|টা|টি)\b/i) ||
-        normalizedText.match(/\b(?:quantity|qty|পরিমাণ|পিস)\s*:?\s*(\d+)\b/i)
+        normalizedText.match(/\b(?:quantity|qty|পরিমাণ|পিস)\s*:?\s*(\d+)\b/i) ||
+        normalizedText.match(/(?:^|[,|])\s*(\d{1,2})\s*$/)
     )
     if (qtyMatch && qtyMatch[1]) {
         const parsed = parseInt(qtyMatch[1], 10)
@@ -102,10 +112,36 @@ export function extractEntitiesDeterministic(text: string, catalog: any[] = []):
         lower.includes('cumilla') || lower.includes('comilla') || lower.includes('cumill') || lower.includes('sylhet') || lower.includes('rajshahi') ||
         lower.includes('khulna') || lower.includes('barisal') || lower.includes('rangpur') ||
         lower.includes('mymensingh') || lower.includes('gazipur') || lower.includes('narayanganj') ||
-        (!looksLikeVariantRow && (normalizedText.match(/,/g) || []).length >= 2 && normalizedText.length >= 8)
+        (!looksLikeCopiedTableRow && (normalizedText.match(/,/g) || []).length >= 2 && normalizedText.length >= 8)
     ) {
-        const cleanedAddress = normalizedText.replace(/^(amar\s*thikana|amar\s*eita\s*mol\s*thikana|thikana\s*:?|ঠিকানা\s*:?|address\s*:?)/i, '').trim()
-        if (cleanedAddress.length >= 4 && !cleanedAddress.startsWith('http')) {
+        let cleanedAddress = normalizedText.replace(/^(amar\s*thikana|amar\s*eita\s*mol\s*thikana|thikana\s*:?|ঠিকানা\s*:?|address\s*:?)/i, '').trim()
+
+        // Sanitize address: if the customer sent a composite order string (e.g. "Dhaka, 01733887749, Black, XL , 1"),
+        // strip out extracted contact & variant info from the physical address field.
+        if (entities.phone || /(?:\+?88)?01[3-9]\d{8}/.test(cleanedAddress)) {
+            cleanedAddress = cleanedAddress.replace(/(?:\+?88)?01[3-9]\d{8}/g, '')
+        }
+        // Remove size tokens
+        cleanedAddress = cleanedAddress.replace(/\b(XXL|XL|L|M|S)\b/gi, '')
+        // Remove standard color tokens
+        cleanedAddress = cleanedAddress.replace(/\b(Black|White|Red|Blue|Green|Yellow|সাদা|কালো|লাল|নীল)\b/gi, '')
+        // Remove quantities or lone integers surrounded by commas/boundaries/whitespace
+        cleanedAddress = cleanedAddress.replace(/\b\d+\s*(?:pcs|pc|piece|pieces|ta|ti|টা|টি)\b/gi, '')
+        cleanedAddress = cleanedAddress.replace(/(?:^|[,|\s])\d+(?=[,|\s]|$)/g, ' ')
+        // Remove product name or SKU if present in composite text
+        if (entities.productName) {
+            cleanedAddress = cleanedAddress.replace(new RegExp(`\\b${entities.productName}\\b`, 'gi'), '')
+        }
+        if (entities.sku) {
+            cleanedAddress = cleanedAddress.replace(new RegExp(`\\b${entities.sku}\\b`, 'gi'), '')
+        }
+        // Clean up formatting artifacts (dangling commas, colons, spaces)
+        cleanedAddress = cleanedAddress
+            .replace(/[,|\-:]\s*[,|\-:]+/g, ',')
+            .replace(/^[,|\-:\s]+|[,|\-:\s]+$/g, '')
+            .trim()
+
+        if (cleanedAddress.length >= 2 && !cleanedAddress.startsWith('http')) {
             entities.address = cleanedAddress
         }
     }
@@ -236,6 +272,18 @@ export function understandMessageFast(
         }
     }
 
+    // 4.1b Payment Gateway / Change Payment Inquiries
+    if (/(?:change\s*(?:my\s*)?payment|change\s*(?:my\s*)?gateway|payment\s*gat?eway|payment\s*methods?|how\s*to\s*pay|পেমেন্ট\s*পরিবর্তন|পেমেন্ট\s*পদ্ধতি|পেমেন্ট\s*গেটওয়ে)/i.test(lower)) {
+        return {
+            intent: 'PAYMENT_QUERY',
+            entities,
+            sentiment: 'neutral',
+            customerCorrection: true,
+            repeatedQuestion: false,
+            confidence: 0.98
+        }
+    }
+
     // 4.2 Payment choice must be recognized before generic price/order words.
     if (entities.paymentMethod) {
         return {
@@ -268,6 +316,24 @@ export function understandMessageFast(
         return {
             intent: 'OPTION_SELECTION', entities, sentiment: 'positive',
             customerCorrection: false, repeatedQuestion: false, confidence: 0.96
+        }
+    }
+
+    // 4.5 New Order / Reset Order / Another Order request
+    const isNewOrderRequest = (
+        /(?:another|new|fresh|again|one\s*more)\s+(?:order|product|item|purchase|buy)/i.test(lower) ||
+        /(?:i\s*want\s*(?:to\s*)?)?(?:another|new|next)\s+order/i.test(lower) ||
+        /^(?:another\s+order|new\s+order|order\s+again|buy\s+again|aro\s+order|notun\s+order)[.!?\s]*$/i.test(lower) ||
+        /(?:আরেকটি|আরেকটা|নতুন|আবার)\s*(?:অর্ডার|কিনব|কিনতে|নিব)/i.test(lower)
+    )
+    if (isNewOrderRequest) {
+        return {
+            intent: 'NEW_ORDER',
+            entities,
+            sentiment: 'positive',
+            customerCorrection: false,
+            repeatedQuestion: false,
+            confidence: 0.99
         }
     }
 

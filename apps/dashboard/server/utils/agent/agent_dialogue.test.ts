@@ -70,6 +70,10 @@ test('normalizes common Bangla payment spellings and typo variants', () => {
     assert.equal(understandMessageFast('nogot').entities.paymentMethod, 'nagad')
     assert.equal(understandMessageFast('বিকাশ').entities.paymentMethod, 'bkash')
     assert.equal(understandMessageFast('stripe').entities.paymentMethod, 'stripe')
+    assert.equal(understandMessageFast('sslcommerz').entities.paymentMethod, 'sslcommerz')
+    assert.equal(understandMessageFast('ssl').entities.paymentMethod, 'sslcommerz')
+    assert.equal(understandMessageFast('bank').entities.paymentMethod, 'sslcommerz')
+    assert.equal(understandMessageFast('ব্যাংক').entities.paymentMethod, 'sslcommerz')
 })
 
 test('uses an inclusive greeting unless the customer explicitly gives salam', () => {
@@ -167,3 +171,20 @@ test('builds a final order review before any side effect is allowed', () => {
     assert.match(review, /Total: ৳970/)
     assert.match(review, /Payment: BKASH/)
 })
+
+test('detects new order intent accurately', () => {
+    assert.equal(understandMessageFast('another order').intent, 'NEW_ORDER')
+    assert.equal(understandMessageFast('i want to another order').intent, 'NEW_ORDER')
+    assert.equal(understandMessageFast('new order').intent, 'NEW_ORDER')
+    assert.equal(understandMessageFast('আরেকটি অর্ডার').intent, 'NEW_ORDER')
+})
+
+test('sanitizes composite order string so address does not leak phone, size, color, quantity', () => {
+    const understanding = understandMessageFast('Dhaka, 01733887749, Black, XL , 1')
+    assert.equal(understanding.entities.address, 'Dhaka')
+    assert.equal(understanding.entities.phone, '01733887749')
+    assert.equal(understanding.entities.color, 'Black')
+    assert.equal(understanding.entities.size, 'XL')
+    assert.equal(understanding.entities.quantity, 1)
+})
+

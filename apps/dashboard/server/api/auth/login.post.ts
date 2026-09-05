@@ -36,7 +36,8 @@ export default defineEventHandler(async (event) => {
         [email]
       )
       const user = result.rows[0]
-      if (!user || user.account_status !== 'active' || !bcrypt.compareSync(password, user.password_hash)) {
+      const passwordValid = user && user.password_hash ? await bcrypt.compare(password, user.password_hash) : false
+      if (!user || user.account_status !== 'active' || !passwordValid) {
         throw new Error('Invalid credentials.')
       }
 

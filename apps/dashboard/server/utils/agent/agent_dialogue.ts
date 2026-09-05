@@ -31,13 +31,24 @@ function productVariants(product: any): Array<{ color?: string; size?: string; s
     const seen = new Set<string>()
     const variants: Array<{ color?: string; size?: string; stock: number }> = []
     for (const item of source) {
-        const color = item.color || undefined
-        const size = item.size || undefined
+        const color = item.color || item.attributes?.color || undefined
+        const rawSize = item.size || item.attributes?.size || undefined
         const stock = Number(item.stock ?? item.quantity ?? product.stock_quantity ?? 0)
-        const key = `${String(color || '').toLowerCase()}|${String(size || '').toLowerCase()}`
-        if (seen.has(key)) continue
-        seen.add(key)
-        variants.push({ color, size, stock })
+
+        if (rawSize && String(rawSize).includes(',')) {
+            const sizes = String(rawSize).split(',').map(s => s.trim()).filter(Boolean)
+            for (const s of sizes) {
+                const key = `${String(color || '').toLowerCase()}|${s.toLowerCase()}`
+                if (seen.has(key)) continue
+                seen.add(key)
+                variants.push({ color, size: s, stock })
+            }
+        } else {
+            const key = `${String(color || '').toLowerCase()}|${String(rawSize || '').toLowerCase()}`
+            if (seen.has(key)) continue
+            seen.add(key)
+            variants.push({ color, size: rawSize, stock })
+        }
     }
     return variants
 }
@@ -51,7 +62,7 @@ function optionIndex(text: string): string | undefined {
 function looksLikeAddress(text: string): boolean {
     const clean = asciiDigits(text).trim()
     if (clean.length < 6 || clean.length > 300 || /^https?:\/\//i.test(clean)) return false
-    if (/^(yes|no|ok|okay|ji|jee|hmm?|bkash|nagad|nogot|nogod|stripe|cod|rocket)$/i.test(clean)) return false
+    if (/^(yes|no|ok|okay|ji|jee|hmm?|bkash|nagad|nogot|nogod|stripe|sslcommerz|ssl|bank|cod|rocket)$/i.test(clean)) return false
     if (/^(?:\+?88)?01[3-9]\d{8}$/.test(clean)) return false
     if ((clean.match(/\|/g) || []).length >= 2) return false
     return clean.includes(',') || /\b(road|house|block|sector|village|gram|union|thana|upazila|district|dhaka|cumill|comilla|chattogram|sylhet|rajshahi|khulna|barisal|rangpur)\b/i.test(clean)
@@ -60,7 +71,7 @@ function looksLikeAddress(text: string): boolean {
 function looksLikeName(text: string): boolean {
     const clean = asciiDigits(text).trim()
     if (clean.length < 2 || clean.length > 80 || /\d|https?:|[|,]/i.test(clean)) return false
-    if (/^(yes|no|ok|okay|ji|jee|bkash|nagad|nogot|stripe|cod|rocket)$/i.test(clean)) return false
+    if (/^(yes|no|ok|okay|ji|jee|bkash|nagad|nogot|stripe|sslcommerz|ssl|bank|cod|rocket)$/i.test(clean)) return false
     return /^[\p{L}.' -]+$/u.test(clean)
 }
 
@@ -409,7 +420,7 @@ export function buildProgressReply(context: AgentContext, missing: MissingOrderF
                 needsAddress ? '📌 Delivery Address (Area, Thana, District): ' : '',
                 needsColor ? `📌 Color (${colors.join(' / ')}): ` : '',
                 needsSize ? `📌 Size (${sizes.join(' / ')}): ` : '',
-                needsPayment ? '📌 Payment Method (bKash / Nagad / Stripe / Cash on Delivery): ' : '',
+                needsPayment ? '📌 Payment Method (bKash / Nagad / Bank / Cash on Delivery): ' : '',
                 '',
                 '👉 Send all details in a single message to place the order quickly!'
             ].filter(line => line !== '')
@@ -424,7 +435,7 @@ export function buildProgressReply(context: AgentContext, missing: MissingOrderF
             needsAddress ? '📌 সম্পূর্ণ ঠিকানা (গ্রাম/এলাকা, থানা, জেলা):' : '',
             needsColor ? `📌 পছন্দের রং (${colors.join(' / ')}):` : '',
             needsSize ? `📌 সাইজ (${sizes.join(' / ')}):` : '',
-            needsPayment ? '📌 পেমেন্ট পদ্ধতি (bKash, Nagad, Stripe অথবা Cash on Delivery):' : '',
+            needsPayment ? '📌 পেমেন্ট পদ্ধতি (bKash, Nagad, ব্যাংক অথবা Cash on Delivery):' : '',
             '',
             '👉 এক মেসেজে সবগুলো তথ্য লিখে পাঠালেই অর্ডারটি দ্রুত তৈরি হয়ে যাবে!'
         ].filter(line => line !== '')
@@ -456,8 +467,8 @@ export function buildProgressReply(context: AgentContext, missing: MissingOrderF
     }
     if (missing === 'payment') {
         return lang === 'en'
-            ? 'Please choose your payment method: bKash, Nagad, Stripe, or Cash on Delivery (COD).'
-            : 'পেমেন্ট পদ্ধতি বেছে নিন: bKash, Nagad, Stripe অথবা Cash on Delivery (COD)।'
+            ? 'Please choose your payment method: bKash, Nagad, Bank, or Cash on Delivery (COD).'
+            : 'পেমেন্ট পদ্ধতি বেছে নিন: bKash, Nagad, ব্যাংক অথবা Cash on Delivery (COD)।'
     }
     return lang === 'en' ? 'Your order details are complete. Verifying order...' : 'আপনার অর্ডারের তথ্য সম্পূর্ণ হয়েছে। এখন অর্ডারটি যাচাই করছি।'
 }
@@ -468,7 +479,22 @@ export function buildOrderReviewReply(context: AgentContext): string {
     const product = catalogProduct(context, draft.sku || context.selection.sku)
     const productName = draft.productName || context.selection.productName || product?.name || draft.sku || 'Product'
     const itemTotal = Number(draft.unitPrice || 0) * Number(draft.quantity || 1)
-    const payment = String(draft.paymentMethod || 'cod').toUpperCase()
+    const rawPayment = String(draft.paymentMethod || 'cod').toLowerCase()
+    const isOnline = ['bkash', 'nagad', 'sslcommerz', 'bank', 'card', 'cards', 'stripe'].includes(rawPayment)
+    const paymentDisplayEn = isOnline
+        ? (rawPayment === 'bkash'
+            ? 'BKASH (Online Payment via SSLCOMMERZ Gateway)'
+            : rawPayment === 'nagad'
+                ? 'NAGAD (Online Payment via SSLCOMMERZ Gateway)'
+                : 'SSLCOMMERZ (Cards / Mobile Banking / Net Banking)')
+        : 'Cash On Delivery (COD)'
+    const paymentDisplayBn = isOnline
+        ? (rawPayment === 'bkash'
+            ? 'বিকাশ (SSLCOMMERZ অনলাইন গেটওয়ে)'
+            : rawPayment === 'nagad'
+                ? 'নগদ (SSLCOMMERZ অনলাইন গেটওয়ে)'
+                : 'SSLCOMMERZ (কার্ড / মোবাইল ব্যাংকিং / নেট ব্যাংকিং)')
+        : 'ক্যাশ অন ডেলিভারি (COD)'
 
     if (lang === 'en') {
         return [
@@ -480,7 +506,7 @@ export function buildOrderReviewReply(context: AgentContext): string {
             `Item total: ৳${itemTotal}`,
             `Delivery: ৳${draft.deliveryFee || 0}`,
             `Total: ৳${draft.total || 0}`,
-            `Payment: ${payment}`,
+            `Payment: ${paymentDisplayEn}`,
             `Name: ${draft.name || context.customerName || ''}`,
             `Phone: ${draft.phone || ''}`,
             `Address: ${draft.address || ''}`,
@@ -498,7 +524,7 @@ export function buildOrderReviewReply(context: AgentContext): string {
         `পণ্যের মূল্য: ৳${itemTotal}`,
         `ডেলিভারি: ৳${draft.deliveryFee || 0}`,
         `সর্বমোট: ৳${draft.total || 0}`,
-        `পেমেন্ট: ${payment}`,
+        `পেমেন্ট: ${paymentDisplayBn}`,
         `নাম: ${draft.name || context.customerName || ''}`,
         `ফোন: ${draft.phone || ''}`,
         `ঠিকানা: ${draft.address || ''}`,
@@ -514,11 +540,16 @@ export function buildConfirmedOrderReceipt(context: AgentContext, orderOutput: a
     const productName = draft.productName || context.selection.productName || product?.name || draft.sku || (lang === 'en' ? 'Product' : 'পণ্য')
     const orderId = orderOutput?.orderId || orderOutput?.invoiceNumber || `CM-${Date.now().toString(36).toUpperCase()}`
 
-    if (lang === 'en') {
-        const paymentDisplay = (draft.paymentMethod || 'cod').toLowerCase() === 'cod'
-            ? 'Cash On Delivery (COD)'
-            : (draft.paymentMethod?.toUpperCase() || 'Cash On Delivery')
+    const rawPayment = String(draft.paymentMethod || 'cod').toLowerCase()
+    const isOnline = ['bkash', 'nagad', 'sslcommerz', 'bank', 'card', 'cards', 'stripe'].includes(rawPayment)
+    const paymentDisplayEn = isOnline
+        ? (rawPayment === 'bkash' || rawPayment === 'nagad' || rawPayment === 'sslcommerz' ? 'Online Payment (SSLCOMMERZ)' : 'Online Payment')
+        : 'Cash On Delivery (COD)'
+    const paymentMethodDisplay = isOnline
+        ? (rawPayment === 'bkash' || rawPayment === 'nagad' || rawPayment === 'sslcommerz' ? 'অনলাইন পেমেন্ট (SSLCOMMERZ)' : 'অনলাইন পেমেন্ট')
+        : 'ক্যাশ অন ডেলিভারি (COD)'
 
+    if (lang === 'en') {
         return [
             `🎉 Congratulations! Your order has been confirmed successfully.`,
             ``,
@@ -532,7 +563,7 @@ export function buildConfirmedOrderReceipt(context: AgentContext, orderOutput: a
             `💰 Item Price: ৳${Number(draft.unitPrice || 0) * Number(draft.quantity || 1)}`,
             `🚚 Delivery Fee: ৳${draft.deliveryFee || 0}`,
             `💵 Total Amount: ৳${draft.total || 0}`,
-            `💳 Payment Method: ${paymentDisplay}`,
+            `💳 Payment Method: ${paymentDisplayEn}`,
             `━━━━━━━━━━━━━━━━━━━━`,
             `👤 Customer Name: ${draft.name || context.customerName || 'Customer'}`,
             `📞 Mobile Number: ${draft.phone || ''}`,
@@ -541,10 +572,6 @@ export function buildConfirmedOrderReceipt(context: AgentContext, orderOutput: a
             `🚚 Your parcel is being processed for fast delivery. Thank you for shopping with us!`
         ].filter(line => line !== '').join('\n')
     }
-
-    const paymentMethodDisplay = (draft.paymentMethod || 'cod').toLowerCase() === 'cod'
-        ? 'ক্যাশ অন ডেলিভারি (COD)'
-        : (draft.paymentMethod || 'Cash On Delivery')
 
     return [
         `🎉 অভিনন্দন! আপনার অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে।`,
@@ -632,6 +659,7 @@ export function collectedDetailsForSave(context: AgentContext, entities: AgentEn
         district: context.orderDraft?.district,
         payment_method: context.orderDraft?.paymentMethod,
         checkout_token: context.session.checkoutToken,
+        language: context.session.language,
         last_presented_options: context.session.lastPresentedOptions || {},
         last_asked_field: context.session.lastAskedField,
         fallback_count: context.session.fallbackCount || 0,

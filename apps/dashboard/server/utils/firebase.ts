@@ -12,11 +12,28 @@ let clockSkewSec = 0
 // ---------------- SERVICE ACCOUNT RESOLVER ----------------
 
 function getServiceAccount(): any | null {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    const rawVal = process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim()
+    try {
+      if (rawVal.startsWith('{')) {
+        return JSON.parse(rawVal)
+      }
+      // Attempt Base64 decode fallback
+      const decoded = Buffer.from(rawVal, 'base64').toString('utf8')
+      if (decoded.startsWith('{')) {
+        return JSON.parse(decoded)
+      }
+    } catch { /* ignore */ }
+  }
+
   const candidatePaths = [
+    path.resolve(process.cwd(), 'serviceAccountKey.json'),
     path.resolve(process.cwd(), 'clickify-mate-ai-firebase-adminsdk-fbsvc-54dff48873.json'),
     path.resolve(process.cwd(), 'apps', 'dashboard', 'clickify-mate-ai-firebase-adminsdk-fbsvc-54dff48873.json'),
     path.resolve(process.cwd(), '..', 'clickify-mate-ai-firebase-adminsdk-fbsvc-54dff48873.json'),
-    path.resolve(process.cwd(), '..', 'apps', 'dashboard', 'clickify-mate-ai-firebase-adminsdk-fbsvc-54dff48873.json')
+    path.resolve(process.cwd(), '..', 'apps', 'dashboard', 'clickify-mate-ai-firebase-adminsdk-fbsvc-54dff48873.json'),
+    '/app/serviceAccountKey.json',
+    '/app/clickify-mate-ai-firebase-adminsdk-fbsvc-54dff48873.json'
   ]
 
   for (const p of candidatePaths) {
@@ -26,12 +43,6 @@ function getServiceAccount(): any | null {
         return JSON.parse(raw)
       } catch { /* try next */ }
     }
-  }
-
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    try {
-      return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-    } catch { /* ignore */ }
   }
 
   return null

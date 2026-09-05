@@ -5,6 +5,7 @@ import { verifyStripeWebhookSignature } from './providers/stripe'
 import type { PaymentProviderName, ProviderPaymentResult } from './providers'
 import { loadActiveGateway, loadGatewayById } from './gateway-store'
 import { processPaidOrderFulfillment } from './fulfillment'
+import { notifyCustomerPaymentResult } from './notifications'
 import { releaseCatalogReservation } from '../catalog-store'
 
 export interface HostedCheckoutResult {
@@ -19,8 +20,9 @@ export interface HostedCheckoutResult {
 
 function cleanProvider(provider: unknown): PaymentProviderName {
   const normalized = String(provider || '').toLowerCase()
-  if (!['bkash', 'nagad', 'stripe'].includes(normalized)) {
-    throw new Error('Payment provider must be bKash, Nagad, or Stripe.')
+  if (normalized === 'bank' || normalized === 'card' || normalized === 'cards') return 'sslcommerz'
+  if (!['bkash', 'nagad', 'stripe', 'sslcommerz'].includes(normalized)) {
+    throw new Error('Payment provider must be bKash, Nagad, Stripe, or SSLCOMMERZ.')
   }
   return normalized as PaymentProviderName
 }
@@ -52,6 +54,80 @@ function paymentAttemptResult(row: any, alreadyExists = false): HostedCheckoutRe
   }
 }
 
+export function resolvePaymentMethodDetails(provider: string, raw: any) {
+  const normProvider = (provider || '').toLowerCase()
+  let method = normProvider
+  let channel = ''
+  let bankName = ''
+  let cardType = ''
+  let cardBrand = ''
+  let cardIssuer = ''
+  let cardNo = ''
+  let cardCategory = ''
+
+  if (raw && typeof raw === 'object') {
+    cardType = String(raw.card_type || '').trim()
+    cardBrand = String(raw.card_brand || '').trim()
+    cardIssuer = String(raw.card_issuer || '').trim()
+    cardNo = String(raw.card_no || '').trim()
+    cardCategory = String(raw.card_category || '').trim()
+
+    const combined = `${cardType} ${cardBrand} ${cardIssuer} ${cardCategory} ${raw.payment_option || ''}`.toLowerCase()
+
+    if (combined.includes('bkash')) {
+      method = 'bkash'
+      channel = 'bKash'
+    } else if (combined.includes('nagad') || combined.includes('nogod')) {
+      method = 'nagad'
+      channel = 'Nagad'
+    } else if (combined.includes('rocket')) {
+      method = 'rocket'
+      channel = 'Rocket'
+    } else if (combined.includes('upay')) {
+      method = 'upay'
+      channel = 'Upay'
+    } else if (
+      combined.includes('visa') ||
+      combined.includes('master') ||
+      combined.includes('amex') ||
+      combined.includes('nexus') ||
+      combined.includes('bank') ||
+      combined.includes('credit') ||
+      combined.includes('debit') ||
+      cardCategory.toUpperCase() === 'CREDIT' ||
+      cardCategory.toUpperCase() === 'DEBIT'
+    ) {
+      method = 'bank'
+      const brand = cardBrand || (combined.includes('visa') ? 'Visa' : combined.includes('master') ? 'Mastercard' : combined.includes('amex') ? 'Amex' : 'Card')
+      const issuer = cardIssuer || raw.emi_issuer || ''
+      bankName = issuer
+      channel = issuer ? `${issuer} (${brand})` : (cardType || 'Bank Card / Net Banking')
+    }
+  }
+
+  if (!channel) {
+    if (method === 'bkash') channel = 'bKash'
+    else if (method === 'nagad') channel = 'Nagad'
+    else if (method === 'rocket') channel = 'Rocket'
+    else if (method === 'bank') channel = 'Bank Transfer / Card'
+    else if (method === 'stripe') channel = 'Stripe (Card)'
+    else if (normProvider === 'sslcommerz') channel = 'SSLCOMMERZ'
+    else channel = provider ? provider.toUpperCase() : 'Online Payment'
+  }
+
+  return {
+    method,
+    channel,
+    bankName,
+    cardType,
+    cardBrand,
+    cardIssuer,
+    cardNo,
+    cardCategory
+  }
+}
+
+
 export async function createHostedCheckoutForOrder(input: {
   userId: string
   orderId: string
@@ -77,6 +153,7 @@ export async function createHostedCheckoutForOrder(input: {
   const currency = String(orderData.currency || 'BDT').toUpperCase()
 
   const gateway = await loadActiveGateway(input.userId, provider)
+  const effectiveProvider = (gateway.provider as PaymentProviderName) || provider
   const existingResult = await queryPg(
     `SELECT *
        FROM public.payment_attempts
@@ -91,7 +168,7 @@ export async function createHostedCheckoutForOrder(input: {
     return paymentAttemptResult(existing, true)
   }
 
-  const idempotencyKey = `checkout:${input.orderId}:${provider}:${crypto.randomUUID()}`
+  const idempotencyKey = `checkout:${input.orderId}:${effectiveProvider}:${crypto.randomUUID()}`
   const inserted = await queryPg(
     `INSERT INTO public.payment_attempts (
        order_id, user_id, gateway_id, provider, amount, currency, idempotency_key, expires_at
@@ -100,13 +177,13 @@ export async function createHostedCheckoutForOrder(input: {
        now() + CASE WHEN $4 = 'stripe' THEN interval '31 minutes' ELSE interval '15 minutes' END
      )
      RETURNING *`,
-    [input.orderId, input.userId, gateway.id, provider, amount, currency, idempotencyKey]
+    [input.orderId, input.userId, gateway.id, effectiveProvider, amount, currency, idempotencyKey]
   )
   const attempt = inserted.rows[0]
 
   try {
     const adapter = createPaymentProvider(gateway)
-    const callbackUrl = publicCallbackUrl(provider, attempt.callback_token, gateway.callbackUrl)
+    const callbackUrl = publicCallbackUrl(effectiveProvider, attempt.callback_token, gateway.callbackUrl)
     const resultUrl = publicResultUrl(attempt.callback_token)
     const session = await adapter.createCheckout({
       attemptId: attempt.id,
@@ -175,7 +252,13 @@ async function completePaymentAttempt(attemptId: string, result: ProviderPayment
     if (attempt.status === 'completed') return { orderId: attempt.order_id, alreadyCompleted: true }
     if (result.status !== 'completed') throw new Error('Provider payment is not completed.')
     if (!result.providerTransactionId) throw new Error('Provider did not return a transaction ID.')
-    if (result.providerPaymentId !== attempt.provider_payment_id) throw new Error('Provider payment ID does not match the checkout attempt.')
+    const paymentIdMatches =
+      result.providerPaymentId === attempt.provider_payment_id ||
+      result.providerPaymentId === attempt.id ||
+      result.raw?.tran_id === attempt.id ||
+      result.raw?.sessionkey === attempt.provider_payment_id ||
+      (Array.isArray(result.raw?.element) && result.raw.element.some((e: any) => e.tran_id === attempt.id || e.val_id === attempt.provider_payment_id))
+    if (!paymentIdMatches) throw new Error('Provider payment ID does not match the checkout attempt.')
     if (result.amount == null || !Number.isFinite(result.amount)) throw new Error('Provider did not return a verifiable payment amount.')
     if (Math.abs(Number(attempt.amount) - Number(result.amount)) > 0.001) throw new Error('Provider payment amount does not match the order total.')
     if (!result.currency || result.currency.toUpperCase() !== String(attempt.currency).toUpperCase()) {
@@ -198,24 +281,38 @@ async function completePaymentAttempt(attemptId: string, result: ProviderPayment
     await client.query(
       `UPDATE public.payment_attempts
           SET status = 'completed', provider_status = $2,
-              provider_transaction_id = $3, provider_response = $4::jsonb,
+              provider_payment_id = COALESCE($3, provider_payment_id),
+              provider_transaction_id = $4, provider_response = $5::jsonb,
               completed_at = now(), updated_at = now(),
               failure_code = NULL, failure_message = NULL
         WHERE id = $1`,
-      [attempt.id, result.providerStatus, result.providerTransactionId, JSON.stringify(result.raw)]
+      [attempt.id, result.providerStatus, result.providerPaymentId, result.providerTransactionId, JSON.stringify(result.raw)]
     )
 
+    const paymentInfo = resolvePaymentMethodDetails(attempt.provider, result.raw)
     const paidAt = new Date().toISOString()
     const orderData = {
       ...(attempt.order_data || {}),
       status: 'confirmed',
       payment_status: 'paid',
       is_paid: true,
-      payment_method: attempt.provider,
+      payment_method: paymentInfo.method,
       payment_provider: attempt.provider,
+      payment_channel: paymentInfo.channel,
+      payment_details: {
+        method: paymentInfo.method,
+        channel: paymentInfo.channel,
+        card_type: paymentInfo.cardType,
+        card_brand: paymentInfo.cardBrand,
+        card_issuer: paymentInfo.cardIssuer,
+        card_no: paymentInfo.cardNo,
+        card_category: paymentInfo.cardCategory,
+        bank_name: paymentInfo.bankName
+      },
       payment_attempt_id: attempt.id,
       provider_payment_id: result.providerPaymentId,
       trx_id: result.providerTransactionId,
+      payment_transaction_id: result.providerTransactionId || result.providerPaymentId,
       paid_at: paidAt,
       current_state: 'ORDER_CONFIRMED',
       inventory_job: { status: 'pending', created_at: paidAt }
@@ -228,6 +325,8 @@ async function completePaymentAttempt(attemptId: string, result: ProviderPayment
               metadata = metadata || $2::jsonb
         WHERE legacy_lead_id = $1`,
       [attempt.order_id, JSON.stringify({
+        payment_method: paymentInfo.method,
+        payment_channel: paymentInfo.channel,
         payment_attempt_id: attempt.id,
         provider_payment_id: result.providerPaymentId,
         provider_transaction_id: result.providerTransactionId,
@@ -256,6 +355,13 @@ async function completePaymentAttempt(attemptId: string, result: ProviderPayment
   } catch (error: any) {
     console.error(`[PAYMENT FULFILLMENT] Paid order ${completion.orderId} needs retry:`, error?.message || error)
   }
+
+  try {
+    await notifyCustomerPaymentResult(completion.orderId, 'payment_success')
+  } catch (error: any) {
+    console.error(`[PAYMENT NOTIFICATION] Order ${completion.orderId} receipt notification failed:`, error?.message || error)
+  }
+
   return completion
 }
 
@@ -283,7 +389,17 @@ async function markAttemptResult(attemptId: string, result: ProviderPaymentResul
       [attemptId, result.status]
     )
     const order = await queryPg('SELECT order_id FROM public.payment_attempts WHERE id = $1', [attemptId])
-    if (order.rows[0]?.order_id) await releaseCatalogReservation(String(order.rows[0].order_id))
+    if (order.rows[0]?.order_id) {
+      const orderId = String(order.rows[0].order_id)
+      await releaseCatalogReservation(orderId)
+      try {
+        await notifyCustomerPaymentResult(orderId, 'payment_failed', {
+          failureReason: result.failureMessage || result.failureCode || result.status
+        })
+      } catch (notifyErr: any) {
+        console.error(`[PAYMENT NOTIFICATION] Order ${orderId} failure notification failed:`, notifyErr?.message || notifyErr)
+      }
+    }
   }
   return { orderId: '', alreadyCompleted: false }
 }
@@ -335,6 +451,11 @@ export async function processPaymentCallback(
   }
 
   if (attempt.status === 'completed') {
+    try {
+      await notifyCustomerPaymentResult(attempt.order_id, 'payment_success')
+    } catch (e: any) {
+      console.error('[PAYMENT NOTIFICATION]:', e?.message || e)
+    }
     return { status: 'completed', resultUrl: publicResultUrl(callbackToken) }
   }
 

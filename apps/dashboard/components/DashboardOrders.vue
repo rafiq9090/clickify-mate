@@ -5,11 +5,10 @@
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2.5">
-            
             <h2 class="text-xl font-bold tracking-tight text-on-surface">Verified Paid Orders</h2>
           </div>
           <p class="text-xs text-on-surface-variant mt-1">
-            Pre-paid orders with verified mobile banking or gateway transaction IDs.
+            Pre-paid orders with confirmed payment transactions (bKash, Nagad, Bank Cards & Net Banking).
           </p>
         </div>
 
@@ -36,7 +35,7 @@
             :value="searchQuery"
             @input="$emit('update:searchQuery', $event.target.value)"
             type="text" 
-            placeholder="Search by customer, phone, TxID, or Order ID..."
+            placeholder="Search customer, phone, TxID, or payment (bKash, Nagad, Bank)..."
             class="w-full h-10 pl-9 pr-8 bg-surface border border-outline rounded-xl text-xs text-on-surface outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-on-surface-variant/50"
           >
           <button 
@@ -81,6 +80,53 @@
           </button>
         </div>
       </div>
+
+      <!-- Payment Method Quick Filter Pills -->
+      <div class="flex items-center gap-2 pt-1 flex-wrap">
+        <span class="text-[11px] font-semibold text-on-surface-variant/70 uppercase tracking-wider mr-1">Payment:</span>
+        <button 
+          @click="$emit('update:paymentFilter', 'all')"
+          :class="paymentFilter === 'all'
+            ? 'bg-surface border-primary/50 text-primary font-bold shadow-xs'
+            : 'bg-surface-hover/50 border-outline text-on-surface-variant hover:text-on-surface font-medium'"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border transition-all cursor-pointer"
+        >
+          <span>All Methods</span>
+        </button>
+
+        <button 
+          @click="$emit('update:paymentFilter', 'bkash')"
+          :class="paymentFilter === 'bkash'
+            ? 'bg-[#E2136E]/15 border-[#E2136E] text-[#E2136E] font-bold shadow-xs'
+            : 'bg-surface-hover/50 border-outline text-on-surface-variant hover:text-[#E2136E] font-medium'"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border transition-all cursor-pointer"
+        >
+          <!-- <span class="w-2 h-2 rounded-full bg-[#E2136E]"></span> -->
+          <span>bKash</span>
+        </button>
+
+        <button 
+          @click="$emit('update:paymentFilter', 'nagad')"
+          :class="paymentFilter === 'nagad'
+            ? 'bg-[#F7941D]/15 border-[#EA580C] text-[#EA580C] font-bold shadow-xs'
+            : 'bg-surface-hover/50 border-outline text-on-surface-variant hover:text-[#EA580C] font-medium'"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border transition-all cursor-pointer"
+        >
+          <!-- <span class="w-2 h-2 rounded-full bg-[#EA580C]"></span> -->
+          <span>Nagad</span>
+        </button>
+
+        <button 
+          @click="$emit('update:paymentFilter', 'bank')"
+          :class="paymentFilter === 'bank'
+            ? 'bg-blue-500/15 border-blue-500 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
+            : 'bg-surface-hover/50 border-outline text-on-surface-variant hover:text-blue-600 font-medium'"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border transition-all cursor-pointer"
+        >
+          <!-- <span class="w-2 h-2 rounded-full bg-blue-500"></span> -->
+          <span>Bank / Card</span>
+        </button>
+      </div>
     </div>
 
     <!-- Data Table Container -->
@@ -94,13 +140,15 @@
       </div>
 
       <div v-if="!loading && orders.length > 0" class="overflow-x-auto">
-        <table class="w-full text-left border-collapse min-w-[750px]">
+        <table class="w-full text-left border-collapse min-w-[850px]">
           <thead>
             <tr class="bg-surface-hover/50 border-b border-outline text-xs font-semibold text-on-surface-variant">
               <th class="py-3 px-3 w-10 text-center"></th>
               <th class="py-3 px-4 w-12 text-center">#</th>
               <th class="py-3 px-4">Platform</th>
               <th class="py-3 px-4">Customer</th>
+              <th class="py-3 px-4">Paid Via</th>
+              <th class="py-3 px-4">Amount</th>
               <th class="py-3 px-4">Transaction ID</th>
               <th class="py-3 px-4">Order ID</th>
               <th class="py-3 px-4 text-right">Date & Time</th>
@@ -142,23 +190,40 @@
                 <td class="py-3.5 px-4">
                   <div class="flex flex-col gap-0.5">
                     <div class="flex items-center gap-2">
-                      <span class="font-semibold text-on-surface capitalize">{{ order.data?.customer || 'Customer' }}</span>
-                      <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                      <span class="font-semibold text-on-surface capitalize">{{ order.data?.name || order.data?.customer_name || order.data?.collected_details?.name || order.data?.customer || 'Customer' }}</span>
+                      <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                         Paid
                       </span>
                     </div>
-                    <span class="text-xs text-on-surface-variant truncate max-w-xs">{{ order.data?.collected_details?.phone || order.email }}</span>
+                    <span class="text-xs text-on-surface-variant truncate max-w-xs">{{ order.data?.phone || order.data?.collected_details?.phone || order.email }}</span>
                   </div>
+                </td>
+
+                <!-- Paid Via (bKash, Nagad, Bank, etc.) -->
+                <td class="py-3.5 px-4" @click.stop>
+                  <div class="flex flex-col gap-0.5 items-start">
+                    <span class="text-xs font-semibold text-on-surface">
+                      {{ getPaymentBadge(order).label }}
+                    </span>
+                    <span v-if="getPaymentBadge(order).sublabel" class="text-[10px] text-on-surface-variant/70 font-medium truncate max-w-[160px]">
+                      {{ getPaymentBadge(order).sublabel }}
+                    </span>
+                  </div>
+                </td>
+
+                <!-- Amount -->
+                <td class="py-3.5 px-4 whitespace-nowrap font-bold text-on-surface text-xs">
+                  ৳{{ getOrderTotal(order) }}
                 </td>
 
                 <!-- Transaction ID -->
                 <td class="py-3.5 px-4" @click.stop>
                   <button 
-                    @click="$emit('copy-text', order.data?.payment_transaction_id)" 
+                    @click="$emit('copy-text', order.data?.payment_transaction_id || order.data?.trx_id)" 
                     class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-hover hover:bg-primary/10 border border-outline text-primary text-xs font-mono font-semibold transition-colors cursor-pointer group/tx"
                     title="Click to copy Transaction ID"
                   >
-                    <span>{{ order.data?.payment_transaction_id || 'N/A' }}</span>
+                    <span>{{ order.data?.payment_transaction_id || order.data?.trx_id || 'N/A' }}</span>
                     <span class="material-symbols-outlined text-xs opacity-60 group-hover/tx:opacity-100">content_copy</span>
                   </button>
                 </td>
@@ -166,11 +231,11 @@
                 <!-- Order ID -->
                 <td class="py-3.5 px-4" @click.stop>
                   <button 
-                    @click="$emit('copy-text', order.id)" 
+                    @click="$emit('copy-text', order.data?.invoice_number || order.id)" 
                     class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline text-on-surface-variant text-xs font-mono transition-colors cursor-pointer group/id"
                     title="Click to copy full ID"
                   >
-                    <span>#{{ order.id.slice(0, 8) }}</span>
+                    <span>#{{ order.data?.invoice_number || order.id.slice(0, 8) }}</span>
                     <span class="material-symbols-outlined text-xs opacity-50 group-hover/id:opacity-100">content_copy</span>
                   </button>
                 </td>
@@ -184,14 +249,84 @@
 
               <!-- Expanded Details Row -->
               <tr v-if="expandedOrders.includes(order.id)" class="bg-surface-hover/20">
-                <td colspan="7" class="p-4 sm:p-6 bg-surface-hover/30 border-b border-outline">
+                <td colspan="9" class="p-4 sm:p-6 bg-surface-hover/30 border-b border-outline">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
-                    <!-- Order Items Breakdown -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0">
-                      <div class="font-semibold text-on-surface">
-                        <span>Payment & Items</span>
+                    <!-- 1. Verified Payment Details Card -->
+                    <div class="space-y-3 p-4 rounded-xl bg-surface border border-outline min-w-0">
+                      <div class="flex items-center justify-between border-b border-outline/40 pb-2">
+                        <div class="flex items-center gap-2">
+                          <span class="font-bold text-on-surface">Payment Verification</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 dark:bg-primary/10 dark:text-on-surface-variant dark:border-primary/20">
+                          CONFIRMED
+                        </span>
                       </div>
-                      <div v-if="order.data?.order && order.data.order.includes(':')" class="space-y-1 pt-1">
+
+                      <div class="space-y-2 pt-0.5">
+                        <!-- Method -->
+                        <div class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Method:</span>
+                          <span class="font-bold text-on-surface text-xs">
+                            {{ getPaymentBadge(order).label }}
+                          </span>
+                        </div>
+
+                        <!-- Specific Channel / Card / Bank -->
+                        <div v-if="getPaymentChannelDetail(order)" class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Paid Channel:</span>
+                          <span class="font-semibold text-on-surface text-right truncate max-w-[180px]">
+                            {{ getPaymentChannelDetail(order) }}
+                          </span>
+                        </div>
+
+                        <!-- Card Number if available -->
+                        <div v-if="order.data?.payment_details?.card_no" class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Card Number:</span>
+                          <span class="font-mono font-semibold text-on-surface">
+                            {{ order.data.payment_details.card_no }}
+                          </span>
+                        </div>
+
+                        <!-- Transaction ID -->
+                        <div class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Trx ID:</span>
+                          <button 
+                            @click.stop="$emit('copy-text', order.data?.payment_transaction_id || order.data?.trx_id)" 
+                            class="font-mono font-bold text-primary hover:underline inline-flex items-center gap-1"
+                            title="Copy TrxID"
+                          >
+                            <span>{{ order.data?.payment_transaction_id || order.data?.trx_id || 'N/A' }}</span>
+                            <span class="material-symbols-outlined text-xs">content_copy</span>
+                          </button>
+                        </div>
+
+                        <!-- Gateway / Aggregator -->
+                        <div v-if="order.data?.payment_provider" class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Gateway:</span>
+                          <span class="font-semibold uppercase text-on-surface text-[11px]">
+                            {{ order.data.payment_provider }}
+                          </span>
+                        </div>
+
+                        <!-- Total Paid Amount -->
+                        <div class="flex items-center justify-between py-1.5 gap-2">
+                          <span class="text-on-surface-variant font-medium">Total Paid:</span>
+                          <span class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+                            ৳{{ getOrderTotal(order) }} BDT
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 2. Order Items Breakdown -->
+                    <div class="space-y-3 p-4 rounded-xl bg-surface border border-outline min-w-0">
+                      <div class="font-bold text-on-surface border-b border-outline/40 pb-2 flex items-center justify-between">
+                        <span>Purchased Items</span>
+                        <span class="text-[11px] text-on-surface-variant font-normal">Details</span>
+                      </div>
+
+                      <!-- Parsed composite order string -->
+                      <div v-if="order.data?.order && order.data.order.includes(':')" class="space-y-1 pt-0.5">
                         <div 
                           v-for="(part, i) in order.data.order.split('|')" 
                           :key="i"
@@ -206,64 +341,95 @@
                           </span>
                         </div>
                       </div>
-                      <p v-else class="text-on-surface font-medium pt-1 break-words">
-                        {{ order.data?.order || 'No items listed' }}
-                      </p>
-                    </div>
 
-                    <!-- Courier Status -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0">
-                      <div class="font-semibold text-on-surface">
-                        <span>Courier Status</span>
-                      </div>
-
-                      <div v-if="order.data?.tracking_code" class="space-y-1.5 pt-1">
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="text-on-surface-variant">Tracking:</span>
-                          <span class="font-mono font-semibold text-primary select-all truncate">{{ order.data.tracking_code }}</span>
+                      <!-- Structured product or collected_details -->
+                      <div v-else class="space-y-1.5 pt-0.5">
+                        <div class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Product:</span>
+                          <span class="font-semibold text-on-surface text-right truncate max-w-[180px]">
+                            {{ order.data?.product || order.data?.collected_details?.productName || order.data?.collected_details?.sku || 'Product Order' }}
+                          </span>
                         </div>
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="text-on-surface-variant">Status:</span>
-                          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-hover text-on-surface border border-outline">
-                            {{ order.data.delivery_status || 'Delivered to Courier' }}
+
+                        <div v-if="order.data?.size || order.data?.color || order.data?.collected_details?.size || order.data?.collected_details?.color" class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Variant:</span>
+                          <span class="font-semibold text-on-surface">
+                            {{ [order.data?.size || order.data?.collected_details?.size, order.data?.color || order.data?.collected_details?.color].filter(Boolean).join(' / ') }}
+                          </span>
+                        </div>
+
+                        <div class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Quantity:</span>
+                          <span class="font-semibold text-on-surface">
+                            {{ order.data?.quantity || order.data?.collected_details?.quantity || 1 }} pcs
+                          </span>
+                        </div>
+
+                        <div v-if="order.data?.delivery_fee || order.data?.collected_details?.deliveryFee" class="flex items-center justify-between py-1 border-b border-outline/30 gap-2">
+                          <span class="text-on-surface-variant">Delivery Fee:</span>
+                          <span class="font-semibold text-on-surface">
+                            ৳{{ order.data?.delivery_fee || order.data?.collected_details?.deliveryFee }}
                           </span>
                         </div>
                       </div>
-                      <div v-else class="pt-1 flex flex-col gap-2">
-                        <span class="text-on-surface-variant text-[11px]">Ready for packaging & dispatch.</span>
-                        <button 
-                          @click.stop="$emit('send-to-steadfast', order.id)" 
-                          :disabled="sendingToSteadfast"
-                          class="inline-flex items-center justify-center px-3.5 py-2 bg-primary text-white hover:bg-primary-accent rounded-xl text-xs font-semibold transition-colors cursor-pointer w-max shadow-xs disabled:opacity-50"
-                        >
-                          Dispatch via Steadfast
-                        </button>
+
+                      <!-- Delivery Address -->
+                      <div class="pt-2 border-t border-outline/40">
+                        <span class="text-[10px] text-on-surface-variant font-semibold uppercase tracking-wider block mb-0.5">Delivery Address</span>
+                        <p class="text-on-surface text-xs font-medium break-words leading-relaxed">
+                          {{ order.data?.address || order.data?.collected_details?.address || 'No address provided' }}
+                        </p>
                       </div>
                     </div>
 
-                    <!-- Actions -->
-                    <div class="space-y-2 p-3.5 rounded-xl bg-surface border border-outline min-w-0 flex flex-col justify-between">
+                    <!-- 3. Courier Status & Actions -->
+                    <div class="space-y-3 p-4 rounded-xl bg-surface border border-outline min-w-0 flex flex-col justify-between">
                       <div>
-                        <div class="font-semibold text-on-surface mb-1">
-                          <span>Order Actions</span>
+                        <div class="font-bold text-on-surface border-b border-outline/40 pb-2 mb-3">
+                          <span>Dispatch & Logistics</span>
                         </div>
-                        <p class="text-[11px] text-on-surface-variant leading-relaxed">
-                          Update verified payment status or view captured customer notes.
-                        </p>
+
+                        <div v-if="order.data?.tracking_code" class="space-y-2">
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="text-on-surface-variant">Tracking ID:</span>
+                            <span class="font-mono font-bold text-primary select-all truncate">{{ order.data.tracking_code }}</span>
+                          </div>
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="text-on-surface-variant">Courier Status:</span>
+                            <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-hover text-on-surface border border-outline">
+                              {{ order.data.delivery_status || 'Dispatched' }}
+                            </span>
+                          </div>
+                        </div>
+                        <div v-else class="space-y-2">
+                          <span class="text-on-surface-variant text-[11px] block leading-relaxed">
+                            Order is verified & paid. Ready for immediate parcel packaging and Steadfast courier booking.
+                          </span>
+                          <button 
+                            @click.stop="$emit('send-to-steadfast', order.id)" 
+                            :disabled="sendingToSteadfast"
+                            class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary text-white hover:bg-primary-accent rounded-xl text-xs font-semibold transition-colors cursor-pointer w-full shadow-xs disabled:opacity-50"
+                          >
+                            <span class="material-symbols-outlined text-sm">local_shipping</span>
+                            Dispatch via Steadfast
+                          </button>
+                        </div>
                       </div>
 
-                      <div class="flex items-center gap-2 pt-2">
+                      <div class="flex items-center gap-2 pt-4 border-t border-outline/30">
                         <button 
                           @click.stop="$emit('open-edit', order)" 
-                          class="flex-1 py-2 px-3 rounded-xl bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-semibold transition-colors flex items-center justify-center cursor-pointer"
+                          class="flex-1 py-2 px-3 rounded-xl bg-surface-hover hover:bg-primary/10 hover:text-primary border border-outline font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          Edit Details
+                          <span class="material-symbols-outlined text-sm">edit</span>
+                          Edit
                         </button>
                         <button 
                           @click.stop="$emit('delete', order.id)" 
-                          class="py-2 px-3.5 rounded-xl bg-surface-hover hover:bg-primary/10 text-on-surface hover:text-primary border border-outline font-semibold transition-colors flex items-center justify-center cursor-pointer"
+                          class="py-2 px-3.5 rounded-xl bg-surface-hover hover:bg-red-500/10 text-on-surface hover:text-red-600 border border-outline font-semibold transition-colors flex items-center justify-center cursor-pointer"
+                          title="Delete Order"
                         >
-                          Delete
+                          <span class="material-symbols-outlined text-sm">delete</span>
                         </button>
                       </div>
                     </div>
@@ -280,7 +446,7 @@
         <span class="material-symbols-outlined text-4xl text-on-surface-variant/30">paid</span>
         <h4 class="text-sm font-semibold text-on-surface">No paid orders recorded</h4>
         <p class="text-xs text-on-surface-variant max-w-sm mx-auto">
-          Orders with confirmed payment transaction receipts will appear here automatically.
+          Orders with confirmed payment transaction receipts (bKash, Nagad, Bank Cards) will appear here automatically.
         </p>
       </div>
 
@@ -338,6 +504,7 @@ defineProps({
   startDate: { type: String, required: true },
   endDate: { type: String, required: true },
   activeTab: { type: String, required: true },
+  paymentFilter: { type: String, default: 'all' },
   sendingToSteadfast: { type: Boolean, default: false }
 })
 
@@ -347,6 +514,7 @@ defineEmits([
   'update:startDate',
   'update:endDate',
   'update:activeTab',
+  'update:paymentFilter',
   'open-edit',
   'delete',
   'send-to-steadfast',
@@ -374,5 +542,128 @@ const formatPlatformName = (platform) => {
 
 const getPlatformBadgeClass = (platform) => {
   return 'bg-surface-hover text-on-surface border-outline/70'
+}
+
+const getOrderTotal = (order) => {
+  const d = order.data || {}
+  if (d.total) return d.total
+  if (d.price) return d.price
+  if (d.collected_details?.total) return d.collected_details.total
+  if (d.collected_details?.price) return d.collected_details.price
+  if (d.order && d.order.includes(':')) {
+    const parts = d.order.split('|')
+    for (const p of parts) {
+      if (p.toLowerCase().includes('total')) {
+        const val = p.split(':')[1]?.replace(/[^0-9.]/g, '').trim()
+        if (val) return val
+      }
+    }
+  }
+  return '0'
+}
+
+const getPaymentBadge = (order) => {
+  const d = order.data || {}
+  const method = (d.payment_method || '').toLowerCase()
+  const channel = (d.payment_channel || '').toLowerCase()
+  const provider = (d.payment_provider || '').toLowerCase()
+  const details = d.payment_details || {}
+  const cardType = (details.card_type || d.card_type || '').toLowerCase()
+  const cardBrand = (details.card_brand || d.card_brand || '').toLowerCase()
+  const cardIssuer = (details.card_issuer || d.card_issuer || '').toLowerCase()
+
+  const combined = `${method} ${channel} ${provider} ${cardType} ${cardBrand} ${cardIssuer}`.toLowerCase()
+
+  // 1. bKash
+  if (combined.includes('bkash')) {
+    return {
+      type: 'bkash',
+      label: 'bKash',
+      sublabel: provider === 'sslcommerz' ? 'via SSLCommerz' : 'Mobile Banking',
+      badgeClass: 'bg-[#E2136E]/10 text-[#E2136E] border-[#E2136E]/30',
+      dotClass: 'bg-[#E2136E]'
+    }
+  }
+
+  // 2. Nagad
+  if (combined.includes('nagad') || combined.includes('nogod')) {
+    return {
+      type: 'nagad',
+      label: 'Nagad',
+      sublabel: provider === 'sslcommerz' ? 'via SSLCommerz' : 'Mobile Banking',
+      badgeClass: 'bg-[#F7941D]/10 text-[#EA580C] border-[#F7941D]/30',
+      dotClass: 'bg-[#EA580C]'
+    }
+  }
+
+  // 3. Rocket
+  if (combined.includes('rocket')) {
+    return {
+      type: 'rocket',
+      label: 'Rocket',
+      sublabel: provider === 'sslcommerz' ? 'via SSLCommerz' : 'Dutch-Bangla Rocket',
+      badgeClass: 'bg-[#8C3494]/10 text-[#8C3494] border-[#8C3494]/30',
+      dotClass: 'bg-[#8C3494]'
+    }
+  }
+
+  // 4. Bank / Card (Visa, Mastercard, Amex, Nexus, etc.)
+  if (
+    combined.includes('bank') ||
+    combined.includes('visa') ||
+    combined.includes('master') ||
+    combined.includes('amex') ||
+    combined.includes('nexus') ||
+    cardType ||
+    cardBrand ||
+    cardIssuer
+  ) {
+    const brand = details.card_brand || (combined.includes('visa') ? 'Visa' : combined.includes('master') ? 'Mastercard' : 'Bank Card')
+    const bank = details.bank_name || details.card_issuer || ''
+    const shortLabel = bank ? bank.split(' ')[0] : `Bank (${brand})`
+
+    return {
+      type: 'bank',
+      label: shortLabel.length > 18 ? shortLabel.slice(0, 18) + '...' : shortLabel,
+      sublabel: details.card_type || (provider === 'sslcommerz' ? 'Card via SSLCommerz' : 'Cards & Net Banking'),
+      badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+      dotClass: 'bg-blue-500'
+    }
+  }
+
+  // 5. Stripe
+  if (combined.includes('stripe')) {
+    return {
+      type: 'stripe',
+      label: 'Stripe',
+      sublabel: 'Credit / Debit Card',
+      badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+      dotClass: 'bg-indigo-500'
+    }
+  }
+
+  // 6. Generic Online Verified
+  return {
+    type: 'online',
+    label: d.payment_method ? d.payment_method.toUpperCase() : 'Online Paid',
+    sublabel: provider ? `via ${provider.toUpperCase()}` : 'Verified Payment',
+    badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+    dotClass: 'bg-emerald-500'
+  }
+}
+
+const getPaymentChannelDetail = (order) => {
+  const d = order.data || {}
+  if (d.payment_channel) return d.payment_channel
+  const details = d.payment_details || {}
+  if (details.channel) return details.channel
+  if (details.card_issuer && details.card_brand) {
+    return `${details.card_issuer} (${details.card_brand})`
+  }
+  if (details.card_type) return details.card_type
+  if (d.payment_method) {
+    return d.payment_method.toUpperCase() + (d.payment_provider ? ` (${d.payment_provider.toUpperCase()})` : '')
+  }
+  return null
 }
 </script>

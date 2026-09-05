@@ -1,7 +1,9 @@
 import { defineEventHandler } from 'h3'
 import { getFirestoreDb } from '~/server/utils/firebase'
+import { requireAdminSession } from '../../utils/auth-session'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  requireAdminSession(event)
   try {
     const db = getFirestoreDb()
     if (!db) {

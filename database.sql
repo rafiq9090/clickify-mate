@@ -306,7 +306,7 @@ CREATE POLICY "Enable all for all user_api_keys" ON public.user_api_keys FOR ALL
 CREATE TABLE IF NOT EXISTS public.payment_gateways (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider IN ('bkash', 'nagad', 'stripe')),
+    provider TEXT NOT NULL CHECK (provider IN ('bkash', 'nagad', 'stripe', 'sslcommerz')),
     merchant_name TEXT NOT NULL CHECK (char_length(merchant_name) BETWEEN 1 AND 120),
     merchant_number TEXT NOT NULL CHECK (char_length(merchant_number) BETWEEN 6 AND 40),
     environment TEXT NOT NULL DEFAULT 'sandbox' CHECK (environment IN ('sandbox', 'production')),
@@ -328,7 +328,7 @@ CREATE TABLE IF NOT EXISTS public.payment_gateway_audit_logs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     gateway_id UUID REFERENCES public.payment_gateways(id) ON DELETE SET NULL,
-    provider TEXT NOT NULL CHECK (provider IN ('bkash', 'nagad', 'stripe')),
+    provider TEXT NOT NULL CHECK (provider IN ('bkash', 'nagad', 'stripe', 'sslcommerz')),
     action TEXT NOT NULL CHECK (action IN ('configured', 'updated', 'deactivated', 'deleted')),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );

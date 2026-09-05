@@ -34,7 +34,7 @@
   width: 100%;
   height: 100%;
   background-color: var(--color-light-purity);
-  background-image: url('https://cdn.zajno.com/dev/codepen/cicada/texture.png');
+  background-image: url('/images/cicada/texture.png');
   background-repeat: repeat;
   mix-blend-mode: soft-light;
   pointer-events: none;

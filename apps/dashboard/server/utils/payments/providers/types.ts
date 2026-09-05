@@ -1,4 +1,4 @@
-export type PaymentProviderName = 'bkash' | 'nagad' | 'stripe'
+export type PaymentProviderName = 'bkash' | 'nagad' | 'stripe' | 'sslcommerz'
 export type PaymentEnvironment = 'sandbox' | 'production'
 
 export interface MerchantGatewayConfig {

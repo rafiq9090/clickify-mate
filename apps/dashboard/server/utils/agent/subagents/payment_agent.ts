@@ -53,8 +53,8 @@ export class PaymentAgent implements SubAgent {
 
         // 2. Payment Method Query / Options
         const text = lang === 'en'
-            ? 'We accept Cash on Delivery (COD), bKash, Nagad, Rocket, and Visa/MasterCard. Which payment method do you prefer?'
-            : 'আমাদের ক্যাশ অন ডেলিভারি (COD), বিকাশ, নগদ, রকেট এবং ভিসা/মাস্টারকার্ডের সুবিধা রয়েছে। আপনি কোন মাধ্যমে পেমেন্ট করতে চান?'
+            ? 'We accept Cash on Delivery (COD), bKash, Nagad, and Bank (Cards & Net Banking). Which payment method do you prefer?'
+            : 'আমাদের ক্যাশ অন ডেলিভারি (COD), বিকাশ, নগদ এবং ব্যাংক (কার্ড ও নেট ব্যাংকিং) সুবিধার রয়েছে। আপনি কোন মাধ্যমে পেমেন্ট করতে চান?'
 
         return {
             text,

@@ -16,6 +16,7 @@ services:
       - ./supabase/migrations/20260823061937_production_foundations.sql:/docker-entrypoint-initdb.d/30-production-foundations.sql:ro
       - ./supabase/migrations/20260823070000_knowledge_rag_foundations.sql:/docker-entrypoint-initdb.d/40-knowledge-rag-foundations.sql:ro
       - ./supabase/migrations/20260824000000_add_stripe_gateway.sql:/docker-entrypoint-initdb.d/50-stripe-gateway.sql:ro
+      - ./supabase/migrations/20260905000000_add_sslcommerz_gateway.sql:/docker-entrypoint-initdb.d/60-sslcommerz-gateway.sql:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -83,8 +84,10 @@ services:
       - B2_ENDPOINT=${B2_ENDPOINT:-}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - AUTH_EMAIL_FROM=${AUTH_EMAIL_FROM:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
       - ALLOW_SIGNUP=${ALLOW_SIGNUP:-false}
       - TELEGRAM_POLLING_ENABLED=${TELEGRAM_POLLING_ENABLED:-false}
+      - FIREBASE_SERVICE_ACCOUNT_KEY=${FIREBASE_SERVICE_ACCOUNT_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

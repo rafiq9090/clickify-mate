@@ -408,6 +408,7 @@
           :startDate="ordersStartDate"
           :endDate="ordersEndDate"
           :activeTab="ordersActiveTab"
+          :paymentFilter="ordersPaymentFilter"
           :sendingToSteadfast="sendingToSteadfast"
           @refresh="fetchOrders"
           @update:currentPage="val => { ordersCurrentPage = val; fetchOrders() }"
@@ -415,6 +416,7 @@
           @update:startDate="val => { ordersStartDate = val; ordersCurrentPage = 1; fetchOrders() }"
           @update:endDate="val => { ordersEndDate = val; ordersCurrentPage = 1; fetchOrders() }"
           @update:activeTab="val => { ordersActiveTab = val; ordersCurrentPage = 1; fetchOrders() }"
+          @update:paymentFilter="val => { ordersPaymentFilter = val; ordersCurrentPage = 1; fetchOrders() }"
           @open-edit="openEditModal"
           @delete="deleteOrder"
           @send-to-steadfast="sendToSteadfast"
@@ -1430,6 +1432,7 @@ const ordersSearchQuery = ref('')
 const ordersStartDate = ref('')
 const ordersEndDate = ref('')
 const ordersActiveTab = ref('all')
+const ordersPaymentFilter = ref('all')
 
 // Modals State
 const showConnectModal = ref(false)
@@ -1757,19 +1760,33 @@ const fetchLeads = async () => {
       .select('*', { count: 'exact' })
       .filter('data->>user_id', 'eq', user.id)
       .is('data->>payment_transaction_id', null)
+      .neq('data->>payment_status', 'paid')
       .order('created_at', { ascending: false })
 
     if (activeTab.value !== 'all') {
-      query = query.eq('data->>platform', activeTab.value)
+      if (activeTab.value === 'facebook') {
+        query = query.or('data->>platform.eq.messenger,data->>platform.eq.fb_comment,data->>platform.eq.facebook')
+      } else {
+        query = query.eq('data->>platform', activeTab.value)
+      }
     }
 
     if (searchQuery.value) {
       const term = searchQuery.value.trim()
-      query = query.or(`email.ilike.%${term}%,data->>customer.ilike.%${term}%,data->>order.ilike.%${term}%`)
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term)
+      if (isUuid) {
+        query = query.eq('id', term)
+      } else {
+        query = query.or(`email.ilike.%${term}%,data->>customer.ilike.%${term}%,data->>name.ilike.%${term}%,data->>phone.ilike.%${term}%,data->>order.ilike.%${term}%`)
+      }
     }
 
     if (startDate.value) query = query.gte('created_at', startDate.value)
-    if (endDate.value) query = query.lte('created_at', endDate.value)
+    if (endDate.value) {
+      const end = new Date(endDate.value)
+      end.setDate(end.getDate() + 1)
+      query = query.lt('created_at', end.toISOString())
+    }
 
     const { data, count, error } = await query.range(from, to)
     if (error) throw error
@@ -1798,16 +1815,40 @@ const fetchOrders = async () => {
       .from('leads')
       .select('*', { count: 'exact' })
       .filter('data->>user_id', 'eq', user.id)
-      .not('data->>payment_transaction_id', 'is', null)
+      .or('data->>payment_transaction_id.not.is.null,data->>trx_id.not.is.null,data->>payment_status.eq.paid,data->>is_paid.eq.true')
       .order('created_at', { ascending: false })
 
     if (ordersActiveTab.value !== 'all') {
-      query = query.eq('data->>platform', ordersActiveTab.value)
+      if (ordersActiveTab.value === 'facebook') {
+        query = query.or('data->>platform.eq.messenger,data->>platform.eq.fb_comment,data->>platform.eq.facebook')
+      } else {
+        query = query.eq('data->>platform', ordersActiveTab.value)
+      }
+    }
+
+    if (ordersPaymentFilter.value !== 'all') {
+      if (ordersPaymentFilter.value === 'bank') {
+        query = query.or('data->>payment_method.eq.bank,data->>payment_channel.ilike.%bank%,data->>payment_channel.ilike.%visa%,data->>payment_channel.ilike.%card%')
+      } else {
+        query = query.or(`data->>payment_method.eq.${ordersPaymentFilter.value},data->>payment_channel.ilike.%${ordersPaymentFilter.value}%,data->>payment_provider.eq.${ordersPaymentFilter.value}`)
+      }
     }
 
     if (ordersSearchQuery.value) {
       const term = ordersSearchQuery.value.trim()
-      query = query.or(`email.ilike.%${term}%,data->>customer.ilike.%${term}%,data->>payment_transaction_id.ilike.%${term}%`)
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term)
+      if (isUuid) {
+        query = query.eq('id', term)
+      } else {
+        query = query.or(`email.ilike.%${term}%,data->>customer.ilike.%${term}%,data->>name.ilike.%${term}%,data->>phone.ilike.%${term}%,data->>invoice_number.ilike.%${term}%,data->>payment_transaction_id.ilike.%${term}%,data->>trx_id.ilike.%${term}%,data->>payment_method.ilike.%${term}%,data->>payment_channel.ilike.%${term}%,data->>payment_provider.ilike.%${term}%`)
+      }
+    }
+
+    if (ordersStartDate.value) query = query.gte('created_at', ordersStartDate.value)
+    if (ordersEndDate.value) {
+      const end = new Date(ordersEndDate.value)
+      end.setDate(end.getDate() + 1)
+      query = query.lt('created_at', end.toISOString())
     }
 
     const { data, count, error } = await query.range(from, to)

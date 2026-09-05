@@ -16,9 +16,8 @@
 
     <div class="banner-tree">
       <video autoplay muted loop playsinline>
-        <source src="https://cdn.zajno.com/dev/codepen/cicada/cicada_tree.mov" type='video/mp4; codecs="hvc1"'>
-        <source src="https://cdn.zajno.com/dev/codepen/cicada/cicada_tree.webm" type="video/webm">
-        <source src="https://cdn.zajno.com/dev/codepen/cicada/cicada_tree.mp4" type="video/mp4">
+        <source src="/videos/cicada_tree.mov" type='video/mp4; codecs="hvc1"'>
+        <source src="/videos/cicada_tree.webm" type="video/webm">
       </video>
     </div>
   </section>

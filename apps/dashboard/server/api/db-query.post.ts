@@ -17,8 +17,10 @@ const TABLE_RULES: Record<string, TableRule> = {
   leads: {
     actions: ['select', 'insert', 'update', 'delete'],
     columns: [
-      'id', 'created_at', 'email', 'source', 'short_id', 'data->>user_id', 'data->>payment_transaction_id',
-      'data->>platform', 'data->>customer', 'data->>order', 'data->>status'
+      'id', 'created_at', 'updated_at', 'email', 'source', 'short_id', 'data->>user_id', 'data->>payment_transaction_id',
+      'data->>trx_id', 'data->>payment_status', 'data->>is_paid', 'data->>payment_method',
+      'data->>platform', 'data->>customer', 'data->>name', 'data->>phone', 'data->>address',
+      'data->>order', 'data->>status', 'data->>invoice_number', 'data->>total', 'data->>price'
     ],
     writable: ['email', 'source', 'data']
   },
@@ -49,6 +51,11 @@ function validateOrFilter(rule: TableRule, value: unknown) {
   const input = String(value || '')
   if (input.length > 1000) throw createError({ statusCode: 400, statusMessage: 'Search filter is too long.' })
   for (const part of input.split(',').map(item => item.trim()).filter(Boolean)) {
+    const isNullMatch = part.match(/^([^.]+)\.(not\.is\.null|is\.not\.null|is\.null)$/i)
+    if (isNullMatch) {
+      validateColumn(rule, isNullMatch[1])
+      continue
+    }
     const match = part.match(/^([^.]+)\.(eq|neq|ilike|like|gt|gte|lt|lte)\.(.*)$/i)
     if (!match) throw createError({ statusCode: 400, statusMessage: 'Search filter is invalid.' })
     validateColumn(rule, match[1])

@@ -1,8 +1,10 @@
 import { defineEventHandler, readBody, createError } from 'h3'
 import { getProviderByName } from '~/server/utils/agent/providers/router'
 import { generateResilientCoverImage, buildAccurateImagePrompt } from '~/server/utils/ai-image'
+import { requireAdminSession } from '../../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
+  requireAdminSession(event)
   try {
     const body = await readBody(event) || {}
     const { topic, category = 'WhatsApp Commerce', tone = 'conversational', audience = 'e-commerce founders and developers' } = body

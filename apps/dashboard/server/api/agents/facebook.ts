@@ -115,10 +115,14 @@ export default defineEventHandler(async (event) => {
         const challenge = query['hub.challenge']
 
         const config = useRuntimeConfig()
-        const verifyToken = config.public.verifyToken || 'papersnap_secure_verify'
+        const verifyToken = config.public.verifyToken || (process.env.NODE_ENV === 'production' ? '' : 'papersnap_secure_verify')
 
-        if (mode === 'subscribe' && token === verifyToken) {
+        if (mode === 'subscribe' && verifyToken && token === verifyToken) {
             return challenge
+        }
+        if (mode === 'subscribe') {
+            console.warn(`[FACEBOOK WEBHOOK HANDSHAKE REJECTED]: Invalid or unconfigured verify token.`)
+            throw createError({ statusCode: 403, statusMessage: 'Webhook verification token mismatch' })
         }
         return { status: 'Facebook Messenger & Page Agent Active', version: VERSION }
     }

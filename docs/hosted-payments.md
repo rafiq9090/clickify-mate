@@ -22,6 +22,7 @@ Each shop owner opens **Dashboard → Payment Gateways** and configures their ow
 - bKash: merchant number, API username/password, app key and app secret.
 - Nagad: merchant ID, merchant account number, merchant private key and Nagad public key.
 - Stripe: Stripe account ID, secret API key, and webhook signing secret. Test mode requires `sk_test_`; live mode requires `sk_live_`.
+- SSLCOMMERZ: store ID and store password (API key). Test mode supports `testbox`/`qwerty`.
 - Start in `sandbox`, run a full checkout, and switch to `production` only after the provider approves the callback URL and server IP.
 
 For Stripe, register `https://<PAYMENT_PUBLIC_BASE_URL>/api/payments/webhook/stripe` in Stripe Workbench and subscribe to:
@@ -35,11 +36,11 @@ Credentials are AES-256-GCM encrypted with the dedicated `PAYMENT_CREDENTIALS_KE
 
 ## Runtime flow
 
-1. The agent calls `create_order` with `paymentProvider=bkash`, `paymentProvider=nagad`, or `paymentProvider=stripe`.
+1. The agent calls `create_order` with `paymentProvider=bkash`, `paymentProvider=nagad`, `paymentProvider=stripe`, or `paymentProvider=sslcommerz`.
 2. The order is stored as `pending_payment`; stock is not deducted and courier is not called.
 3. The server creates a `payment_attempt` and provider checkout session.
 4. The agent sends the returned `checkoutUrl` to the customer.
-5. bKash/Nagad redirect to the attempt-specific callback; Stripe sends a signed webhook and redirects the customer to the public result page.
+5. bKash/Nagad/SSLCOMMERZ redirect to the attempt-specific callback; Stripe sends a signed webhook and redirects the customer to the public result page.
 6. The server treats callbacks/webhooks only as triggers and queries the payment through the merchant API.
 7. Amount, currency, provider payment ID, completed status and unique transaction ID must all match.
 8. A database transaction inserts the immutable payment transaction and marks the order paid/confirmed.
@@ -52,8 +53,10 @@ Credentials are AES-256-GCM encrypted with the dedicated `PAYMENT_CREDENTIALS_KE
 POST /api/payments/checkout
 GET  /api/payments/callback/bkash/:token
 GET  /api/payments/callback/nagad/:token
+GET  /api/payments/callback/sslcommerz/:token
 POST /api/payments/callback/bkash/:token
 POST /api/payments/callback/nagad/:token
+POST /api/payments/callback/sslcommerz/:token
 POST /api/payments/webhook/stripe
 GET  /api/payments/status/:token
 GET  /payment/result?token=:token

@@ -585,3 +585,117 @@ CREATE TABLE IF NOT EXISTS public.knowledge_gaps (
 CREATE INDEX IF NOT EXISTS idx_knowledge_gaps_agent ON public.knowledge_gaps (agent_id, status, frequency DESC);
 ALTER TABLE public.knowledge_gaps ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable all for knowledge_gaps" ON public.knowledge_gaps FOR ALL USING (true);
+
+-- Blogs table
+CREATE TABLE IF NOT EXISTS public.blogs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    title TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    excerpt TEXT,
+    content TEXT NOT NULL,
+    category TEXT,
+    image TEXT,
+    date DATE DEFAULT CURRENT_DATE,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_blogs_slug ON public.blogs (slug);
+ALTER TABLE public.blogs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for blogs" ON public.blogs FOR ALL USING (true);
+
+-- Templates table
+CREATE TABLE IF NOT EXISTS public.templates (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    title TEXT NOT NULL,
+    content TEXT,
+    type TEXT DEFAULT 'msg',
+    category TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for templates" ON public.templates FOR ALL USING (true);
+
+-- Trends table
+CREATE TABLE IF NOT EXISTS public.trends (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    keyword TEXT NOT NULL,
+    volume TEXT,
+    growth TEXT,
+    difficulty TEXT DEFAULT 'Easy',
+    rank INTEGER,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+ALTER TABLE public.trends ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for trends" ON public.trends FOR ALL USING (true);
+
+-- Navigation table
+CREATE TABLE IF NOT EXISTS public.navigation (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    label TEXT NOT NULL,
+    path TEXT NOT NULL,
+    icon TEXT,
+    "order" INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+ALTER TABLE public.navigation ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for navigation" ON public.navigation FOR ALL USING (true);
+
+-- Ads table
+CREATE TABLE IF NOT EXISTS public.ads (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    label TEXT NOT NULL,
+    "isEnabled" BOOLEAN DEFAULT true,
+    code TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+ALTER TABLE public.ads ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for ads" ON public.ads FOR ALL USING (true);
+
+-- Settings table
+CREATE TABLE IF NOT EXISTS public.settings (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    adsense_pub_id TEXT,
+    adsense_code TEXT,
+    google_analytics_id TEXT,
+    site_name TEXT,
+    google_search_console_id TEXT,
+    bing_webmaster_id TEXT,
+    yandex_webmaster_id TEXT,
+    groq_api_key TEXT,
+    gemini_api_key TEXT,
+    tinyurl_api_token TEXT,
+    supabase_url TEXT,
+    supabase_key TEXT,
+    supabase_service_role_key TEXT
+);
+INSERT INTO public.settings (site_name) 
+SELECT 'Clickify Mate' WHERE NOT EXISTS (SELECT 1 FROM public.settings);
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for settings" ON public.settings FOR ALL USING (true);
+
+-- Visitors Analytics table
+CREATE TABLE IF NOT EXISTS public.visitors (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    last_active_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    session_id TEXT UNIQUE NOT NULL,
+    current_path TEXT,
+    tools_used JSONB DEFAULT '[]'::jsonb,
+    time_spent_seconds INTEGER DEFAULT 0,
+    ip_address TEXT,
+    city TEXT,
+    country TEXT,
+    os TEXT,
+    browser TEXT,
+    device TEXT DEFAULT 'Desktop',
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON public.visitors (session_id);
+ALTER TABLE public.visitors ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for visitors" ON public.visitors FOR ALL USING (true);
+
