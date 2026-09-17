@@ -41,10 +41,10 @@ function requiredSecret(name: 'JWT_SECRET' | 'ADMIN_SESSION_SECRET') {
   return value
 }
 
-function cookieOptions(maxAge: number) {
+function cookieOptions(event: any, maxAge: number) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: getRequestProtocol(event, { xForwardedProto: true }) === 'https',
     sameSite: 'lax' as const,
     path: '/',
     maxAge
@@ -102,11 +102,11 @@ export function signDashboardSession(user: DashboardUser) {
 }
 
 export function setDashboardSession(event: any, user: DashboardUser) {
-  setCookie(event, DASHBOARD_COOKIE, signDashboardSession(user), cookieOptions(8 * 60 * 60))
+  setCookie(event, DASHBOARD_COOKIE, signDashboardSession(user), cookieOptions(event, 8 * 60 * 60))
 }
 
 export function clearDashboardSession(event: any) {
-  setCookie(event, DASHBOARD_COOKIE, '', cookieOptions(0))
+  setCookie(event, DASHBOARD_COOKIE, '', cookieOptions(event, 0))
 }
 
 export function signAdminSession(username: string) {
@@ -118,11 +118,11 @@ export function signAdminSession(username: string) {
 }
 
 export function setAdminSession(event: any, username: string) {
-  setCookie(event, ADMIN_COOKIE, signAdminSession(username), cookieOptions(8 * 60 * 60))
+  setCookie(event, ADMIN_COOKIE, signAdminSession(username), cookieOptions(event, 8 * 60 * 60))
 }
 
 export function clearAdminSession(event: any) {
-  setCookie(event, ADMIN_COOKIE, '', cookieOptions(0))
+  setCookie(event, ADMIN_COOKIE, '', cookieOptions(event, 0))
 }
 
 export async function requireDashboardUser(event: any): Promise<DashboardUser> {
