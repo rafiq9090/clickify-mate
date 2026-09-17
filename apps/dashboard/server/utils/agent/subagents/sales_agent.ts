@@ -34,7 +34,7 @@ export class SalesAgent implements SubAgent {
 
     async execute(input: SubAgentInput): Promise<SubAgentOutput> {
         const { event, context, understanding } = input
-        const lang = context.session.language || 'bn'
+        const isBn = (context.session.language || 'bn') === 'bn'
         const toolCalls: any[] = []
         const toolResults: any[] = []
 
@@ -56,7 +56,7 @@ export class SalesAgent implements SubAgent {
                 const bundleText = executed.data?.tierDiscountPercent 
                     ? ` (Discount applied: ${executed.data.tierDiscountPercent}%)` 
                     : ''
-                const text = lang === 'en'
+                const text = !isBn
                     ? `The price for ${sku} is ৳${price}${bundleText}. Would you like to place an order?`
                     : `${sku}-এর বর্তমান মূল্য ৳${price}${bundleText}। আপনি কি এটি অর্ডার করতে চান?`
                 

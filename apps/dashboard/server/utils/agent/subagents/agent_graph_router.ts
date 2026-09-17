@@ -102,8 +102,8 @@ export async function executeSubAgentGraph(
     if (!criticReview.pass) {
         repaired = true
         console.warn(`[SUBAGENT CRITIC REJECT] Subagent "${targetAgent.id}" produced issues:`, criticReview.issues)
-        const lang = context.session.language || 'bn'
-        finalText = lang === 'en'
+        const isBn = (context.session.language || 'bn') === 'bn'
+        finalText = !isBn
             ? 'I am verifying those details with our catalog. Could you please specify your preferred size or color?'
             : 'আমি আপনার পছন্দের প্রোডাক্টের সঠিক বিবরণ চেক করছি। অনুগ্রহ করে সাইজ বা কালারটি পুনরায় জানাবেন কি?'
     }

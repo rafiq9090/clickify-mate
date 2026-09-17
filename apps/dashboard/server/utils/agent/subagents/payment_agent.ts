@@ -21,7 +21,7 @@ export class PaymentAgent implements SubAgent {
 
     async execute(input: SubAgentInput): Promise<SubAgentOutput> {
         const { event, context, understanding } = input
-        const lang = context.session.language || 'bn'
+        const isBn = (context.session.language || 'bn') === 'bn'
         const toolCalls: any[] = []
         const toolResults: any[] = []
 
@@ -38,7 +38,7 @@ export class PaymentAgent implements SubAgent {
             toolResults.push({ toolCallId, name: 'verify_payment', output: executed.data, error: executed.error })
 
             // We report submission received for manual/gateway audit without falsely marking confirmed
-            const text = lang === 'en'
+            const text = !isBn
                 ? `Thank you! Your Transaction ID (${trxId}) has been received for manual verification. Our accounts team will confirm within 15 minutes.`
                 : `ধন্যবাদ! আপনার ট্রানজেকশন আইডি (${trxId}) পর্যালোচনার জন্য জমা নেওয়া হয়েছে। আমাদের অ্যাকাউন্টস টিম দ্রুত যাচাই করে অর্ডার কনফার্ম করবে।`
             
@@ -52,7 +52,7 @@ export class PaymentAgent implements SubAgent {
         }
 
         // 2. Payment Method Query / Options
-        const text = lang === 'en'
+        const text = !isBn
             ? 'We accept Cash on Delivery (COD), bKash, Nagad, and Bank (Cards & Net Banking). Which payment method do you prefer?'
             : 'আমাদের ক্যাশ অন ডেলিভারি (COD), বিকাশ, নগদ এবং ব্যাংক (কার্ড ও নেট ব্যাংকিং) সুবিধার রয়েছে। আপনি কোন মাধ্যমে পেমেন্ট করতে চান?'
 

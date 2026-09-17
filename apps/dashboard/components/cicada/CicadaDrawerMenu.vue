@@ -60,14 +60,14 @@
 
         <!-- Action Buttons -->
         <div class="mobile-nav-actions">
-          <NuxtLink to="/dashboard" class="mobile-menu-btn-primary" @click="emit('close')">
-            <span>Get Started Free</span>
+          <NuxtLink :to="user ? '/dashboard' : '/login'" class="mobile-menu-btn-primary" @click="emit('close')">
+            <span>{{ user ? 'Dashboard' : 'Get Started Free' }}</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>
             </svg>
           </NuxtLink>
-          <NuxtLink to="/login" class="mobile-menu-btn-secondary" @click="emit('close')">
+          <NuxtLink v-if="!user" to="/login" class="mobile-menu-btn-secondary" @click="emit('close')">
             Sign In to Console
           </NuxtLink>
         </div>
@@ -77,6 +77,8 @@
 </template>
 
 <script setup lang="ts">
+const user = useAuthUser()
+
 defineProps<{
   isOpen: boolean
 }>()

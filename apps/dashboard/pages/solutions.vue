@@ -438,7 +438,7 @@ const scrollToTop = () => {
   border-radius: 14px;
   font-size: 13.5px;
   line-height: 1.5;
-  max-width: 88%;
+  max-width: 100%;
 }
 
 .chat-bubble.user {

@@ -98,16 +98,20 @@ export async function createCourierParcel(
     }
 }
 
-export async function getTrackingStatus(trackingCode: string): Promise<{
+export async function getTrackingStatus(trackingCode: string, context?: any): Promise<{
     trackingCode: string
     status: string
     message: string
 }> {
+    const isBn = (context?.session?.language || 'bn') === 'bn'
+
     if (!trackingCode) {
         return {
             trackingCode: '',
             status: 'unknown',
-            message: 'ট্র্যাকিং কোড ছাড়া স্ট্যাটাস পাওয়া যায়নি। আপনার অর্ডার আইডি বা ফোন নম্বর দিন।'
+            message: !isBn
+                ? 'Tracking status cannot be retrieved without a tracking code. Please provide your order ID or phone number.'
+                : 'ট্র্যাকিং কোড ছাড়া স্ট্যাটাস পাওয়া যায়নি। আপনার অর্ডার আইডি বা ফোন নম্বর দিন।'
         }
     }
 
@@ -117,13 +121,17 @@ export async function getTrackingStatus(trackingCode: string): Promise<{
             return {
                 trackingCode,
                 status: 'unknown',
-                message: 'কুরিয়ার ট্র্যাকিং এখনো কনফিগার করা হয়নি। সাপোর্ট টিমের সাথে যোগাযোগ করুন।'
+                message: !isBn
+                    ? 'Courier tracking is not configured yet. Please contact our support team.'
+                    : 'কুরিয়ার ট্র্যাকিং এখনো কনফিগার করা হয়নি। সাপোর্ট টিমের সাথে যোগাযোগ করুন।'
             }
         }
         return {
             trackingCode,
             status: 'booked',
-            message: `আপনার অর্ডারটি সফলভাবে কনফার্ম ও বুক করা হয়েছে (Tracking: ${trackingCode})। কুরিয়ার টিম পার্সেলটি পিকআপের প্রক্রিয়ায় রয়েছে।`
+            message: !isBn
+                ? `Your order has been booked successfully (Tracking: ${trackingCode}). The courier team is in the process of parcel pickup.`
+                : `আপনার অর্ডারটি সফলভাবে কনফার্ম ও বুক করা হয়েছে (Tracking: ${trackingCode})। কুরিয়ার টিম পার্সেলটি পিকআপের প্রক্রিয়ায় রয়েছে।`
         }
     }
 
@@ -134,11 +142,17 @@ export async function getTrackingStatus(trackingCode: string): Promise<{
 
         let userFriendlyMessage = ''
         if (rawStatus.includes('delivered')) {
-            userFriendlyMessage = `আপনার পার্সেলটি (Tracking: ${trackingCode}) ডেলিভারি সম্পন্ন হয়েছে।`
+            userFriendlyMessage = !isBn
+                ? `Your parcel (Tracking: ${trackingCode}) has been delivered successfully.`
+                : `আপনার পার্সেলটি (Tracking: ${trackingCode}) ডেলিভারি সম্পন্ন হয়েছে।`
         } else if (rawStatus.includes('transit') || rawStatus.includes('delivery')) {
-            userFriendlyMessage = `আপনার পার্সেলটি (Tracking: ${trackingCode}) কুরিয়ারে হস্তান্তর করা হয়েছে এবং বর্তমানে ডেলিভারির পথে রয়েছে।`
+            userFriendlyMessage = !isBn
+                ? `Your parcel (Tracking: ${trackingCode}) has been handed over to courier and is out for delivery.`
+                : `আপনার পার্সেলটি (Tracking: ${trackingCode}) কুরিয়ারে হস্তান্তর করা হয়েছে এবং বর্তমানে ডেলিভারির পথে রয়েছে।`
         } else {
-            userFriendlyMessage = `আপনার পার্সেলটি বুক করা হয়েছে (Tracking: ${trackingCode})। কুরিয়ার পিকআপের প্রক্রিয়ায় রয়েছে।`
+            userFriendlyMessage = !isBn
+                ? `Your parcel has been booked (Tracking: ${trackingCode}). Courier pickup is in progress.`
+                : `আপনার পার্সেলটি বুক করা হয়েছে (Tracking: ${trackingCode})। কুরিয়ার পিকআপের প্রক্রিয়ায় রয়েছে।`
         }
 
         return {
@@ -150,7 +164,9 @@ export async function getTrackingStatus(trackingCode: string): Promise<{
         return {
             trackingCode,
             status: 'booked',
-            message: `আপনার অর্ডারটি বুক করা হয়েছে (Tracking: ${trackingCode})। কুরিয়ার পিকআপের অপেক্ষায় রয়েছে।`
+            message: !isBn
+                ? `Your order has been booked (Tracking: ${trackingCode}). Awaiting courier pickup.`
+                : `আপনার অর্ডারটি বুক করা হয়েছে (Tracking: ${trackingCode})। কুরিয়ার পিকআপের অপেক্ষায় রয়েছে।`
         }
     }
 }

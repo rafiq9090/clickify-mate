@@ -40,7 +40,7 @@ const toggleFaq = (idx: number) => {
 const faqs = [
   {
     q: 'How does Clickify Mate automate DM sales on WhatsApp and Instagram?',
-    a: 'Clickify Mate listens to incoming DMs and post comments via official Meta Graph APIs. Autonomous AI swarms analyze buyer intent, query real-time product stock, answer inquiries, and generate instant 1-click checkout links or automated COD confirmation.'
+    a: 'Clickify Mate listens to incoming DMs and comments via official Meta Graph APIs. Autonomous AI swarms analyze buyer intent, query real-time catalog stock, negotiate bundle pricing, and generate 1-click checkout links or automated COD confirmation.'
   },
   {
     q: 'Does Clickify Mate sync with my Shopify or WooCommerce catalog?',
@@ -51,8 +51,8 @@ const faqs = [
     a: '100%. Clickify Mate routes all WhatsApp Business and Instagram Direct messages through official Meta Cloud API channels with certified BSP tier routing, ensuring zero account bans or template delivery issues.'
   },
   {
-    q: 'How do multi-agent swarms handle complex or custom customer questions?',
-    a: 'Our swarm architecture delegates specialized tasks: one agent recommends products, another calculates bundle discounts, and another verifies delivery addresses. If an inquiry requires human intervention, it is escalated with full chat context.'
+    q: 'How do multi-agent swarms handle complex or custom inquiries?',
+    a: 'Our swarm architecture delegates specialized tasks: one agent recommends products, another calculates bundle discounts, and another verifies delivery addresses. If human intervention is needed, the inquiry escalates with complete chat context.'
   },
   {
     q: 'Can I test Clickify Mate before committing?',
@@ -65,7 +65,6 @@ const faqs = [
 .cicada-stack-item {
   width: 100%;
   height: 100%;
-  min-height: 80vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -77,12 +76,12 @@ const faqs = [
   background: #FAF8FC;
   border: 1px solid rgba(123, 76, 133, 0.2);
   border-radius: 0.32rem;
-  padding: 0.45rem 0.6rem;
-  box-shadow: 0 24px 60px -12px rgba(52, 31, 55, 0.14),
+  padding: 0.35rem 0.55rem;
+  box-shadow: 0 24px 60px -12px rgba(52, 31, 55, 0.12),
               inset 0 1px 2px 0 rgba(255, 255, 255, 1);
   display: flex;
   flex-direction: column;
-  gap: 0.32rem;
+  gap: 0.22rem;
   width: 100%;
   height: 100%;
   justify-content: center;
@@ -93,28 +92,28 @@ const faqs = [
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.08rem;
+  gap: 0.06rem;
 }
 
 .section-badge {
-  font-size: 0.15rem;
-  font-weight: 700;
+  font-size: 0.14rem;
+  font-weight: 800;
   letter-spacing: 0.08em;
   color: #7B4C85;
   text-transform: uppercase;
 }
 
 .section-title {
-  font-size: 0.38rem;
+  font-size: 0.34rem;
   font-weight: 800;
   letter-spacing: -0.015rem;
   color: #341F37;
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.18;
 }
 
 .section-desc {
-  font-size: 0.19rem;
+  font-size: 0.17rem;
   color: #5C4560;
   margin: 0;
   max-width: 8rem;
@@ -123,62 +122,65 @@ const faqs = [
 .faq-list {
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
+  gap: 0.1rem;
 }
 
 .faq-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.95);
-  border-radius: 0.18rem;
-  padding: 0.2rem 0.28rem;
-  box-shadow: 0 8px 24px 0 rgba(84, 51, 89, 0.03);
+  border-radius: 0.14rem;
+  padding: 0.14rem 0.2rem;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.22s ease;
+  box-shadow: 0 4px 12px rgba(84, 51, 89, 0.03);
 }
 
 .faq-card:hover {
   background: #FFFFFF;
-  border-color: rgba(123, 76, 133, 0.25);
+  border-color: rgba(123, 76, 133, 0.3);
 }
 
 .faq-card.active {
   background: #FFFFFF;
-  border-color: rgba(123, 76, 133, 0.4);
-  box-shadow: 0 12px 30px 0 rgba(84, 51, 89, 0.06);
+  border-color: #7B4C85;
+  box-shadow: 0 8px 24px rgba(123, 76, 133, 0.1);
 }
 
 .faq-question-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 
 .faq-question {
-  font-size: 0.21rem;
+  font-size: 0.175rem;
   font-weight: 700;
   color: #341F37;
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.25;
+}
+
+.faq-card.active .faq-question {
+  color: #7B4C85;
 }
 
 .faq-toggle-icon {
-  font-size: 0.24rem;
-  font-weight: 600;
+  font-size: 0.22rem;
+  font-weight: 700;
   color: #7B4C85;
   line-height: 1;
 }
 
 .faq-answer-block {
-  margin-top: 0.12rem;
-  border-top: 1px solid rgba(84, 51, 89, 0.08);
-  padding-top: 0.12rem;
+  margin-top: 0.08rem;
+  padding-top: 0.08rem;
+  border-top: 1px solid rgba(84, 51, 89, 0.06);
 }
 
 .faq-answer {
-  font-size: 0.175rem;
-  line-height: 1.55;
+  font-size: 0.145rem;
+  line-height: 1.48;
   color: #5C4560;
   margin: 0;
 }
@@ -186,7 +188,7 @@ const faqs = [
 @media (max-width: 768px) {
   .glass-faq-card {
     padding: 0.28rem 0.2rem;
-    gap: 0.2rem;
+    gap: 0.16rem;
     justify-content: flex-start;
   }
   .section-title {
@@ -198,14 +200,8 @@ const faqs = [
   .section-badge {
     font-size: 0.12rem;
   }
-  .faq-card {
-    padding: 0.16rem 0.18rem;
-  }
   .faq-question {
     font-size: 0.16rem;
-  }
-  .faq-toggle-icon {
-    font-size: 0.2rem;
   }
   .faq-answer {
     font-size: 0.135rem;

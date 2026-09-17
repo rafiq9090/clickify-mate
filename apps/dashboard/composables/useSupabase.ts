@@ -1,12 +1,16 @@
 import { useNuxtApp, useState } from '#app'
 
-export const useSupabase = () => {
-  const nuxtApp = useNuxtApp()
+export const useAuthUser = () => {
+  return useState<any | null>('clickify-dashboard-user', () => null)
+}
+
+export const useSupabase = (): any => {
+  const nuxtApp = useNuxtApp() as any
   if (nuxtApp._supabase) {
     return nuxtApp._supabase
   }
 
-  const authUser = useState<any | null>('clickify-dashboard-user', () => null)
+  const authUser = useAuthUser()
   let sessionLoaded = false
   let pendingRecovery: { email: string; token: string } | null = null
 
@@ -18,7 +22,8 @@ export const useSupabase = () => {
   const refreshUser = async (force = false) => {
     if (sessionLoaded && !force) return authUser.value
     try {
-      const response: any = await $fetch('/api/auth/session')
+      const fetcher = import.meta.server ? useRequestFetch() : $fetch
+      const response: any = await fetcher('/api/auth/session')
       authUser.value = normalizeUser(response?.user)
     } catch {
       authUser.value = null

@@ -336,7 +336,7 @@ export default defineEventHandler(async (event) => {
                     type: 'text',
                     text: { body: aiReply }
                 }
-            }).catch(err => console.error('[WHATSAPP TEXT SEND ERROR]:', err.message))
+            }).catch(err => console.error('[WHATSAPP TEXT SEND ERROR]:', err.message, JSON.stringify(err.data || '')))
         }
 
         // 6. Save Assistant Response to Chat History

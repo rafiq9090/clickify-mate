@@ -17,7 +17,7 @@ export class LogisticsAgent implements SubAgent {
 
     async execute(input: SubAgentInput): Promise<SubAgentOutput> {
         const { event, context, understanding } = input
-        const lang = context.session.language || 'bn'
+        const isBn = (context.session.language || 'bn') === 'bn'
         const toolCalls: any[] = []
         const toolResults: any[] = []
 
@@ -36,7 +36,7 @@ export class LogisticsAgent implements SubAgent {
                     const courier = executed.data.courier || 'Steadfast Courier'
                     const location = executed.data.currentLocation ? ` (Location: ${executed.data.currentLocation})` : ''
                     
-                    const text = lang === 'en'
+                    const text = !isBn
                         ? `Tracking status for *${trackingCode}*:\n• Status: *${status}*${location}\n• Carrier: ${courier}\nEstimated delivery: 24-48 hours.`
                         : `আপনার পার্সেল ট্র্যাকিং (*${trackingCode}*):\n• বর্তমান অবস্থা: *${status}*${location}\n• কুরিয়ার: ${courier}\nআনুমানিক ডেলিভারি সময়: ২৪-৪৮ ঘণ্টার মধ্যে।`
                     
@@ -51,7 +51,7 @@ export class LogisticsAgent implements SubAgent {
             }
 
             // If no tracking code was provided, ask for it
-            const text = lang === 'en'
+            const text = !isBn
                 ? 'Please share your Order Invoice ID or Courier Tracking Code to check live tracking.'
                 : 'আপনার পার্সেলের লাইভ লোকেশন জানতে অনুগ্রহ করে আপনার অর্ডার আইডি বা ট্র্যাকিং কোড দিন।'
             
@@ -72,9 +72,9 @@ export class LogisticsAgent implements SubAgent {
 
         const fee = executed.data?.deliveryFee ?? 80
         const isDhaka = district.toLowerCase() === 'dhaka'
-        const timeline = isDhaka ? (lang === 'en' ? '24 to 48 hours' : '২৪ থেকে ৪৮ ঘণ্টার মধ্যে') : (lang === 'en' ? '2 to 3 days' : '২ থেকে ৩ কার্যদিবস')
+        const timeline = isDhaka ? (!isBn ? '24 to 48 hours' : '২৪ থেকে ৪৮ ঘণ্টার মধ্যে') : (!isBn ? '2 to 3 days' : '২ থেকে ৩ কার্যদিবস')
 
-        const text = lang === 'en'
+        const text = !isBn
             ? `Delivery fee for ${district} is ৳${fee}. Estimated delivery time: ${timeline}. We deliver all over Bangladesh!`
             : `${district}-তে ডেলিভারি চার্জ ৳${fee}। ডেলিভারি সময়: ${timeline}। আমরা সারা বাংলাদেশে হোম ডেলিভারি দিয়ে থাকি!`
 

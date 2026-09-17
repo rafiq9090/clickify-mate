@@ -14,6 +14,9 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     }
   }
 
+  // Hydrate user session for consistent nav state across landing pages and protected routes
+  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }))
+
   // 1. Admin Protection
   if (cleanPath.startsWith('/admin') && cleanPath !== '/admin/login') {
     const session: any = await $fetch('/api/auth/session').catch(() => null)
@@ -27,7 +30,6 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   const isProtected = protectedRoutes.some(route => cleanPath.startsWith(route))
 
   if (isProtected) {
-    const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return navigateTo('/login')
     }
@@ -40,12 +42,8 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   }
 
   if (cleanPath === '/login') {
-    const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       return navigateTo('/dashboard')
     }
   }
 })
-
-
-

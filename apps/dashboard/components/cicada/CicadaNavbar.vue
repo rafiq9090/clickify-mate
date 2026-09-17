@@ -42,10 +42,10 @@
         </NuxtLink>
       </nav>
 
-      <!-- Right Action Buttons (Get Started CTA) -->
+      <!-- Right Action Buttons (Get Started / Dashboard CTA) -->
       <div class="header-right">
-        <NuxtLink to="/dashboard" class="liquid-cta-btn">
-          <span>Get Started</span>
+        <NuxtLink :to="user ? '/dashboard' : '/login'" class="liquid-cta-btn">
+          <span>{{ user ? 'Dashboard' : 'Get Started' }}</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
             <polyline points="12 5 19 12 12 19"></polyline>
@@ -75,6 +75,8 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
+const user = useAuthUser()
+const supabase = useSupabase() as any
 
 const menuItems = [
   { label: 'Product & Features', path: '/features' },
@@ -191,6 +193,9 @@ watch(() => route.path, () => {
 })
 
 onMounted(() => {
+  if (!user.value) {
+    supabase.auth.getUser().catch(() => null)
+  }
   nextTick(() => {
     setTimeout(() => {
       updateIndicatorPosition()

@@ -104,15 +104,21 @@ export function detectLanguage(text: string, currentLanguage?: string): string {
     if (/[\u0900-\u097F]/.test(text)) return 'hi'
     if (/[\u0980-\u09FF]/.test(text)) return 'bn'
 
-    // 3. Common English Words / Questions
-    if (/\b(?:order confirm|order confirmation|give me|what is the price|which size|how much|i want to buy|delivery charge|is it available|please provide|confirm order|receipt|invoice|order from|tell me about|your company)\b/i.test(lower)) {
-        return 'en'
-    }
+    // 3. Robust English vs Banglish Scoring for Latin-script inputs
+    const EN_WORDS = /\b(?:i|me|my|we|our|you|your|he|she|it|they|this|that|these|those|is|am|are|was|were|be|been|have|has|had|do|does|did|will|would|shall|should|can|could|may|might|must|what|which|who|whom|whose|why|where|when|how|inbox|dm|pm|send|check|message|details|detail|info|information|price|cost|rate|discount|offer|deal|product|products|item|items|available|stock|size|sizes|color|colors|colour|colours|quality|original|real|picture|photo|image|pic|pics|buy|purchase|order|delivery|courier|charge|location|address|shop|store|cash|payment|pay|please|plz|pls|thank|thanks|yes|no|want|need|looking|give|tell)\b/gi
+    const BN_WORDS = /\b(?:ami|amra|apnar|apni|apnader|tomar|tumi|toder|tar|tara|koto|dam|taka|tk|eita|eta|oita|ota|kinbo|kinte|nibo|nite|lagbe|thikana|bujchi|bujlam|hobe|ache|ase|nai|den|dao|din|korbo|koren|koro|korben|cai|chai|kichu|bhai|vai|vaia|bhaiya|apu|apuni|kothay|kothaye|koi|ki|kemon|valo|bhalo|shundor|ekhon|ajke|kal|shob|sob|sathe|dokan|bari)\b/gi
+
+    const enMatches = (text.match(EN_WORDS) || []).length
+    const bnMatches = (text.match(BN_WORDS) || []).length
+
+    if (bnMatches > 0 && bnMatches >= enMatches) return 'bn'
+    if (bnMatches > 0 && enMatches === 0) return 'bn'
+    if (enMatches > 0 && bnMatches === 0) return 'en'
+    if (enMatches > bnMatches) return 'en'
 
     // 4. If current language is set and text doesn't contain explicit Banglish markers, preserve it
     if (currentLanguage && currentLanguage !== 'bn') {
-        const banglishMarkers = /\b(?:ami|apnar|apni|koto|dam|taka|eita|eta|kinbo|kinbu|nibo|lagbe|thikana|bujchi|hobe|ache|den|dao|korbo|cai|chai|kichu)\b/i
-        if (!banglishMarkers.test(lower)) {
+        if (bnMatches === 0) {
             return currentLanguage
         }
     }
@@ -177,12 +183,12 @@ function getBrandName(context: AgentContext): string {
 }
 
 export function buildGreetingReply(context: AgentContext, userText?: string): string {
-    const language = context.session.language || 'bn'
+    const isBn = (context.session.language || 'bn') === 'bn'
     const brandName = getBrandName(context)
     const customerName = getCleanCustomerName(context)
     const explicitlyIslamicGreeting = /(?:ass?alamu?\s*alaikum|salam\s*alaikum|আসসালামু\s*আলাইকুম|সালাম)/i.test(userText || '')
 
-    if (language === 'en') {
+    if (!isBn) {
         const opening = explicitlyIslamicGreeting 
             ? (customerName ? `Wa alaikum assalam, ${customerName}!` : 'Wa alaikum assalam!')
             : (customerName ? `Hello ${customerName}!` : 'Hello!')
@@ -203,10 +209,21 @@ export function buildGreetingReply(context: AgentContext, userText?: string): st
  */
 export function mergeCurrentTurn(
     context: AgentContext,
-    understanding: AgentUnderstanding,
-    rawText: string
-): AgentEntities {
-    const entities = { ...understanding.entities }
+    arg2: string | AgentUnderstanding,
+    arg3?: string | AgentUnderstanding
+) {
+    let userText = ''
+    let understanding: AgentUnderstanding = {} as AgentUnderstanding
+
+    if (typeof arg2 === 'string') {
+        userText = arg2
+        understanding = (arg3 as AgentUnderstanding) || ({} as AgentUnderstanding)
+    } else {
+        understanding = (arg2 as AgentUnderstanding) || ({} as AgentUnderstanding)
+        userText = typeof arg3 === 'string' ? arg3 : ''
+    }
+
+    const rawText = (userText || '').trim()
 
     // Dynamically detect and persist conversation language
     const lang = detectLanguage(rawText, context.session.language || context.customer?.preferredLanguage)
@@ -214,6 +231,15 @@ export function mergeCurrentTurn(
     if (context.customer) {
         context.customer.preferredLanguage = lang
     }
+
+    // Preserve Islamic greeting preference if user initiated with salam
+    if (/(?:ass?alamu?\s*alaikum|salam\s*alaikum|আসসালামু\s*আলাইকুম|সালাম)/i.test(rawText)) {
+        context.session.greetingStyle = 'salam'
+    } else if (/^(?:hi|hello|hey|hola|bonjour|namaste|hlo|good\s*(?:morning|afternoon|evening))[.!?\s]*$/i.test(rawText)) {
+        context.session.greetingStyle = 'neutral'
+    }
+
+    const entities = { ...(understanding.entities || {}) }
 
     if (understanding.intent === 'OPTION_SELECTION' || (!entities.sku && optionIndex(rawText))) {
         const index = optionIndex(rawText)
@@ -249,22 +275,26 @@ export function mergeCurrentTurn(
         understanding.entities = entities
     }
 
+    // Track previously active selection so cancel/back can revert cleanly
+    if (context.selection?.sku && (!context.previousSelection || context.previousSelection.sku !== context.selection.sku)) {
+        context.previousSelection = { ...context.selection }
+    }
+
+    // Track explicit or resolved product selection
     if (entities.sku) {
-        const product = catalogProduct(context, entities.sku)
-        const changed = context.selection.sku && context.selection.sku !== entities.sku
-        if (changed) {
-            context.previousSelection = { ...context.selection }
-            context.selection.color = undefined
-            context.selection.size = undefined
-            if (context.orderDraft) {
-                context.orderDraft.color = undefined
-                context.orderDraft.size = undefined
-            }
-        }
         context.selection.sku = entities.sku
-        context.selection.productName = entities.productName || product?.name
         context.orderDraft = context.orderDraft || {}
         context.orderDraft.sku = entities.sku
+    }
+    if (entities.productName) {
+        context.selection.productName = entities.productName
+        context.orderDraft = context.orderDraft || {}
+        context.orderDraft.productName = entities.productName
+    }
+    if (entities.unitPrice) {
+        context.selection.price = entities.unitPrice
+        context.orderDraft = context.orderDraft || {}
+        context.orderDraft.unitPrice = entities.unitPrice
     }
     if (entities.color) {
         context.selection.color = entities.color
@@ -313,13 +343,13 @@ export function mergeCurrentTurn(
 }
 
 export function buildProductListReply(context: AgentContext): { text: string; options: Record<string, string> } {
-    const lang = context.session.language || 'bn'
+    const isBn = (context.session.language || 'bn') === 'bn'
     const products = (context.agentConfig.catalog || []).filter((product: any) =>
         !product.assigned_agent || product.assigned_agent === 'all' || product.assigned_agent === context.agentId
     )
     if (products.length === 0) {
         return {
-            text: lang === 'en'
+            text: !isBn
                 ? 'Sorry, no active products are currently available in the catalog. A store representative will check shortly.'
                 : 'দুঃখিত, এই মুহূর্তে ক্যাটালগে কোনো সক্রিয় প্রোডাক্ট পাওয়া যাচ্ছে না। একজন প্রতিনিধি ক্যাটালগটি যাচাই করবেন।',
             options: {}
@@ -334,8 +364,8 @@ export function buildProductListReply(context: AgentContext): { text: string; op
         return `${key}. ${product.name}${Number.isFinite(price) && price > 0 ? ` — ৳${price}` : ''}`
     })
 
-    const title = lang === 'en' ? 'Our Available Products:' : 'বর্তমানে আমাদের প্রোডাক্ট:'
-    const instruction = lang === 'en' ? "Please reply with the product number or name you'd like to order." : 'যেটি চান তার নম্বর বা নাম বলুন।'
+    const title = !isBn ? 'Our Available Products:' : 'বর্তমানে আমাদের প্রোডাক্ট:'
+    const instruction = !isBn ? "Please reply with the product number or name you'd like to order." : 'যেটি চান তার নম্বর বা নাম বলুন।'
 
     return {
         text: `${title}\n${lines.join('\n')}\n${instruction}`,
@@ -368,6 +398,7 @@ export function getMissingOrderField(context: AgentContext): MissingOrderField {
     if (colors.size === 1 && !draft.color && !context.selection.color) {
         const onlyColor = colors.values().next().value
         if (onlyColor) {
+            draft.color = onlyColor
             context.selection.color = onlyColor
             if (context.orderDraft) context.orderDraft.color = onlyColor
         }
@@ -375,13 +406,14 @@ export function getMissingOrderField(context: AgentContext): MissingOrderField {
     if (sizes.size === 1 && !draft.size && !context.selection.size) {
         const onlySize = sizes.values().next().value
         if (onlySize) {
+            draft.size = onlySize
             context.selection.size = onlySize
             if (context.orderDraft) context.orderDraft.size = onlySize
         }
     }
 
-    if (colors.size > 1 && !(draft.color || context.selection.color)) return 'color'
-    if (sizes.size > 1 && !(draft.size || context.selection.size)) return 'size'
+    if (colors.size > 1 && !draft.color && !context.selection.color) return 'color'
+    if (sizes.size > 1 && !draft.size && !context.selection.size) return 'size'
     if (!draft.name) return 'name'
     if (!draft.phone) return 'phone'
     if (!draft.address) return 'address'
@@ -390,7 +422,7 @@ export function getMissingOrderField(context: AgentContext): MissingOrderField {
 }
 
 export function buildProgressReply(context: AgentContext, missing: MissingOrderField): string {
-    const lang = context.session.language || 'bn'
+    const isBn = (context.session.language || 'bn') === 'bn'
     const product = catalogProduct(context, context.orderDraft?.sku || context.selection.sku)
     const variants = productVariants(product).filter(v => v.stock > 0)
     if (missing === 'product') return buildProductListReply(context).text
@@ -411,7 +443,7 @@ export function buildProgressReply(context: AgentContext, missing: MissingOrderF
     // If 2 or more fields are missing, provide the FULL ALL-IN-ONE order form template in ONE single message
     if (missingFieldsCount >= 2) {
         const productName = product?.name || draft.productName || 'Product'
-        if (lang === 'en') {
+        if (!isBn) {
             const formLines = [
                 `📦 To confirm your order for "${productName}", please reply with the following details in one message:`,
                 '',
@@ -443,41 +475,41 @@ export function buildProgressReply(context: AgentContext, missing: MissingOrderF
     }
 
     if (missing === 'color') {
-        return lang === 'en'
+        return !isBn
             ? `Which color would you like? Available: ${colors.join(', ')}.`
             : `কোন রংটি চান? উপলভ্য: ${colors.join(', ')}।`
     }
     if (missing === 'size') {
-        return lang === 'en'
+        return !isBn
             ? `Which size would you like? Available: ${sizes.join(', ')}.`
             : `কোন সাইজটি চান? উপলভ্য: ${sizes.join(', ')}।`
     }
     if (missing === 'name') {
-        return lang === 'en' ? 'Please provide your full name for the order.' : 'অর্ডারের জন্য আপনার নামটি দিন।'
+        return !isBn ? 'Please provide your full name for the order.' : 'অর্ডারের জন্য আপনার নামটি দিন।'
     }
     if (missing === 'phone') {
-        return lang === 'en'
+        return !isBn
             ? 'Please provide your 11-digit mobile number for delivery.'
             : 'অর্ডারের জন্য আপনার ১১ সংখ্যার মোবাইল নম্বর দিন।'
     }
     if (missing === 'address') {
-        return lang === 'en'
+        return !isBn
             ? 'Thank you. Please provide your delivery address (Area/Village, Thana, District).'
             : 'ধন্যবাদ। এখন এলাকা/গ্রাম, থানা ও জেলাসহ ডেলিভারি ঠিকানাটি দিন।'
     }
     if (missing === 'payment') {
-        return lang === 'en'
+        return !isBn
             ? 'Please choose your payment method: bKash, Nagad, Bank, or Cash on Delivery (COD).'
             : 'পেমেন্ট পদ্ধতি বেছে নিন: bKash, Nagad, ব্যাংক অথবা Cash on Delivery (COD)।'
     }
-    return lang === 'en' ? 'Your order details are complete. Verifying order...' : 'আপনার অর্ডারের তথ্য সম্পূর্ণ হয়েছে। এখন অর্ডারটি যাচাই করছি।'
+    return !isBn ? 'Your order details are complete. Verifying order...' : 'আপনার অর্ডারের তথ্য সম্পূর্ণ হয়েছে। এখন অর্ডারটি যাচাই করছি।'
 }
 
 export function buildOrderReviewReply(context: AgentContext): string {
-    const lang = context.session.language || 'bn'
+    const isBn = (context.session.language || 'bn') === 'bn'
     const draft = context.orderDraft || {}
     const product = catalogProduct(context, draft.sku || context.selection.sku)
-    const productName = draft.productName || context.selection.productName || product?.name || draft.sku || 'Product'
+    const productName = draft.productName || context.selection.productName || product?.name || draft.sku || (isBn ? 'পণ্য' : 'Product')
     const itemTotal = Number(draft.unitPrice || 0) * Number(draft.quantity || 1)
     const rawPayment = String(draft.paymentMethod || 'cod').toLowerCase()
     const isOnline = ['bkash', 'nagad', 'sslcommerz', 'bank', 'card', 'cards', 'stripe'].includes(rawPayment)
@@ -496,7 +528,7 @@ export function buildOrderReviewReply(context: AgentContext): string {
                 : 'SSLCOMMERZ (কার্ড / মোবাইল ব্যাংকিং / নেট ব্যাংকিং)')
         : 'ক্যাশ অন ডেলিভারি (COD)'
 
-    if (lang === 'en') {
+    if (!isBn) {
         return [
             'Please review your order before it is created:',
             `Product: ${productName}`,
@@ -534,10 +566,10 @@ export function buildOrderReviewReply(context: AgentContext): string {
 }
 
 export function buildConfirmedOrderReceipt(context: AgentContext, orderOutput: any): string {
-    const lang = context.session.language || 'bn'
+    const isBn = (context.session.language || 'bn') === 'bn'
     const draft = context.orderDraft || {}
     const product = catalogProduct(context, draft.sku || context.selection.sku)
-    const productName = draft.productName || context.selection.productName || product?.name || draft.sku || (lang === 'en' ? 'Product' : 'পণ্য')
+    const productName = draft.productName || context.selection.productName || product?.name || draft.sku || (isBn ? 'পণ্য' : 'Product')
     const orderId = orderOutput?.orderId || orderOutput?.invoiceNumber || `CM-${Date.now().toString(36).toUpperCase()}`
 
     const rawPayment = String(draft.paymentMethod || 'cod').toLowerCase()
@@ -549,7 +581,7 @@ export function buildConfirmedOrderReceipt(context: AgentContext, orderOutput: a
         ? (rawPayment === 'bkash' || rawPayment === 'nagad' || rawPayment === 'sslcommerz' ? 'অনলাইন পেমেন্ট (SSLCOMMERZ)' : 'অনলাইন পেমেন্ট')
         : 'ক্যাশ অন ডেলিভারি (COD)'
 
-    if (lang === 'en') {
+    if (!isBn) {
         return [
             `🎉 Congratulations! Your order has been confirmed successfully.`,
             ``,
@@ -597,14 +629,14 @@ export function buildConfirmedOrderReceipt(context: AgentContext, orderOutput: a
 }
 
 export function buildPendingPaymentReceipt(context: AgentContext, orderOutput: any): string {
-    const lang = context.session.language || 'bn'
+    const isBn = (context.session.language || 'bn') === 'bn'
     const draft = context.orderDraft || {}
     const product = catalogProduct(context, draft.sku || context.selection.sku)
-    const productName = draft.productName || context.selection.productName || product?.name || draft.sku || (lang === 'en' ? 'Product' : 'পণ্য')
+    const productName = draft.productName || context.selection.productName || product?.name || draft.sku || (isBn ? 'পণ্য' : 'Product')
     const orderId = orderOutput?.orderId || `CM-${Date.now().toString(36).toUpperCase()}`
     const provider = orderOutput?.paymentProvider || draft.paymentMethod || 'bKash'
 
-    if (lang === 'en') {
+    if (!isBn) {
         return [
             `🎉 Your order has been placed and is awaiting payment!`,
             ``,

@@ -94,6 +94,7 @@ export interface AgentEntities {
     trxId?: string
     paymentMethod?: string
     couponCode?: string
+    unitPrice?: number
 }
 
 export interface AgentUnderstanding {
@@ -133,6 +134,7 @@ export interface AgentContext {
         lastAskedField?: 'product' | 'color' | 'size' | 'quantity' | 'name' | 'phone' | 'address' | 'payment' | 'confirmation'
         fallbackCount?: number
         language?: string
+        greetingStyle?: 'salam' | 'neutral'
         activeSubAgent?: string
         subAgentHistory?: string[]
     }
@@ -144,6 +146,7 @@ export interface AgentContext {
         size?: string
         quantity?: number
         price?: number
+        unitPrice?: number
     }
     previousSelection?: {
         productId?: string

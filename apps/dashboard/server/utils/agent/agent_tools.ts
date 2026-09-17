@@ -55,7 +55,7 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
             required: ['district']
         },
         isSideEffect: false,
-        execute: async (args) => calculateDeliveryFee(args)
+        execute: async (args, context) => calculateDeliveryFee(args, context)
     },
 
     search_products: {
@@ -113,7 +113,7 @@ export const agentToolRegistry: Record<string, AgentToolDefinition> = {
             required: ['trackingCode']
         },
         isSideEffect: false,
-        execute: async (args) => getTrackingStatus(args.trackingCode)
+        execute: async (args, context) => getTrackingStatus(args.trackingCode, context)
     },
 
     resolve_product_images: {

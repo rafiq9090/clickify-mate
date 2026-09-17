@@ -84,7 +84,7 @@
                   class="w-full h-full object-cover" 
                   @error="thread.customer_avatar = ''"
                 />
-                <span v-else>{{ getCustomerInitials(thread.customer_name, thread.user_external_id) }}</span>
+                <span v-else>{{ getCustomerInitials(thread.customer_name, thread.user_external_id, thread.platform) }}</span>
               </div>
             </div>
 
@@ -148,7 +148,7 @@
                     class="w-full h-full object-cover" 
                     @error="selectedThread.customer_avatar = ''"
                   />
-                  <span v-else>{{ getCustomerInitials(selectedThread.customer_name, selectedThread.user_external_id) }}</span>
+                  <span v-else>{{ getCustomerInitials(selectedThread.customer_name, selectedThread.user_external_id, selectedThread.platform) }}</span>
                 </div>
               </div>
 
@@ -705,13 +705,18 @@ const toggleAiForThread = async (thread) => {
   }
 }
 
-const getCustomerInitials = (name, id) => {
+const getCustomerInitials = (name, id, platform) => {
   if (name && name.trim()) {
-    const parts = name.trim().split(' ').filter(Boolean)
+    const clean = name.replace(/^@/, '').trim()
+    const parts = clean.split(' ').filter(Boolean)
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-    return name.slice(0, 2).toUpperCase()
+    return clean.slice(0, 2).toUpperCase()
   }
-  return id ? id.slice(-2).toUpperCase() : 'CU'
+  if (platform === 'instagram') return 'IG'
+  if (platform === 'whatsapp') return 'WA'
+  if (platform === 'telegram') return 'TG'
+  if (platform === 'facebook') return 'FB'
+  return id ? (isNaN(Number(id.slice(-2))) ? id.slice(-2).toUpperCase() : (platform ? platform.slice(0, 2).toUpperCase() : 'CU')) : 'CU'
 }
 
 const handleChatScroll = () => {
@@ -749,6 +754,8 @@ const fetchChatHistory = async (isBackground = false) => {
     if (error) throw error
 
     const aiStatusMap = {}
+    const leadNameMap = {}
+    const leadAvatarMap = {}
     if (leadsRes.data) {
       leadsRes.data.forEach(lead => {
         let userExtId = ''
@@ -760,8 +767,18 @@ const fetchChatHistory = async (isBackground = false) => {
           userExtId = lead.data.customer.toString().trim()
         }
 
-        if (userExtId && lead.data?.ai_disabled !== undefined && aiStatusMap[userExtId] === undefined) {
-          aiStatusMap[userExtId] = Boolean(lead.data.ai_disabled)
+        if (userExtId) {
+          if (lead.data?.ai_disabled !== undefined && aiStatusMap[userExtId] === undefined) {
+            aiStatusMap[userExtId] = Boolean(lead.data.ai_disabled)
+          }
+          const leadName = lead.data?.customer_name || lead.data?.name || ''
+          if (leadName && !leadNameMap[userExtId]) {
+            leadNameMap[userExtId] = leadName
+          }
+          const leadAvatar = lead.data?.customer_avatar || lead.data?.avatar || ''
+          if (leadAvatar && !leadAvatarMap[userExtId]) {
+            leadAvatarMap[userExtId] = leadAvatar
+          }
         }
       })
     }
@@ -789,8 +806,8 @@ const fetchChatHistory = async (isBackground = false) => {
           threadMap[key] = {
             user_external_id: key,
             agent_id: row.agent_id,
-            customer_name: row.customer_name || '',
-            customer_avatar: row.customer_avatar || '',
+            customer_name: row.customer_name || leadNameMap[key] || '',
+            customer_avatar: row.customer_avatar || leadAvatarMap[key] || '',
             platform,
             ai_disabled: aiStatusMap[key] || false,
             last_active: row.created_at,
@@ -800,11 +817,11 @@ const fetchChatHistory = async (isBackground = false) => {
           }
         }
 
-        if (row.customer_name && !threadMap[key].customer_name) {
-          threadMap[key].customer_name = row.customer_name
+        if (!threadMap[key].customer_name && (row.customer_name || leadNameMap[key])) {
+          threadMap[key].customer_name = row.customer_name || leadNameMap[key]
         }
-        if (row.customer_avatar && !threadMap[key].customer_avatar) {
-          threadMap[key].customer_avatar = row.customer_avatar
+        if (!threadMap[key].customer_avatar && (row.customer_avatar || leadAvatarMap[key])) {
+          threadMap[key].customer_avatar = row.customer_avatar || leadAvatarMap[key]
         }
 
         threadMap[key].messages.push(row)
@@ -914,7 +931,8 @@ const handleSendReply = async () => {
 const formatCustomerName = (id, platform) => {
   if (!id) return 'Customer'
   if (platform === 'telegram' || id.startsWith('tg_')) return `Telegram User #${id.slice(-6)}`
-  if (id.startsWith('880')) return `+${id}`
+  if (platform === 'instagram') return `Instagram User #${id.slice(-6)}`
+  if (platform === 'whatsapp' || id.startsWith('880')) return id.startsWith('880') ? `+${id}` : `WhatsApp User #${id.slice(-6)}`
   return `Customer #${id.slice(0, 8)}`
 }
 

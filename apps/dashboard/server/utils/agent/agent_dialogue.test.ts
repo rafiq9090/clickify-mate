@@ -188,3 +188,31 @@ test('sanitizes composite order string so address does not leak phone, size, col
     assert.equal(understanding.entities.quantity, 1)
 })
 
+test('dynamically switches response language between English, Bengali, and international languages', () => {
+    // English customer
+    const enCtx = context({ session: { state: 'SALES_INQUIRING', language: 'en' } })
+    const enProducts = buildProductListReply(enCtx)
+    assert.match(enProducts.text, /Our Available Products:/)
+    assert.equal(enProducts.text.includes('বর্তমানে আমাদের প্রোডাক্ট:'), false)
+
+    // Bengali customer
+    const bnCtx = context({ session: { state: 'SALES_INQUIRING', language: 'bn' } })
+    const bnProducts = buildProductListReply(bnCtx)
+    assert.match(bnProducts.text, /বর্তমানে আমাদের প্রোডাক্ট:/)
+    assert.equal(bnProducts.text.includes('Our Available Products:'), false)
+
+    // International (e.g. Spanish) customer falls back cleanly to universal English (no unwanted Bangla letters)
+    const esCtx = context({ session: { state: 'SALES_INQUIRING', language: 'es' } })
+    const esProducts = buildProductListReply(esCtx)
+    assert.match(esProducts.text, /Our Available Products:/)
+    assert.equal(/[\u0985-\u09B9]/.test(esProducts.text), false)
+
+    // Dynamic switching via turn detection
+    const dynCtx = context({ session: { state: 'SALES_INQUIRING' } })
+    mergeCurrentTurn(dynCtx, understandMessageFast('can you give in english please'), 'can you give in english please')
+    assert.equal(dynCtx.session.language, 'en')
+
+    mergeCurrentTurn(dynCtx, understandMessageFast('বাংলায় বলুন'), 'বাংলায় বলুন')
+    assert.equal(dynCtx.session.language, 'bn')
+})
+

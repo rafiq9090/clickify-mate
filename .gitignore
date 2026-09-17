@@ -22,19 +22,27 @@ env/
 .DS_Store
 .fleet
 .idea
+.vscode/
+!.vscode/extensions.json
 Thumbs.db
 desktop.ini
+ehthumbs.db
 
 # Local env & secret keys
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.cert
 *firebase-adminsdk*.json
 serviceAccountKey*.json
 
-# TestSprite tests and scripts
+# TestSprite tests, coverage & scripts
 testsprite_tests/
 scripts/create-testsprite_tests
+coverage/
+.nyc_output/
 
 # Supabase CLI local metadata
 supabase/.temp/
@@ -43,5 +51,6 @@ supabase/.temp/
 **/__pycache__/
 **/*.pyc
 
-# Temporary scratch
+# Temporary scratch & root inspection screenshots
 apps/dashboard/scratch/
+/*.png

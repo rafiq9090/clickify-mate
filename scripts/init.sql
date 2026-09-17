@@ -337,15 +337,14 @@ ORDER BY 1 DESC;
 CREATE TABLE IF NOT EXISTS public.user_api_keys (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL,
-CREATE TABLE IF NOT EXISTS public.navigation (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    key_value TEXT UNIQUE NOT NULL,
+    name TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    label TEXT NOT NULL,
-    path TEXT NOT NULL,
-    icon TEXT,
-    "order" INTEGER DEFAULT 0,
-    metadata JSONB DEFAULT '{}'::jsonb
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+ALTER TABLE public.user_api_keys ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for all user_api_keys" ON public.user_api_keys FOR ALL USING (true);
 
 -- Create Ads table (Sync with UI)
 CREATE TABLE IF NOT EXISTS public.ads (
@@ -534,19 +533,6 @@ FROM public.token_usage
 WHERE created_at >= now() - INTERVAL '1 year'
 GROUP BY 1
 ORDER BY 1 DESC;
-
--- API Keys table for custom webhook connections
-CREATE TABLE IF NOT EXISTS public.user_api_keys (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID NOT NULL,
-    key_value TEXT UNIQUE NOT NULL,
-    name TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
-ALTER TABLE public.user_api_keys ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all for all user_api_keys" ON public.user_api_keys FOR ALL USING (true);
 
 -- Durable Webhook Events table for multi-instance deduplication
 CREATE TABLE IF NOT EXISTS public.webhook_events (

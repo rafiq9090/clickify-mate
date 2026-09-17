@@ -474,9 +474,12 @@ export async function runAgent(
     }
 
     // 2.1.1 Defect & Damage Complaint Priority Escalation (e.g. Unboxing Videos / Defect Reports)
+    const isBn = (context.session.language || 'bn') === 'bn'
     if (understanding.intent === 'COMPLAINT') {
         await mergeLeadData(supabase, context.session.leadId, { support_status: 'priority_defect', complaint_details: userText })
-        const complaintText = 'আমরা আন্তরিকভাবে দুঃখিত এই অসুবিধার জন্য! আপনার দেওয়া তথ্য/ভিডিওটি আমাদের কাস্টমার সাপোর্ট টিমের কাছে পাঠানো হয়েছে। খুব দ্রুত আমাদের টিম আপনার সাথে যোগাযোগ করে এটি সমাধান করে দেবে। ধন্যবাদ!'
+        const complaintText = !isBn
+            ? 'We are sincerely sorry for this issue! Your message/video has been forwarded to our customer support team. A representative will reach out to you shortly to resolve this. Thank you for your patience!'
+            : 'আমরা আন্তরিকভাবে দুঃখিত এই অসুবিধার জন্য! আপনার দেওয়া তথ্য/ভিডিওটি আমাদের কাস্টমার সাপোর্ট টিমের কাছে পাঠানো হয়েছে। খুব দ্রুত আমাদের টিম আপনার সাথে যোগাযোগ করে এটি সমাধান করে দেবে। ধন্যবাদ!'
         const complaintResult: AgentResult = {
             text: complaintText,
             state: 'SUPPORT',
@@ -495,7 +498,9 @@ export async function runAgent(
         // If vision caught an in-catalog item (e.g. t-shirt), allow discovery flow, otherwise give immediate human-review confirmation
         const isApparelMention = userText.toLowerCase().includes('shirt') || userText.toLowerCase().includes('hoodie') || userText.toLowerCase().includes('t-shirt')
         if (!isApparelMention && !catalogMatch.isMatch) {
-            const longVideoText = 'ধন্যবাদ! আপনার পাঠানো ভিডিওটি আমাদের সাপোর্ট টিমের কাছে পৌঁছেছে। আমাদের প্রতিনিধি ভিডিওটি দেখে খুব দ্রুত আপনার সাথে যোগাযোগ করবে। আপনি চাইলে সংক্ষেপে বিস্তারিত লিখেও জানাতে পারেন।'
+            const longVideoText = !isBn
+                ? 'Thank you! Your video has been received by our support team. A representative will review it and contact you shortly. You may also reply with a brief text message.'
+                : 'ধন্যবাদ! আপনার পাঠানো ভিডিওটি আমাদের সাপোর্ট টিমের কাছে পৌঁছেছে। আমাদের প্রতিনিধি ভিডিওটি দেখে খুব দ্রুত আপনার সাথে যোগাযোগ করবে। আপনি চাইলে সংক্ষেপে বিস্তারিত লিখেও জানাতে পারেন।'
             const longVidResult: AgentResult = {
                 text: longVideoText,
                 state: 'SUPPORT',
@@ -514,7 +519,9 @@ export async function runAgent(
 
     if (isImageUpload && !catalogMatch.isMatch) {
         understanding.intent = 'OUT_OF_CATALOG'
-        const outOfCatalogText = 'ধন্যবাদ আপনার ছবির জন্য। তবে এটি আমাদের বর্তমান ক্যাটালগের কোনো প্রোডাক্টের সাথে মিলছে না। আমাদের বর্তমান প্রোডাক্ট ক্যাটালগ দেখতে চাইলে জানাতে পারেন, অথবা অন্য কোনোভাবে সাহায্য করতে পারি কি?'
+        const outOfCatalogText = !isBn
+            ? 'Thank you for sharing the photo! However, this item does not match any product in our current store catalog. Would you like to view our available catalog, or is there anything else I can help you with?'
+            : 'ধন্যবাদ আপনার ছবির জন্য। তবে এটি আমাদের বর্তমান ক্যাটালগের কোনো প্রোডাক্টের সাথে মিলছে না। আমাদের বর্তমান প্রোডাক্ট ক্যাটালগ দেখতে চাইলে জানাতে পারেন, অথবা অন্য কোনোভাবে সাহায্য করতে পারি কি?'
         const outResult: AgentResult = {
             text: outOfCatalogText,
             state: 'PRODUCT_DISCOVERY',
@@ -708,7 +715,9 @@ CORE BEHAVIORAL RULES:
             } catch (fallbackError: any) {
                 console.error(`[AGENT PROVIDER FAILURE]: Both providers failed (${fallbackError?.message || 'unknown error'}).`)
                 context.session.fallbackCount = (context.session.fallbackCount || 0) + 1
-                finalReplyText = 'দুঃখিত, এই মুহূর্তে AI সেবায় সাময়িক সমস্যা হচ্ছে। আপনার তথ্য সংরক্ষিত আছে—একটু পরে আবার চেষ্টা করুন বা “human agent” লিখুন।'
+                finalReplyText = !isBn
+                    ? 'Sorry, we are experiencing a temporary AI service disruption. Your details are safely recorded — please try again in a moment or type "human agent".'
+                    : 'দুঃখিত, এই মুহূর্তে AI সেবায় সাময়িক সমস্যা হচ্ছে। আপনার তথ্য সংরক্ষিত আছে—একটু পরে আবার চেষ্টা করুন বা “human agent” লিখুন।'
                 break
             }
         }
@@ -771,12 +780,16 @@ CORE BEHAVIORAL RULES:
             finalReplyText = buildConfirmedOrderReceipt(context, orderResult.output)
         } else if (stockResult?.output) {
             finalReplyText = stockResult.output.available
-                ? `জি, ${stockResult.output.productName} (${stockResult.output.availableQuantity} পিস) স্টকে এভেইলেবল রয়েছে। আপনি কি অর্ডার করতে চান?`
-                : `দুঃখিত, এই ভ্যারিয়েন্টটি বর্তমানে স্টকে নেই। অন্য কোনো কালার বা সাইজ দেখতে পারেন।`
+                ? (!isBn
+                    ? `Yes, ${stockResult.output.productName} (${stockResult.output.availableQuantity} in stock) is available. Would you like to order?`
+                    : `জি, ${stockResult.output.productName} (${stockResult.output.availableQuantity} পিস) স্টকে এভেইলেবল রয়েছে। আপনি কি অর্ডার করতে চান?`)
+                : (!isBn
+                    ? 'Sorry, this variant is currently out of stock. You may check other colors or sizes.'
+                    : `দুঃখিত, এই ভ্যারিয়েন্টটি বর্তমানে স্টকে নেই। অন্য কোনো কালার বা সাইজ দেখতে পারেন।`)
         } else if (deliveryResult?.output) {
-            finalReplyText = deliveryResult.output.explanation || `ডেলিভারি চার্জ: ${deliveryResult.output.deliveryFee} টাকা।`
+            finalReplyText = deliveryResult.output.explanation || (!isBn ? `Delivery fee: ৳${deliveryResult.output.deliveryFee} BDT.` : `ডেলিভারি চার্জ: ${deliveryResult.output.deliveryFee} টাকা।`)
         } else if (priceResult?.output) {
-            finalReplyText = priceResult.output.explanation || `মূল্য: ৳${priceResult.output.finalItemTotal} BDT।`
+            finalReplyText = priceResult.output.explanation || (!isBn ? `Price: ৳${priceResult.output.finalItemTotal} BDT.` : `মূল্য: ৳${priceResult.output.finalItemTotal} BDT।`)
         } else if (understanding.intent === 'GREETING') {
             finalReplyText = buildGreetingReply(context, userText)
         } else {
@@ -787,8 +800,12 @@ CORE BEHAVIORAL RULES:
             } else {
                 context.session.fallbackCount = (context.session.fallbackCount || 0) + 1
                 finalReplyText = context.session.fallbackCount >= 2
-                    ? 'দুঃখিত, আপনার কথাটি নিশ্চিতভাবে বুঝতে পারিনি। প্রোডাক্টের নাম, অর্ডার সমস্যা, অথবা প্রয়োজনটি আরেকটু বিস্তারিত লিখুন; চাইলে “human agent” লিখে প্রতিনিধির সাহায্য নিন।'
-                    : 'দুঃখিত, আপনার কথাটি পুরোপুরি বুঝতে পারিনি। আপনি প্রোডাক্ট, দাম, স্টক, ডেলিভারি নাকি অর্ডার সম্পর্কে জানতে চান—একটু পরিষ্কার করে বলুন।'
+                    ? (!isBn
+                        ? 'Sorry, I could not understand your request clearly. Please describe your inquiry with more details, or type "human agent" for live assistance.'
+                        : 'দুঃখিত, আপনার কথাটি নিশ্চিতভাবে বুঝতে পারিনি। প্রোডাক্টের নাম, অর্ডার সমস্যা, অথবা প্রয়োজনটি আরেকটু বিস্তারিত লিখুন; চাইলে “human agent” লিখে প্রতিনিধির সাহায্য নিন।')
+                    : (!isBn
+                        ? 'Sorry, I did not catch that. Please let me know whether you would like to know about products, pricing, stock, delivery, or orders.'
+                        : 'দুঃখিত, আপনার কথাটি পুরোপুরি বুঝতে পারিনি। আপনি প্রোডাক্ট, দাম, স্টক, ডেলিভারি নাকি অর্ডার সম্পর্কে জানতে চান—একটু পরিষ্কার করে বলুন।')
             }
             // Safe Knowledge Gap Detection
             recordKnowledgeGap({
@@ -815,7 +832,9 @@ CORE BEHAVIORAL RULES:
         const missing = getMissingOrderField(context)
         finalReplyText = missing && ORDER_COLLECTION_STATES.includes(context.session.state)
             ? buildProgressReply(context, missing)
-            : 'দুঃখিত, উত্তরটি নির্ভরযোগ্যভাবে যাচাই করা যায়নি। আপনার তথ্য সংরক্ষিত আছে—একজন প্রতিনিধি বিষয়টি যাচাই করবেন।'
+            : (!isBn
+                ? 'Sorry, that response could not be verified reliably. Your details are saved — a store representative will review this shortly.'
+                : 'দুঃখিত, উত্তরটি নির্ভরযোগ্যভাবে যাচাই করা যায়নি। আপনার তথ্য সংরক্ষিত আছে—একজন প্রতিনিধি বিষয়টি যাচাই করবেন।')
     }
 
     // 8. Exact Catalog Image Resolution

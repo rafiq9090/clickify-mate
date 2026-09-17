@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
+const user = useAuthUser()
 const isMenuOpen = ref(false)
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
@@ -100,14 +101,14 @@ const faqs = [
 
           <!-- Action Buttons -->
           <div class="mobile-nav-actions">
-            <NuxtLink to="/dashboard" class="mobile-menu-btn-primary" @click="closeMenu">
-              <span>Get Started Free</span>
+            <NuxtLink :to="user ? '/dashboard' : '/login'" class="mobile-menu-btn-primary" @click="closeMenu">
+              <span>{{ user ? 'Dashboard' : 'Get Started Free' }}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
               </svg>
             </NuxtLink>
-            <NuxtLink to="/login" class="mobile-menu-btn-secondary" @click="closeMenu">
+            <NuxtLink v-if="!user" to="/login" class="mobile-menu-btn-secondary" @click="closeMenu">
               Sign In to Console
             </NuxtLink>
           </div>
@@ -151,7 +152,6 @@ const faqs = [
         <!-- Hero Content Layer -->
         <div class="mobile-hero-content">
           <div class="mobile-badge">
-            <span class="live-pulse"></span>
             <span>AUTONOMOUS SOCIAL COMMERCE AI</span>
           </div>
 
@@ -178,39 +178,7 @@ const faqs = [
         </div>
       </section>
 
-      <!-- Live Telemetry Section -->
-      <section class="mobile-section">
-        <div class="mobile-card mobile-telemetry-card">
-          <div class="mobile-card-header">
-            <span class="card-badge">LIVE TELEMETRY COCKPIT</span>
-            <h2 class="card-title">Proven Velocity Across Millions of Conversations</h2>
-            <p class="card-desc">Autonomous multi-agent swarms running 24/7 with zero human intervention required.</p>
-          </div>
 
-          <div class="mobile-stats-grid">
-            <div class="stat-box">
-              <div class="stat-val">99.99%</div>
-              <div class="stat-label">Delivery SLA</div>
-              <div class="stat-sub">Direct Tier-1 Meta Graph API routing</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-val">&lt;380ms</div>
-              <div class="stat-label">Response Time</div>
-              <div class="stat-sub">Zero shopper drop-off on high intent DMs</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-val">4.8x</div>
-              <div class="stat-label">ROAS Lift</div>
-              <div class="stat-sub">Measured across social ad campaigns</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-val">+42%</div>
-              <div class="stat-label">In-Chat Checkout</div>
-              <div class="stat-sub">Instant cart generation & COD verification</div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- Core Features Grid -->
       <section class="mobile-section">
@@ -249,84 +217,7 @@ const faqs = [
         </div>
       </section>
 
-      <!-- 4-Step Workflow -->
-      <section class="mobile-section">
-        <div class="mobile-card mobile-workflow-card">
-          <div class="mobile-card-header">
-            <span class="card-badge">SEAMLESS ONBOARDING</span>
-            <h2 class="card-title">From Connect to Full Autonomous Selling in 4 Steps</h2>
-          </div>
 
-          <div class="mobile-steps-list">
-            <div class="step-row">
-              <div class="step-num">01</div>
-              <div class="step-info">
-                <h4 class="step-heading">Connect Social Channels</h4>
-                <p class="step-text">1-click official Meta authorization for WhatsApp, Instagram, and Facebook.</p>
-              </div>
-            </div>
-
-            <div class="step-row">
-              <div class="step-num">02</div>
-              <div class="step-info">
-                <h4 class="step-heading">Sync Product Knowledge</h4>
-                <p class="step-text">Ingest Shopify or WooCommerce catalogs into real-time vector embeddings.</p>
-              </div>
-            </div>
-
-            <div class="step-row">
-              <div class="step-num">03</div>
-              <div class="step-info">
-                <h4 class="step-heading">Activate AI Sales Swarm</h4>
-                <p class="step-text">Assign sub-agents to consultative sales, discount rules, and buyer inquiries.</p>
-              </div>
-            </div>
-
-            <div class="step-row">
-              <div class="step-num">04</div>
-              <div class="step-info">
-                <h4 class="step-heading">Automate Checkout &amp; Delivery</h4>
-                <p class="step-text">Generate payment links or automated COD confirmation with courier dispatch.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Integrations Ecosystem -->
-      <section class="mobile-section">
-        <div class="mobile-section-header">
-          <span class="card-badge">OMNICHANNEL ECOSYSTEM</span>
-          <h2 class="card-title">Natively Connected to Your Modern Stack</h2>
-        </div>
-
-        <div class="mobile-integrations-grid">
-          <div class="integration-chip">
-            <span class="chip-name">WhatsApp Cloud API</span>
-            <span class="chip-sub">Official Meta BSP</span>
-          </div>
-          <div class="integration-chip">
-            <span class="chip-name">Instagram Direct</span>
-            <span class="chip-sub">Story &amp; Post AI</span>
-          </div>
-          <div class="integration-chip">
-            <span class="chip-name">Facebook Messenger</span>
-            <span class="chip-sub">Comment Auto-Reply</span>
-          </div>
-          <div class="integration-chip">
-            <span class="chip-name">Shopify Store</span>
-            <span class="chip-sub">Vector Sync</span>
-          </div>
-          <div class="integration-chip">
-            <span class="chip-name">WooCommerce</span>
-            <span class="chip-sub">Order Sync</span>
-          </div>
-          <div class="integration-chip">
-            <span class="chip-name">Stripe &amp; In-Chat Pay</span>
-            <span class="chip-sub">1-Click Checkout</span>
-          </div>
-        </div>
-      </section>
 
       <!-- FAQ Section -->
       <section class="mobile-section">

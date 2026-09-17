@@ -1,30 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+// Trigger client HMR
 import ClickifyCicadaExperience from '~/components/ClickifyCicadaExperience.vue'
-import ClickifyMobileExperience from '~/components/ClickifyMobileExperience.vue'
 
 definePageMeta({
   layout: false,
-})
-
-const isMobile = ref(false)
-
-const checkDevice = () => {
-  if (typeof window !== 'undefined') {
-    const isPortrait = window.innerHeight > window.innerWidth
-    isMobile.value = window.innerWidth <= 1024 || (isPortrait && window.innerWidth <= 1280)
-  }
-}
-
-onMounted(() => {
-  checkDevice()
-  window.addEventListener('resize', checkDevice)
-})
-
-onBeforeUnmount(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', checkDevice)
-  }
 })
 
 useHead({
@@ -129,15 +108,7 @@ useHead({
 
 <template>
   <div class="landing-root">
-    <!-- Desktop Experience (> 768px) -->
-    <div v-if="!isMobile" class="desktop-view">
-      <ClickifyCicadaExperience />
-    </div>
-
-    <!-- Native Mobile Experience (<= 768px) -->
-    <div v-else class="mobile-view">
-      <ClickifyMobileExperience />
-    </div>
+    <ClickifyCicadaExperience />
   </div>
 </template>
 
@@ -175,26 +146,5 @@ html, body, html.cicada-page {
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
-}
-
-@media (max-width: 1024px), (max-width: 1280px) and (orientation: portrait) {
-  .desktop-view {
-    display: none !important;
-  }
-  .mobile-view {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100vw !important;
-    overflow-x: hidden !important;
-  }
-}
-
-@media (min-width: 1025px) and (orientation: landscape) {
-  .desktop-view {
-    display: block !important;
-  }
-  .mobile-view {
-    display: none !important;
-  }
 }
 </style>

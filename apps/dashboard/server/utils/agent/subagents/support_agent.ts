@@ -17,9 +17,9 @@ export class SupportAgent implements SubAgent {
 
     async execute(input: SubAgentInput): Promise<SubAgentOutput> {
         const { context } = input
-        const lang = context.session.language || 'bn'
+        const isBn = (context.session.language || 'bn') === 'bn'
 
-        const text = lang === 'en'
+        const text = !isBn
             ? 'I understand and am transferring your conversation to a live customer service representative. Our support agent will reply to you shortly. Thank you for your patience!'
             : 'আপনার অনুরোধটি আমাদের কাস্টমার সাপোর্ট টিমের কাছে পাঠানো হয়েছে। একজন সাপোর্ট এক্সিকিউটিভ খুব শীঘ্রই আপনার সাথে চ্যাটে যুক্ত হবেন। একটু অপেক্ষা করার জন্য ধন্যবাদ!'
 

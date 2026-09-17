@@ -134,7 +134,27 @@ export default defineEventHandler(async (event) => {
                 .eq('external_id', igAccountId)
                 .eq('is_active', true)
 
-            const agent = agentList?.[0]
+            let agent = agentList?.[0]
+
+            if (!agent) {
+                // Fallback to active Instagram agent and auto-heal external_id
+                const { data: fallbackAgents } = await supabase
+                    .from('agent_configs')
+                    .select('*')
+                    .in('platform', ['instagram', 'ig_comment'])
+                    .eq('is_active', true)
+                    .order('updated_at', { ascending: false })
+                    .limit(1)
+
+                if (fallbackAgents && fallbackAgents.length > 0) {
+                    agent = fallbackAgents[0]
+                    console.log(`[INSTAGRAM AGENT ROUTING]: Fallback matched active Instagram agent ${agent.id} (${agent.name}) for account ${igAccountId}`)
+                    if (agent.external_id !== igAccountId) {
+                        await supabase.from('agent_configs').update({ external_id: igAccountId }).eq('id', agent.id)
+                        console.log(`[INSTAGRAM AGENT ROUTING]: Auto-healed external_id for agent ${agent.id} to ${igAccountId}`)
+                    }
+                }
+            }
 
             if (!agent) {
                 console.warn(`[INSTAGRAM AGENT ROUTING]: No active agent found for Instagram account ID: ${igAccountId}`)
@@ -219,11 +239,38 @@ export default defineEventHandler(async (event) => {
 
                     if (!incomingText.trim()) continue
 
+                    // Fetch Instagram Sender Profile (Username, Full Name, Avatar)
+                    let customerName = ''
+                    let customerAvatar = ''
+                    const igProfileBase = accessToken.startsWith('IGA') ? 'https://graph.instagram.com' : 'https://graph.facebook.com'
+                    try {
+                        const profileRes: any = await $fetch(`${igProfileBase}/v19.0/${senderId}?fields=name,username,profile_pic&access_token=${accessToken}`).catch(() => null)
+                        if (profileRes) {
+                            customerName = profileRes.name || (profileRes.username ? `@${profileRes.username}` : '')
+                            customerAvatar = profileRes.profile_pic || ''
+                        }
+                    } catch (pErr: any) {
+                        console.warn(`[INSTAGRAM PROFILE WARN]: ${pErr.message}`)
+                    }
+
+                    // Fallback to existing lead data if known
+                    if (!customerName) {
+                        try {
+                            const { data: existingLead } = await supabase.from('leads').select('data').eq('email', `${senderId}@instagram.meta`).maybeSingle()
+                            if (existingLead?.data?.customer_name) {
+                                customerName = existingLead.data.customer_name
+                                customerAvatar = existingLead.data.customer_avatar || ''
+                            }
+                        } catch {}
+                    }
+
                     // Build canonical incoming event
                     const incomingEvent: IncomingAgentEvent = {
                         channel: 'instagram',
                         eventId: `ig_evt_${messageId}`,
                         customerId: senderId,
+                        customerName: customerName,
+                        customerAvatar: customerAvatar,
                         messageId,
                         text: incomingText,
                         timestamp: messagingItem.timestamp || Date.now()
@@ -236,6 +283,8 @@ export default defineEventHandler(async (event) => {
                         {
                             agent_id: agent.id,
                             user_external_id: senderId,
+                            customer_name: customerName,
+                            customer_avatar: customerAvatar,
                             role: 'user',
                             content: incomingText,
                             message_id: messageId,
@@ -244,6 +293,8 @@ export default defineEventHandler(async (event) => {
                         ...(agentResult.text ? [{
                             agent_id: agent.id,
                             user_external_id: senderId,
+                            customer_name: customerName,
+                            customer_avatar: customerAvatar,
                             role: 'assistant',
                             content: agentResult.text,
                             images: agentResult.imagesToSend || [],
@@ -252,13 +303,26 @@ export default defineEventHandler(async (event) => {
                         }] : [])
                     ])
 
+                    if (customerName || customerAvatar) {
+                        await supabase.from('leads').upsert({
+                            email: `${senderId}@instagram.meta`,
+                            data: {
+                                customer_name: customerName,
+                                customer_avatar: customerAvatar,
+                                platform: 'instagram',
+                                user_external_id: senderId
+                            }
+                        }, { onConflict: 'email' }).catch(() => null)
+                    }
+
                     if (agentResult.aiPaused || !agentResult.text) {
                         continue
                     }
 
                     // Dispatch text response back to customer on Instagram
+                    const igGraphBase = accessToken.startsWith('IGA') ? 'https://graph.instagram.com' : 'https://graph.facebook.com'
                     try {
-                        await $fetch(`https://graph.facebook.com/v19.0/me/messages`, {
+                        await $fetch(`${igGraphBase}/v19.0/me/messages`, {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,
@@ -274,7 +338,7 @@ export default defineEventHandler(async (event) => {
                         // If agent resolved product photos, dispatch them as media messages
                         if (Array.isArray(agentResult.imagesToSend) && agentResult.imagesToSend.length > 0) {
                             for (const imgUrl of agentResult.imagesToSend.slice(0, 3)) {
-                                await $fetch(`https://graph.facebook.com/v19.0/me/messages`, {
+                                await $fetch(`${igGraphBase}/v19.0/me/messages`, {
                                     method: 'POST',
                                     headers: {
                                         'Authorization': `Bearer ${accessToken}`,
@@ -351,9 +415,10 @@ export default defineEventHandler(async (event) => {
                             }] : [])
                         ])
                         if (!commentResult.aiPaused && commentResult.text) {
+                            const igGraphBase = accessToken.startsWith('IGA') ? 'https://graph.instagram.com' : 'https://graph.facebook.com'
                             // 1. Reply to public comment
                             try {
-                                await $fetch(`https://graph.facebook.com/v19.0/${commentId}/replies`, {
+                                await $fetch(`${igGraphBase}/v19.0/${commentId}/replies`, {
                                     method: 'POST',
                                     headers: {
                                         'Authorization': `Bearer ${accessToken}`,
@@ -365,7 +430,7 @@ export default defineEventHandler(async (event) => {
                                 }).catch((cErr: any) => console.warn(`[IG PUBLIC REPLY WARN]: ${cErr.message}`))
 
                                 // 2. Send private DM with full sales info & checkout link
-                                await $fetch(`https://graph.facebook.com/v19.0/me/messages`, {
+                                await $fetch(`${igGraphBase}/v19.0/me/messages`, {
                                     method: 'POST',
                                     headers: {
                                         'Authorization': `Bearer ${accessToken}`,

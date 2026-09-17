@@ -34,19 +34,25 @@ export function isLocationInsideDhaka(addressOrDistrict: string): boolean {
     return true
 }
 
-export async function calculateDeliveryFee(args: {
-    address?: string
-    district?: string
-    orderTotal?: number
-}): Promise<DeliveryFeeResult> {
+export async function calculateDeliveryFee(
+    args: {
+        address?: string
+        district?: string
+        orderTotal?: number
+    },
+    context?: any
+): Promise<DeliveryFeeResult> {
     const loc = (args.district || args.address || 'Dhaka').trim()
     const isInside = isLocationInsideDhaka(loc)
     const orderTotal = args.orderTotal || 0
+    const isBn = (context?.session?.language || 'bn') === 'bn'
 
     // Free delivery rule for orders >= ৳1500
     if (orderTotal >= 1500) {
         const advanceExplanation = !isInside
-            ? 'ঢাকার বাইরে ডেলিভারি চার্জ সম্পূর্ণ ফ্রি (৳০)! তবে অর্ডার নিশ্চিত করতে ৳১৫০ অগ্রিম প্রদান করতে হবে, যা ডেলিভারির সময় মোট বিল থেকে সমন্বয় (adjust) করা হবে।'
+            ? (!isBn
+                ? 'Delivery charge outside Dhaka is 100% free (৳0)! However, an advance payment of ৳150 is required to confirm your order, which will be adjusted from your total bill upon delivery.'
+                : 'ঢাকার বাইরে ডেলিভারি চার্জ সম্পূর্ণ ফ্রি (৳০)! তবে অর্ডার নিশ্চিত করতে ৳১৫০ অগ্রিম প্রদান করতে হবে, যা ডেলিভারির সময় মোট বিল থেকে সমন্বয় (adjust) করা হবে।')
             : undefined
 
         return {
@@ -59,15 +65,19 @@ export async function calculateDeliveryFee(args: {
             advanceExplanation,
             estimatedDays: isInside ? '1-2 Days' : '2-4 Days',
             explanation: isInside
-                ? 'ঢাকার ভেতরে আপনার অর্ডারে ফ্রি ডেলিভারি (৳০) প্রযোজ্য হয়েছে।'
-                : (advanceExplanation || 'ঢাকার বাইরে ফ্রি ডেলিভারি প্রযোজ্য।'),
+                ? (!isBn
+                    ? 'Free delivery (৳0) applies to your order inside Dhaka.'
+                    : 'ঢাকার ভেতরে আপনার অর্ডারে ফ্রি ডেলিভারি (৳০) প্রযোজ্য হয়েছে।')
+                : (advanceExplanation || (!isBn ? 'Free delivery applies outside Dhaka.' : 'ঢাকার বাইরে ফ্রি ডেলিভারি প্রযোজ্য।')),
             currency: 'BDT'
         }
     }
 
     const fee = isInside ? 80 : 150
     const advanceExplanation = !isInside
-        ? 'ঢাকার বাইরে ডেলিভারি চার্জ ৳১৫০ অগ্রিম বিকাশ বা নগদে প্রদান করতে হবে। বাকি পণ্যের মূল্য ক্যাশ অন ডেলিভারিতে প্রদান করবেন।'
+        ? (!isBn
+            ? 'For delivery outside Dhaka, an advance delivery fee of ৳150 is required via bKash or Nagad. The remaining product price will be paid via Cash on Delivery.'
+            : 'ঢাকার বাইরে ডেলিভারি চার্জ ৳১৫০ অগ্রিম বিকাশ বা নগদে প্রদান করতে হবে। বাকি পণ্যের মূল্য ক্যাশ অন ডেলিভারিতে প্রদান করবেন।')
         : undefined
 
     return {
@@ -80,8 +90,10 @@ export async function calculateDeliveryFee(args: {
         advanceExplanation,
         estimatedDays: isInside ? '1-2 Days' : '2-4 Days',
         explanation: isInside
-            ? 'ঢাকার ভেতরে ডেলিভারি চার্জ ৳৮০ (ক্যাশ অন ডেলিভারি)।'
-            : (advanceExplanation || 'ঢাকার বাইরে ডেলিভারি চার্জ ৳১৫০।'),
+            ? (!isBn
+                ? 'Delivery fee inside Dhaka is ৳80 (Cash on Delivery).'
+                : 'ঢাকার ভেতরে ডেলিভারি চার্জ ৳৮০ (ক্যাশ অন ডেলিভারি)।')
+            : (advanceExplanation || (!isBn ? 'Delivery fee outside Dhaka is ৳150.' : 'ঢাকার বাইরে ডেলিভারি চার্জ ৳১৫০।')),
         currency: 'BDT'
     }
 }

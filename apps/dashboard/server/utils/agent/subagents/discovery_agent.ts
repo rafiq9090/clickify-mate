@@ -21,7 +21,7 @@ export class DiscoveryAgent implements SubAgent {
 
     async execute(input: SubAgentInput): Promise<SubAgentOutput> {
         const { event, context, understanding } = input
-        const lang = context.session.language || 'bn'
+        const isBn = (context.session.language || 'bn') === 'bn'
         const toolCalls: any[] = []
         const toolResults: any[] = []
         const imagesToSend: string[] = []
@@ -42,7 +42,7 @@ export class DiscoveryAgent implements SubAgent {
 
             if (executed.data?.images?.length) {
                 imagesToSend.push(...executed.data.images)
-                const text = lang === 'en'
+                const text = !isBn
                     ? `Here are the photos of ${executed.data.productName || 'the product'}. Which color or size would you like?`
                     : `এই নিন ${executed.data.productName || 'প্রোডাক্টটির'} ছবি। আপনি কোন সাইজ বা কালারটি নিতে আগ্রহী?`
                 return {
@@ -69,7 +69,7 @@ export class DiscoveryAgent implements SubAgent {
                 const colors = [...new Set(variants.map((v: any) => v.color).filter(Boolean))].join(', ')
                 const sizes = [...new Set(variants.map((v: any) => v.size).filter(Boolean))].join(', ')
                 
-                const text = lang === 'en'
+                const text = !isBn
                     ? `Available options for ${executed.data.productName || understanding.entities.sku}:\n• Colors: ${colors || 'Standard'}\n• Sizes: ${sizes || 'Free Size'}\nWhich combination do you prefer?`
                     : `${executed.data.productName || understanding.entities.sku}-এর জন্য উপলব্ধ ভ্যারিয়েন্ট:\n• কালার: ${colors || 'স্ট্যান্ডার্ড'}\n• সাইজ: ${sizes || 'ফ্রি সাইজ'}\nআপনি কোন কম্বিনেশনটি অর্ডার করতে চান?`
                 
@@ -97,7 +97,7 @@ export class DiscoveryAgent implements SubAgent {
                     `${idx + 1}. *${p.name}* (৳${p.price}) - SKU: \`${p.sku}\``
                 ).join('\n')
 
-                const text = lang === 'en'
+                const text = !isBn
                     ? `Here are our matching items:\n\n${list}\n\nWhich one would you like to see details for?`
                     : `আপনার খোঁজা প্রোডাক্টের তালিকা:\n\n${list}\n\nকোনটির বিস্তারিত দেখতে চান?`
 

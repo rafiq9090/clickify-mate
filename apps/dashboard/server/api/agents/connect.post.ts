@@ -5,7 +5,15 @@ import { requireDashboardRole } from '../../utils/auth-session'
 export default defineEventHandler(async (event) => {
     const dashboardUser = await requireDashboardRole(event, ['owner', 'admin', 'manager'])
     const body = await readBody(event)
-    const { platform, token, knowledge, name } = body
+    const { platform, knowledge, name } = body
+    let token = typeof body.token === 'string' ? body.token.trim() : ''
+
+    if (token.startsWith('Bearer ')) {
+        token = token.slice(7).trim()
+    }
+    if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
+        token = token.slice(1, -1).trim()
+    }
 
     if (!platform || !token) {
         throw createError({ statusCode: 400, statusMessage: 'Metadata missing: platform and token are required' })
@@ -33,16 +41,53 @@ export default defineEventHandler(async (event) => {
         // Auto-detect External ID and Name for Meta Platforms (FB, Messenger, WhatsApp, Instagram)
         if (['messenger', 'fb_comment', 'facebook', 'whatsapp', 'instagram', 'ig_comment'].includes(platform)) {
             try {
-                // 1. Get the main account ID (Page ID, WABA ID, or connected Instagram Account)
-                const metaData: any = await $fetch(`https://graph.facebook.com/v19.0/me?fields=id,name,instagram_business_account{id,username}&access_token=${token}`)
-                if (metaData?.id) {
+                const isInstagram = platform === 'instagram' || platform === 'ig_comment'
+                let metaData: any = null
+
+                if (isInstagram && token.startsWith('IGA')) {
+                    // Direct Instagram User Token from Instagram Login flow
+                    metaData = await $fetch(`https://graph.instagram.com/v19.0/me?fields=id,username,user_id&access_token=${token}`).catch(async () => {
+                        return await $fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${token}`)
+                    })
+                    if (metaData?.user_id || metaData?.id) {
+                        externalId = metaData.user_id || metaData.id
+                        if (!detectedName && metaData.username) {
+                            detectedName = `@${metaData.username} (Instagram)`
+                        }
+                        console.log(`[AGENT CONNECT]: Auto-detected Instagram Account via Instagram Login: ${externalId} (${detectedName})`)
+                    }
+                } else {
+                    const fields = isInstagram ? 'id,name,instagram_business_account{id,username}' : 'id,name'
+                    try {
+                        metaData = await $fetch(`https://graph.facebook.com/v19.0/me?fields=${fields}&access_token=${token}`)
+                    } catch (fbErr: any) {
+                        if (isInstagram) {
+                            metaData = await $fetch(`https://graph.instagram.com/v19.0/me?fields=id,username,user_id&access_token=${token}`).catch(async () => {
+                                return await $fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${token}`).catch(() => null)
+                            })
+                            if (metaData?.user_id || metaData?.id) {
+                                externalId = metaData.user_id || metaData.id
+                                if (!detectedName && metaData.username) {
+                                    detectedName = `@${metaData.username} (Instagram)`
+                                }
+                                console.log(`[AGENT CONNECT]: Auto-detected Instagram Account via graph.instagram.com fallback: ${externalId}`)
+                            } else {
+                                throw fbErr
+                            }
+                        } else {
+                            throw fbErr
+                        }
+                    }
+                }
+
+                if (metaData?.id && !externalId) {
                     externalId = metaData.id
                     if (!detectedName && metaData.name) {
                         detectedName = metaData.name
                     }
 
-                    // 2. For Instagram, check connected Instagram Business Account
-                    if (platform === 'instagram' || platform === 'ig_comment') {
+                    // 2. For Instagram via Facebook Page token, check connected Instagram Business Account
+                    if (isInstagram) {
                         if (metaData.instagram_business_account?.id) {
                             externalId = metaData.instagram_business_account.id
                             if (metaData.instagram_business_account.username) {
@@ -53,25 +98,40 @@ export default defineEventHandler(async (event) => {
                             throw new Error('No linked Instagram Business Account found for this Facebook Page token. Link your Instagram account in Facebook Page Settings first.')
                         }
                     }
+                }
                     
-                    // 3. For WhatsApp, specifically fetch phone_number_id
-                    if (platform === 'whatsapp') {
-                        try {
-                            const phones: any = await $fetch(`https://graph.facebook.com/v19.0/${externalId}/phone_numbers?access_token=${token}`).catch(() => null)
-                            if (phones?.data?.[0]?.id) {
-                                externalId = phones.data[0].id
-                                if (phones.data[0].display_phone_number) {
-                                    detectedName = `${detectedName || 'WhatsApp'} (${phones.data[0].display_phone_number})`
+                // 3. For WhatsApp, specifically fetch phone_number_id
+                if (platform === 'whatsapp') {
+                    try {
+                        let phones: any = await $fetch(`https://graph.facebook.com/v19.0/${externalId}/phone_numbers?access_token=${token}`).catch(() => null)
+                        
+                        // If externalId was User ID, resolve WABA ID via debug_token
+                        if (!phones?.data?.[0]?.id) {
+                            try {
+                                const debugRes: any = await $fetch(`https://graph.facebook.com/debug_token?input_token=${token}&access_token=${token}`)
+                                const wabaScope = debugRes?.data?.granular_scopes?.find((s: any) => s.scope?.includes('whatsapp_business'))
+                                const wabaId = wabaScope?.target_ids?.[0]
+                                if (wabaId) {
+                                    phones = await $fetch(`https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${token}`).catch(() => null)
                                 }
-                                console.log(`[AGENT CONNECT]: Auto-detected WhatsApp Phone ID: ${externalId}`)
-                            }
-                        } catch (phoneErr: any) {
-                            console.warn(`[AGENT CONNECT]: Could not fetch WhatsApp phone numbers: ${phoneErr.message}`)
+                            } catch {}
                         }
-                    } else {
-                        console.log(`[AGENT CONNECT]: Auto-detected Meta ID: ${externalId}`)
+
+                        if (phones?.data?.[0]?.id) {
+                            externalId = phones.data[0].id
+                            if (phones.data[0].display_phone_number) {
+                                detectedName = `${detectedName || 'WhatsApp'} (${phones.data[0].display_phone_number})`
+                            }
+                            console.log(`[AGENT CONNECT]: Auto-detected WhatsApp Phone ID: ${externalId}`)
+                        }
+                    } catch (phoneErr: any) {
+                        console.warn(`[AGENT CONNECT]: Could not fetch WhatsApp phone numbers: ${phoneErr.message}`)
                     }
                 } else {
+                    console.log(`[AGENT CONNECT]: Auto-detected Meta ID: ${externalId}`)
+                }
+
+                if (!externalId) {
                     throw new Error('Meta API returned empty account details')
                 }
             } catch (metaErr: any) {

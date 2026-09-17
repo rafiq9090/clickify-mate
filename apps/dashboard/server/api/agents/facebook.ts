@@ -9,6 +9,7 @@ import { verifyMetaSignature } from '../../utils/agent/webhook_auth'
 import { analyzeImage } from '../../utils/agent/vision'
 import { analyzeVideoMessage } from '../../utils/agent/video_processor'
 import { analyzeCommentToxicity } from '../../utils/agent/comment_moderator'
+import { detectLanguage } from '../../utils/agent/agent_dialogue'
 
 const postCaptionCache = new Map<string, { message: string; timestamp: number }>()
 
@@ -94,13 +95,73 @@ function renderPrivacyComment(options: {
     senderName: string
     emojiAllowed: boolean
     sentPrivateSuccess: boolean
+    language?: string
+    isPricing?: boolean
 }): string {
-    const { senderName, emojiAllowed, sentPrivateSuccess } = options
+    const { senderName, emojiAllowed, sentPrivateSuccess, language } = options
     const emoji = emojiAllowed ? ' 😊' : ''
+    const lang = (language || 'bn').toLowerCase()
+
+    const raw = (senderName || '').trim()
+    const isPlaceholder = !raw || /^(?:facebook\s+user|user|guest|\d+)/i.test(raw)
+    const nameBn = isPlaceholder ? 'গ্রাহক' : raw
+    const nameEn = isPlaceholder ? 'there' : raw
+
     if (sentPrivateSuccess) {
-        return `প্রিয় ${senderName}, আপনার গোপনীয়তা ও সুরক্ষার স্বার্থে বিস্তারিত তথ্য ইনবক্সে পাঠানো হয়েছে। অনুগ্রহ করে ইনবক্স চেক করুন। ধন্যবাদ!${emoji}`
+        const variations: Record<string, string[]> = {
+            bn: [
+                `প্রিয় ${nameBn}, বিস্তারিত তথ্য আপনার ইনবক্সে পাঠানো হয়েছে। অনুগ্রহ করে ইনবক্স চেক করুন। ধন্যবাদ!${emoji}`,
+                `ধন্যবাদ ${nameBn}! বিস্তারিত তথ্য ও প্রাইজ ইনবক্সে মেসেজ করে পাঠিয়েছি। দয়া করে ইনবক্স চেক করবেন।${emoji}`,
+                `হ্যালো ${nameBn}, আপনার প্রয়োজনীয় বিস্তারিত বিবরণ ইনবক্সে পাঠিয়ে দেওয়া হয়েছে। মেসেজ রিকোয়েস্ট বা ইনবক্স দেখে নিন।${emoji}`
+            ],
+            en: [
+                `Hi ${nameEn}, we have sent the details to your Inbox. Please check your messages. Thank you!${emoji}`,
+                `Hello ${nameEn}! All details have been sent to your Inbox. Please check your message requests. Thank you!${emoji}`,
+                `Hi ${nameEn}, please check your Inbox for all the details you requested. Thank you!${emoji}`
+            ],
+            ar: [
+                `مرحباً ${raw || 'بك'}، تم إرسال كافة التفاصيل إلى بريدك الوارد (Inbox). يرجى التحقق من الرسائل. شكراً لك!${emoji}`,
+                `أهلاً ${raw || 'بك'}، لقد أرسلنا التفاصيل كاملة إلى رسائلك الخاصة. يرجى مراجعة بريدك. شكراً!${emoji}`
+            ],
+            hi: [
+                `नमस्ते ${raw || 'जी'}, सारी जानकारी आपके इनबॉक्स (Inbox) में भेज दी गई है। कृपया अपने संदेश देखें। धन्यवाद!${emoji}`,
+                `नमस्ते ${raw || 'जी'}! आपके अनुरोध की पूरी जानकारी ইনবক্সে পাঠিয়ে দেওয়া হয়েছে। कृपया ইনবক্স চেক করুন। धन्यवाद!${emoji}`
+            ],
+            es: [
+                `¡Hola ${raw || ''}! Le hemos enviado los detalles a su bandeja de entrada (Inbox). Por favor revise sus mensajes. ¡Gracias!${emoji}`,
+                `¡Hola ${raw || ''}! Todos los detalles han sido enviados a su mensaje privado. ¡Muchas gracias!${emoji}`
+            ],
+            fr: [
+                `Bonjour ${raw || ''}, nous vous avons envoyé les détails dans votre boîte de réception. Veuillez vérifier vos messages. Merci !${emoji}`,
+                `Bonjour ${raw || ''} ! Les informations détaillées vous ont été envoyées par message privé. Merci !${emoji}`
+            ],
+            de: [
+                `Hallo ${raw || ''}, wir haben Ihnen die Details per Direktnachricht (Inbox) geschickt. Bitte prüfen Sie Ihre Nachrichten. Vielen Dank!${emoji}`,
+                `Guten Tag ${raw || ''}, die gewünschten Informationen wurden an Ihr Postfach gesendet. Vielen Dank!${emoji}`
+            ]
+        }
+
+        const list = variations[lang] || variations.en || []
+        return list[Math.floor(Math.random() * list.length)] || list[0] || ''
     } else {
-        return `প্রিয় ${senderName}, আপনার গোপনীয়তা ও সুরক্ষার স্বার্থে অর্ডারের তথ্যের জন্য অনুগ্রহ করে আমাদের পেইজে একটি সরাসরি মেসেজ (Inbox) পাঠান। ধন্যবাদ!${emoji}`
+        const fallbacks: Record<string, string[]> = {
+            bn: [
+                `প্রিয় ${nameBn}, বিস্তারিত তথ্যের জন্য অনুগ্রহ করে আমাদের পেইজে একটি সরাসরি মেসেজ (Inbox) পাঠান। ধন্যবাদ!${emoji}`,
+                `হ্যালো ${nameBn}, বিস্তারিত জানতে দয়া করে আমাদের পেইজে ইনবক্স মেসেজ করুন। ধন্যবাদ!${emoji}`
+            ],
+            en: [
+                `Hi ${nameEn}, please send a direct message (Inbox) to our page for details. Thank you!${emoji}`,
+                `Hello ${nameEn}! Kindly send us a direct message (Inbox) for full details and assistance. Thank you!${emoji}`
+            ],
+            ar: [
+                `مرحباً ${raw || 'بك'}، لمزيد من التفاصيل، يرجى إرسال رسالة مباشرة (Inbox) إلى صفحتنا. شكراً لك!${emoji}`
+            ],
+            hi: [
+                `नमस्ते ${raw || 'जी'}, अधिक जानकारी के लिए कृपया हमारे पेज पर सीधा संदेश (Inbox) भेजें। धन्यवाद!${emoji}`
+            ]
+        }
+        const list = fallbacks[lang] || fallbacks.en || []
+        return list[Math.floor(Math.random() * list.length)] || list[0] || ''
     }
 }
 
@@ -170,6 +231,20 @@ export default defineEventHandler(async (event) => {
             .eq('is_active', true)
             .maybeSingle()
         agent = data
+    }
+    if (!agent) {
+        const { data } = await supabase
+            .from('agent_configs')
+            .select('*')
+            .in('platform', fbPlatforms)
+            .eq('is_active', true)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        if (data) {
+            agent = data
+            console.log(`[FACEBOOK WEBHOOK]: Fallback matched active ${agent.platform} agent ${agent.id} (${agent.name})`)
+        }
     }
 
     if (!agent) {
@@ -378,15 +453,21 @@ export default defineEventHandler(async (event) => {
         // 3. Send Text Response with Quick Reply Action Buttons
         if (aiReply && pageAccessToken) {
             const messagePayload: any = { text: aiReply }
+            const isBn = (agentRes as any).language === 'bn' || detectLanguage(userText) === 'bn'
 
             if (agentRes.state === 'ORDER_CONFIRMED') {
-                messagePayload.quick_replies = [
+                messagePayload.quick_replies = isBn ? [
                     { content_type: 'text', title: '🛍️ আরো পণ্য দেখুন', payload: 'MORE_PRODUCTS' },
                     { content_type: 'text', title: '📦 অর্ডার ট্র্যাক করুন', payload: 'TRACK_ORDER' }
+                ] : [
+                    { content_type: 'text', title: '🛍️ View More Products', payload: 'MORE_PRODUCTS' },
+                    { content_type: 'text', title: '📦 Track My Order', payload: 'TRACK_ORDER' }
                 ]
             } else if (agentRes.state === 'COLLECT_PHONE' || agentRes.state === 'COLLECT_ADDRESS') {
-                messagePayload.quick_replies = [
+                messagePayload.quick_replies = isBn ? [
                     { content_type: 'text', title: '✍️ অর্ডার বাতিল করুন', payload: 'CANCEL_ORDER' }
+                ] : [
+                    { content_type: 'text', title: '✍️ Cancel Order', payload: 'CANCEL_ORDER' }
                 ]
             }
 
@@ -396,7 +477,7 @@ export default defineEventHandler(async (event) => {
                     recipient: { id: senderId },
                     message: messagePayload
                 }
-            }).catch(err => console.error('[FB TEXT SEND ERROR]:', err.message))
+            }).catch(err => console.error('[FB TEXT SEND ERROR]:', err.message, JSON.stringify(err.data || '')))
         }
 
         // 4. Save Assistant Message to chat_history
@@ -538,8 +619,11 @@ export default defineEventHandler(async (event) => {
                     message_id: commentId
                 })
 
-                // 🛡️ Deterministic Privacy Shield: Detect private order/PII inquiries BEFORE public tool exposure
+                // 🛡️ Deterministic Privacy & Inbox Shield:
+                // Send detailed AI response to Messenger Inbox + post clean friendly comment reply
                 const containsPrivateInquiry = /(?:01[3-9]\d{8}|order|parcel|trx|trxid|tracking|ঠিকানা|পার্সেল|টাকা|ডেলিভারি|কোড|bkash|nagad)/i.test(commentText)
+                const isPricingOrProductInquiry = /(?:price|cost|how much|rate|available|stock|size|color|কত|দাম|কতো|চাই|lagbe|need|details|বিস্তারিত|অর্ডার)/i.test(commentText)
+                const shouldSendPrivateReply = containsPrivateInquiry || isPricingOrProductInquiry || agent.agent_behavior?.fb_comment_inbox_reply === true
 
                 let aiReply = ''
                 let sentPrivateSuccess = false
@@ -549,7 +633,7 @@ export default defineEventHandler(async (event) => {
                     ? `[Customer commented on Post: "${postCaption.slice(0, 150)}"] ${commentText}`
                     : commentText
 
-                if (containsPrivateInquiry) {
+                if (shouldSendPrivateReply) {
                     // Dispatch directly to Agent Engine for private response context
                     const privateEvent: IncomingAgentEvent = {
                         channel: 'messenger',
@@ -564,25 +648,51 @@ export default defineEventHandler(async (event) => {
                         rawPayload: commentValue
                     }
                     const privateRes = await runAgent(privateEvent, agent)
-                    const privateReplyText = privateRes.text || 'আপনার অর্ডারের বিস্তারিত তথ্য এখানে প্রদান করা হলো।'
+                    const commentLang = detectLanguage(commentText)
+                    const privateReplyText = privateRes.text || (commentLang === 'bn' ? 'আপনার পণ্যের বিস্তারিত তথ্য ইনবক্সে প্রদান করা হলো।' : 'Here are the details regarding your inquiry.')
 
-                    // Attempt sending Private Reply via Meta Graph API
-                    if (pageAccessToken && commentId) {
+                    // Attempt sending Private Reply via Meta Graph API /me/messages
+                    if (pageAccessToken && (commentId || senderId)) {
                         try {
-                            await $fetch(`https://graph.facebook.com/v19.0/${commentId}/private_replies?access_token=${pageAccessToken}`, {
+                            const recipientPayload = commentId ? { comment_id: commentId } : { id: senderId }
+                            await $fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${pageAccessToken}`, {
                                 method: 'POST',
-                                body: { message: privateReplyText }
+                                body: {
+                                    recipient: recipientPayload,
+                                    message: { text: privateReplyText }
+                                }
                             })
                             sentPrivateSuccess = true
-                            console.log(`[FB PRIVACY SHIELD]: Successfully dispatched private reply to ${senderName} for comment ${commentId}`)
+                            console.log(`[FB INBOX REPLY SUCCESS]: Dispatched private inbox reply to ${senderName} (${senderId}) for comment ${commentId}`)
                         } catch (privErr: any) {
-                            console.warn(`[FB PRIVACY SHIELD]: Private reply error: ${privErr.message}`)
-                            sentPrivateSuccess = false
+                            console.warn(`[FB INBOX REPLY ERROR]: ${privErr.message}`, JSON.stringify(privErr.data || ''))
+                            // Fallback to senderId if comment_id recipient failed
+                            if (senderId && commentId) {
+                                try {
+                                    await $fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${pageAccessToken}`, {
+                                        method: 'POST',
+                                        body: {
+                                            recipient: { id: senderId },
+                                            message: { text: privateReplyText }
+                                        }
+                                    })
+                                    sentPrivateSuccess = true
+                                    console.log(`[FB INBOX REPLY SUCCESS]: Dispatched via sender ID to ${senderName}`)
+                                } catch (e2: any) {
+                                    console.warn(`[FB INBOX REPLY FALLBACK ERROR]: ${e2.message}`)
+                                    sentPrivateSuccess = false
+                                }
+                            }
                         }
                     }
 
-                    // Format public safe message honoring merchant personality settings
-                    aiReply = renderPrivacyComment({ senderName, emojiAllowed, sentPrivateSuccess })
+                    // If private reply succeeded, render clean friendly public comment.
+                    // If private reply failed (e.g. Meta policy limit), fallback to posting the AI answer publicly!
+                    if (sentPrivateSuccess) {
+                        aiReply = renderPrivacyComment({ senderName, emojiAllowed, sentPrivateSuccess, language: commentLang, isPricing: isPricingOrProductInquiry })
+                    } else {
+                        aiReply = privateReplyText
+                    }
                 } else {
                     // Normal Public Comment Inquiry
                     const incomingEvent: IncomingAgentEvent = {

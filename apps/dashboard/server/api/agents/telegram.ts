@@ -302,6 +302,20 @@ export default defineEventHandler(async (event) => {
         }
 
         if (!agent) {
+            // Resilient Fallback: If agentId changed or was recreated, fallback to active Telegram agent
+            const { data: activeAgents } = await supabase
+                .from('agent_configs')
+                .select('*')
+                .eq('platform', 'telegram')
+                .eq('is_active', true)
+
+            if (activeAgents && activeAgents.length > 0) {
+                agent = activeAgents[0]
+                console.warn(`[TELEGRAM AGENT RESILIENT FALLBACK]: Webhook called with ID "${agentId}", falling back to active agent "${agent.id}"`)
+            }
+        }
+
+        if (!agent) {
             console.error(`[AGENT DEBUG]: Agent ${agentId} not found in DB`)
             throw createError({ statusCode: 404, statusMessage: 'Active Telegram agent configuration not found' })
         }

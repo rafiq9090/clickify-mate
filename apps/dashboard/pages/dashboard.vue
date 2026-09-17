@@ -523,7 +523,7 @@
               <label class="text-xs font-medium text-on-surface-variant">Agent Name / Branch Label (Optional)</label>
               <input 
                 v-model="connectAgentName"
-                placeholder="e.g. WhatsApp - Banani Branch, Telegram VIP Bot"
+                placeholder="Your Brand Name"
                 class="w-full bg-surface-hover border border-outline rounded-xl px-3.5 py-2.5 text-xs text-on-surface outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-colors"
               />
             </div>

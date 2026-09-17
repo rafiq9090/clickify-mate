@@ -37,11 +37,12 @@ export async function notifyCustomerPaymentResult(
     if (!token) return
 
     const orderNumber = data.invoice_number || data.id || orderId
-    const productName = data.product || data.sku || (lang === 'en' ? 'Product' : 'পণ্য')
+    const isBn = lang === 'bn'
+    const productName = data.product || data.sku || (isBn ? 'পণ্য' : 'Product')
     const itemTotal = Number(data.price || 0) * Number(data.quantity || 1)
     const deliveryFee = Number(data.delivery_fee || 0)
     const totalAmount = Number(data.total || itemTotal + deliveryFee)
-    const customerName = data.name || (lang === 'en' ? 'Customer' : 'গ্রাহক')
+    const customerName = data.name || (isBn ? 'গ্রাহক' : 'Customer')
     const phone = data.phone || ''
     const address = data.address || ''
     const paymentMethod = String(data.payment_method || data.payment_provider || 'Online Payment').toUpperCase()
@@ -50,7 +51,7 @@ export async function notifyCustomerPaymentResult(
     let messageText = ''
 
     if (type === 'payment_success') {
-      if (lang === 'en') {
+      if (!isBn) {
         messageText = [
           `🎉 Congratulations! Your payment of ৳${totalAmount} has been verified successfully.`,
           ``,
@@ -108,7 +109,7 @@ export async function notifyCustomerPaymentResult(
         checkoutUrl = attemptRes.rows[0]?.checkout_url
       }
 
-      if (lang === 'en') {
+      if (!isBn) {
         messageText = [
           `⚠️ Payment Notice:`,
           `Your online payment could not be completed${isCancelled ? ' (Cancelled)' : ''}.`,

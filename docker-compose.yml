@@ -8,10 +8,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: clickify_mate
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/00-init.sql
       - ./supabase/migrations/20260820082635_add_hosted_payment_flow.sql:/docker-entrypoint-initdb.d/20-hosted-payment-flow.sql:ro
       - ./supabase/migrations/20260823061937_production_foundations.sql:/docker-entrypoint-initdb.d/30-production-foundations.sql:ro
       - ./supabase/migrations/20260823070000_knowledge_rag_foundations.sql:/docker-entrypoint-initdb.d/40-knowledge-rag-foundations.sql:ro
@@ -19,7 +19,7 @@ services:
       - ./supabase/migrations/20260905000000_add_sslcommerz_gateway.sql:/docker-entrypoint-initdb.d/60-sslcommerz-gateway.sql:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -41,7 +41,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: telegraph_redis
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    command: [ "redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}" ]
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -70,6 +70,7 @@ services:
       - PAYMENT_PUBLIC_BASE_URL=${PAYMENT_PUBLIC_BASE_URL:?PAYMENT_PUBLIC_BASE_URL is required}
       - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
       - META_APP_SECRET=${META_APP_SECRET:-}
+      - SKIP_WEBHOOK_VERIFICATION=${SKIP_WEBHOOK_VERIFICATION:-}
       - VERIFY_TOKEN=${VERIFY_TOKEN:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -88,6 +89,10 @@ services:
       - ALLOW_SIGNUP=${ALLOW_SIGNUP:-false}
       - TELEGRAM_POLLING_ENABLED=${TELEGRAM_POLLING_ENABLED:-false}
       - FIREBASE_SERVICE_ACCOUNT_KEY=${FIREBASE_SERVICE_ACCOUNT_KEY:-}
+      - SHOWCASE_MODE=${SHOWCASE_MODE:-false}
+      - GOOGLE_OAUTH_ENABLED=${GOOGLE_OAUTH_ENABLED:-false}
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-https://clickifymate.com}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,7 +101,7 @@ services:
       redis:
         condition: service_started
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: [ "CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))" ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -104,7 +109,7 @@ services:
 
   # Python Agent AI Service (FastAPI)
   agent_ai:
-    profiles: ["legacy"]
+    profiles: [ "legacy" ]
     build:
       context: ./services/agent_ai
       dockerfile: Dockerfile
@@ -122,7 +127,7 @@ services:
 
   # Go Ingestion & Orchestration Service
   orchestrator:
-    profiles: ["legacy"]
+    profiles: [ "legacy" ]
     build:
       context: ./services/orchestrator
       dockerfile: Dockerfile
@@ -143,7 +148,7 @@ services:
       webhook_rust:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -151,7 +156,7 @@ services:
 
   # Rust Image Verification Service (OCR & Screenshot fingerprinting)
   image_verifier:
-    profiles: ["legacy"]
+    profiles: [ "legacy" ]
     build:
       context: ./services/image_verifier
       dockerfile: Dockerfile
@@ -160,7 +165,7 @@ services:
 
   # Rust Webhook & Cryptography Service (AES-256-GCM engine & Webhook dispatcher)
   webhook_rust:
-    profiles: ["legacy"]
+    profiles: [ "legacy" ]
     build:
       context: ./services/webhook_rust
       dockerfile: Dockerfile
@@ -172,7 +177,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5004/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
